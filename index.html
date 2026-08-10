@@ -7198,10 +7198,19 @@
       btn.disabled = false; btn.textContent = 'Enviar solicitud';
       return;
     }
+    const otraTexto = document.getElementById('a-otralicencia').value.trim();
     const licenciaTexto = licenciasChecked.map(v => {
-      if(v === 'otra') return document.getElementById('a-otralicencia').value.trim();
+      if(v === 'otra') return otraTexto ? `Otra (${otraTexto})` : 'Otra';
       return LICENCIA_LABELS[v] || v;
     }).join(', ');
+    // Por seguridad (por si la columna license_type tiene alguna restricción de
+    // formato en la base de datos), mandamos ahí solo el primer tipo elegido
+    // igual que antes, y el detalle completo de todas las licencias marcadas
+    // lo agregamos al mensaje para no perder esa información.
+    const licenciaPrincipal = licenciasChecked[0] === 'otra' ? (otraTexto || 'otra') : licenciasChecked[0];
+    const experienciaVal = document.getElementById('a-experiencia').value.trim();
+    const mensajeOriginal = document.getElementById('a-mensaje').value.trim();
+    const mensajeConLicencias = `Tipos de licencia marcados: ${licenciaTexto}` + (mensajeOriginal ? `\n\n${mensajeOriginal}` : '');
 
     const payload = {
       full_name: document.getElementById('a-nombre').value + ' ' + document.getElementById('a-apellido').value,
@@ -7210,10 +7219,10 @@
       address: document.getElementById('a-direccion').value,
       state: document.getElementById('a-estado').value,
       non_resident_states: document.getElementById('a-noresidente').value,
-      license_type: licenciaTexto,
+      license_type: licenciaPrincipal,
       license_number: document.getElementById('a-numlicencia').value,
-      years_experience: document.getElementById('a-experiencia').value,
-      message: document.getElementById('a-mensaje').value
+      years_experience: experienciaVal || null,
+      message: mensajeConLicencias
     };
 
     const { error } = await sb.from('agent_applications').insert(payload);
@@ -7221,7 +7230,8 @@
     btn.disabled = false; btn.textContent = 'Enviar solicitud';
 
     if(error){
-      showMsg('appMsg','error','Hubo un problema al enviar tu solicitud. Intenta de nuevo.');
+      console.error('Error al guardar solicitud de agente:', error);
+      showMsg('appMsg','error','Hubo un problema al enviar tu solicitud: ' + (error.message || 'error desconocido') + '. Intenta de nuevo.');
       return;
     }
 
