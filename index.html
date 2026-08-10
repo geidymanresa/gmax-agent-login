@@ -428,15 +428,15 @@
         <input type="text" id="a-noresidente" placeholder="Ej: Florida, Georgia, California">
       </div>
       <div class="form-row">
-        <label for="a-licencia">Tipo de licencia</label>
-        <select id="a-licencia" required onchange="document.getElementById('otraLicenciaRow').style.display = this.value==='otra' ? 'block' : 'none';">
-          <option value="">Selecciona una opción</option>
-          <option value="vida">Licencia de Vida</option>
-          <option value="vida_salud">Licencia de Vida y Salud</option>
-          <option value="personal_lines">Licencia de Personal Lines</option>
-          <option value="property_casualty">Licencia de Property &amp; Casualty</option>
-          <option value="otra">Otra</option>
-        </select>
+        <label>Tipo de licencia <span style="font-weight:400;">(marca todas las que apliquen)</span></label>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:6px;">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" name="a-licencia-cb" value="vida"> Licencia de Vida</label>
+          <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" name="a-licencia-cb" value="vida_salud"> Licencia de Vida y Salud</label>
+          <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" name="a-licencia-cb" value="personal_lines"> Licencia de Personal Lines</label>
+          <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" name="a-licencia-cb" value="property_casualty"> Licencia de Property &amp; Casualty</label>
+          <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" name="a-licencia-cb" value="otra" onchange="document.getElementById('otraLicenciaRow').style.display = this.checked ? 'block' : 'none';"> Otra</label>
+        </div>
+        <div class="error-text" id="a-licencia-error" style="display:none; color:#C23B3B; font-size:13px; margin-top:6px;">Selecciona al menos un tipo de licencia.</div>
       </div>
       <div class="form-row" id="otraLicenciaRow" style="display:none;">
         <label for="a-otralicencia">Especifica cuál</label>
@@ -4501,14 +4501,22 @@
     const monthlyPayment = parseFloat(document.getElementById('tx-pago-mensual').value) || null;
     const depositAmount = parseFloat(document.getElementById('tx-cargo').value) || null;
     const notes = document.getElementById('tx-notas').value || null;
+    const termino = document.getElementById('tx-termino').value ? parseInt(document.getElementById('tx-termino').value, 10) : null;
+    const resumenEl = document.getElementById('tx-resumen');
+    const serviceFee = (resumenEl.dataset.serviceFee && parseFloat(resumenEl.dataset.serviceFee) > 0) ? parseFloat(resumenEl.dataset.serviceFee) : null;
+    const totalRef = (resumenEl.dataset.total && parseFloat(resumenEl.dataset.total) > 0) ? parseFloat(resumenEl.dataset.total) : null;
 
     const { data: { session } } = await sb.auth.getSession();
     const { error } = await sb.from('client_quotes').insert({
       client_id: currentClientId,
       company_name: companyName,
       product: producto,
+      term_months: termino,
       monthly_payment: monthlyPayment,
       deposit_amount: depositAmount,
+      service_fee_amount: serviceFee,
+      total_reference: totalRef,
+      quote_date: toISODateLocal(new Date()),
       notes: notes,
       created_by: session.user.id
     });
@@ -5321,6 +5329,8 @@
     const totalACobrar = parseFloat(resumen.dataset.total);
 
     let stripePaymentIntentId = null;
+    let stripeCheckoutSessionId = null;
+    let paymentLinkUrl = null;
     if(metodoPago === 'tarjeta'){
       if(totalACobrar <= 0){
         showMsg('newTransactionMsg','error','El monto a cobrar debe ser mayor a $0.');
@@ -5364,6 +5374,39 @@
         showMsg('newTransactionMsg','error','Error de conexión con Stripe: ' + err.message);
         return;
       }
+    } else if(metodoPago === 'link'){
+      const linkEmail = document.getElementById('tx-link-email').value.trim();
+      if(!linkEmail){
+        showMsg('newTransactionMsg','error','Escribe el correo del cliente para enviarle el link de pago.');
+        return;
+      }
+      if(totalACobrar <= 0){
+        showMsg('newTransactionMsg','error','El monto a cobrar debe ser mayor a $0.');
+        return;
+      }
+      showMsg('newTransactionMsg','success','Creando el link de pago, un momento...');
+      try {
+        const resp = await fetch(SUPABASE_URL + '/functions/v1/create-payment-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+          body: JSON.stringify({
+            amount: totalACobrar,
+            description: 'GMAX All Insurance - ' + (SERVICE_TYPE_LABELS[tipo] || tipo),
+            clientEmail: linkEmail,
+            clientName: document.getElementById('cd-nombre').textContent
+          })
+        });
+        const linkData = await resp.json();
+        if(!resp.ok || linkData.error){
+          showMsg('newTransactionMsg','error','No se pudo crear el link de pago: ' + (linkData.error || 'error desconocido'));
+          return;
+        }
+        stripeCheckoutSessionId = linkData.sessionId;
+        paymentLinkUrl = linkData.url;
+      } catch(err){
+        showMsg('newTransactionMsg','error','Error de conexión al crear el link de pago: ' + err.message);
+        return;
+      }
     }
 
     const { data: { session } } = await sb.auth.getSession();
@@ -5402,8 +5445,12 @@
 
       // Vender una póliza de verdad (con recibo y cobro) es lo que hace que un
       // cliente pase de Lead a Activo — sin importar si llegó por "Vender Póliza",
-      // por venderle una cotización, o por el flujo normal.
-      await sb.from('clients').update({ client_status: 'activo' }).eq('id', currentClientId);
+      // por venderle una cotización, o por el flujo normal. Si el pago quedó
+      // pendiente por un link, el cliente pasa a Activo hasta que Stripe
+      // confirme que sí pagó (eso lo hace el webhook, no aquí).
+      if(metodoPago !== 'link'){
+        await sb.from('clients').update({ client_status: 'activo' }).eq('id', currentClientId);
+      }
 
       // Si esta póliza viene de darle "Vender" a una cotización, la marcamos
       // como vendida y la amarramos a la póliza real que se acaba de crear.
@@ -5446,6 +5493,8 @@
       payment_method: resumen.dataset.paymentMethod || 'tarjeta',
       stripe_payment_intent_id: stripePaymentIntentId,
       payment_link_email: metodoPago === 'link' ? (document.getElementById('tx-link-email').value || null) : null,
+      stripe_checkout_session_id: stripeCheckoutSessionId,
+      payment_link_url: paymentLinkUrl,
       monthly_payment: tipo === 'nueva_poliza' ? (parseFloat(document.getElementById('tx-pago-mensual').value) || 0) : null,
       endorsement_details: combinedEndorsoDetails,
       cancellation_type: tipo === 'cancelacion' ? cancelTipo : null,
@@ -5464,7 +5513,7 @@
       processing_fee_estimate: resumen.dataset.processingFee ? parseFloat(resumen.dataset.processingFee) : 0,
       total_reference: resumen.dataset.total ? parseFloat(resumen.dataset.total) : 0,
       notes: document.getElementById('tx-notas').value || null,
-      status: tipo === 'nueva_poliza' ? 'pendiente_poliza' : 'completada',
+      status: metodoPago === 'link' ? 'pendiente_pago' : (tipo === 'nueva_poliza' ? 'pendiente_poliza' : 'completada'),
       created_by: session.user.id
     };
 
@@ -5573,9 +5622,13 @@
     } else if(tipo === 'reinstalacion'){
       const relatedPolicy = currentClientPolicies.find(p => p.id === policyId);
       await saveReinstatementFormAsDocument(insertedTx.id, relatedPolicy ? (relatedPolicy.policy_number || 's/n') : 's/n');
-    } else if(tipo !== 'nueva_poliza'){
+    } else if(tipo !== 'nueva_poliza' && metodoPago !== 'link'){
       const relatedPolicy = currentClientPolicies.find(p => p.id === policyId);
       await saveReceiptAsDocument(insertedTx.id, relatedPolicy ? (relatedPolicy.policy_number || 's/n') : 's/n');
+    }
+
+    if(metodoPago === 'link' && paymentLinkUrl){
+      showMsg('newTransactionMsg','success', `Link de pago creado${document.getElementById('tx-link-email').value ? ' y enviado por correo' : ''}. También puedes copiarlo y mandarlo tú misma: ${paymentLinkUrl}`);
     }
 
     document.getElementById('newTransactionForm').reset();
@@ -7132,7 +7185,24 @@
     const btn = document.getElementById('appBtn');
     btn.disabled = true; btn.textContent = 'Enviando...';
 
-    const licenciaVal = document.getElementById('a-licencia').value;
+    const LICENCIA_LABELS = { vida: 'Licencia de Vida', vida_salud: 'Licencia de Vida y Salud', personal_lines: 'Licencia de Personal Lines', property_casualty: 'Licencia de Property & Casualty', otra: 'Otra' };
+    const licenciasChecked = [...document.querySelectorAll('input[name="a-licencia-cb"]:checked')].map(el => el.value);
+    if(licenciasChecked.length === 0){
+      document.getElementById('a-licencia-error').style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Enviar solicitud';
+      return;
+    }
+    document.getElementById('a-licencia-error').style.display = 'none';
+    if(licenciasChecked.includes('otra') && !document.getElementById('a-otralicencia').value.trim()){
+      showMsg('appMsg','error','Especifica cuál es la otra licencia que tienes.');
+      btn.disabled = false; btn.textContent = 'Enviar solicitud';
+      return;
+    }
+    const licenciaTexto = licenciasChecked.map(v => {
+      if(v === 'otra') return document.getElementById('a-otralicencia').value.trim();
+      return LICENCIA_LABELS[v] || v;
+    }).join(', ');
+
     const payload = {
       full_name: document.getElementById('a-nombre').value + ' ' + document.getElementById('a-apellido').value,
       email: document.getElementById('a-correo').value,
@@ -7140,7 +7210,7 @@
       address: document.getElementById('a-direccion').value,
       state: document.getElementById('a-estado').value,
       non_resident_states: document.getElementById('a-noresidente').value,
-      license_type: licenciaVal === 'otra' ? document.getElementById('a-otralicencia').value : licenciaVal,
+      license_type: licenciaTexto,
       license_number: document.getElementById('a-numlicencia').value,
       years_experience: document.getElementById('a-experiencia').value,
       message: document.getElementById('a-mensaje').value
