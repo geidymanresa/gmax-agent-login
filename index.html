@@ -255,10 +255,11 @@
     </p>
 
     <div id="forgotPasswordCard" style="display:none; margin-top:14px; padding:16px; border:1.5px solid var(--line); border-radius:10px;">
-      <p class="sub" style="margin-top:0;">Escribe tu correo y te enviamos un link para restablecer tu contraseña.</p>
+      <p class="sub" style="margin-top:0;">Escribe tu correo y tu código de agente (GM###) para confirmar que eres tú, y te enviamos un link para restablecer tu contraseña.</p>
       <div class="msg" id="forgotPasswordMsg"></div>
       <form id="forgotPasswordForm">
         <div class="form-row"><label>Correo electrónico</label><input type="email" id="fp-email" required></div>
+        <div class="form-row"><label>Código de agente</label><input type="text" id="fp-codigo" placeholder="GM001" required></div>
         <button type="submit" class="btn-primary">Enviar link de recuperación</button>
       </form>
     </div>
@@ -2328,15 +2329,38 @@
 
   document.getElementById('forgotPasswordForm').addEventListener('submit', async function(e){
     e.preventDefault();
-    const email = document.getElementById('fp-email').value;
+    const btn = e.target.querySelector('button[type="submit"]');
+    const email = document.getElementById('fp-email').value.trim();
+    const codigo = document.getElementById('fp-codigo').value.trim();
+    btn.disabled = true; btn.textContent = 'Verificando...';
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/verify-agent-identity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email, producerCode: codigo })
+      });
+      const data = await resp.json();
+      if(!resp.ok || !data.match){
+        showMsg('forgotPasswordMsg','error','El correo y el código de agente no coinciden con ninguna cuenta registrada.');
+        btn.disabled = false; btn.textContent = 'Enviar link de recuperación';
+        return;
+      }
+    } catch(err){
+      showMsg('forgotPasswordMsg','error','Error de conexión: ' + err.message);
+      btn.disabled = false; btn.textContent = 'Enviar link de recuperación';
+      return;
+    }
+
     const { error } = await sb.auth.resetPasswordForEmail(email, {
       redirectTo: window.location.origin + window.location.pathname
     });
+    btn.disabled = false; btn.textContent = 'Enviar link de recuperación';
     if(error){
       showMsg('forgotPasswordMsg','error','No se pudo enviar el correo: ' + error.message);
       return;
     }
-    showMsg('forgotPasswordMsg','success','Si ese correo existe en el sistema, te llegó un link para restablecer tu contraseña. Revisa tu bandeja (y spam).');
+    showMsg('forgotPasswordMsg','success','Correo y código verificados. Te llegó un link para restablecer tu contraseña. Revisa tu bandeja (y spam).');
     document.getElementById('forgotPasswordForm').reset();
   });
 
