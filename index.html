@@ -7230,8 +7230,9 @@
     btn.disabled = false; btn.textContent = 'Enviar solicitud';
 
     if(error){
-      console.error('Error al guardar solicitud de agente:', error);
-      showMsg('appMsg','error','Hubo un problema al enviar tu solicitud: ' + (error.message || 'error desconocido') + '. Intenta de nuevo.');
+      const detalleError = [error.message, error.details, error.hint, error.code].filter(Boolean).join(' | ');
+      console.error('ERROR AL GUARDAR SOLICITUD DE AGENTE: ' + detalleError);
+      showMsg('appMsg','error','Hubo un problema al enviar tu solicitud. Detalle: ' + (detalleError || 'sin detalle') + '. Intenta de nuevo.');
       return;
     }
 
