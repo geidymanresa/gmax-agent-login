@@ -458,6 +458,13 @@
     </form>
   </div>
 
+  <div class="form-box wide" id="appThankYouView" style="display:none; text-align:center;">
+    <div style="font-size:56px; margin-bottom:10px;">✅</div>
+    <h3 style="margin-bottom:10px;">¡Solicitud enviada!</h3>
+    <p class="sub" style="font-size:16px; margin-bottom:28px;">Gracias por tu interés en GMAX Agent. Alguien de nuestro equipo se pondrá en contacto contigo en breve.</p>
+    <button type="button" class="btn-primary" style="width:auto; padding:14px 34px;" onclick="document.getElementById('appThankYouView').style.display='none'; document.getElementById('appView').style.display='block'; window.scrollTo({top:0, behavior:'smooth'});">← Volver</button>
+  </div>
+
   <!-- DASHBOARD (after login) -->
   <div class="dash-wrap" id="dashboardView">
     <aside class="dash-sidebar">
@@ -2138,20 +2145,27 @@
 
         <div class="dash-card" id="addUserCard" style="display:none;">
           <h4>Agregar usuario nuevo</h4>
-          <p class="sub" style="margin-bottom:16px;">Primero crea a la persona en Supabase → Authentication → Users, copia su UID, y complétalo aquí.</p>
+          <p class="sub" style="margin-bottom:16px;">Se crea la cuenta de verdad — la persona podrá iniciar sesión de inmediato con el correo y la contraseña que le pongas aquí. Su código de agente (GM###) se asigna solo.</p>
           <div class="msg" id="addUserMsg"></div>
           <form id="addUserForm">
-            <div class="form-row"><label>UID de Supabase</label><input type="text" id="nu-uid" required></div>
             <div class="form-row"><label>Nombre completo</label><input type="text" id="nu-nombre" required></div>
             <div class="form-row"><label>Correo</label><input type="email" id="nu-correo" required></div>
             <div class="form-row"><label>Correo de respaldo (opcional)</label><input type="email" id="nu-correo-respaldo" placeholder="Por si pierde acceso al correo principal"></div>
+            <div class="form-row">
+              <label>Contraseña temporal</label>
+              <div style="display:flex; gap:10px;">
+                <input type="text" id="nu-password" required minlength="8" style="flex:1;">
+                <button type="button" class="btn-ghost" style="width:auto; padding:10px 16px;" onclick="document.getElementById('nu-password').value = generateRandomPassword();">Generar</button>
+              </div>
+              <p class="sub" style="margin-top:6px;">Cópiala y comunícasela tú misma a la persona (llamada, mensaje) — el sistema no la envía por correo automáticamente.</p>
+            </div>
             <div class="form-row"><label>Rol</label>
               <select id="nu-rol" required>
                 <option value="agent">Agente</option>
                 <option value="admin">Administrador</option>
               </select>
             </div>
-            <button type="submit" class="btn-primary">Guardar usuario</button>
+            <button type="submit" class="btn-primary">Crear usuario</button>
           </form>
         </div>
 
@@ -6986,7 +7000,7 @@
           ${canManage ? `<button class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:6px;" onclick="editProducerCode('${u.id}', '${(u.producer_code || '').replace(/'/g,"\\'")}')">Editar</button>` : ''}
         </td>
         <td><span class="badge ${active ? 'active' : 'gray'}">${active ? 'Activo' : 'Inactivo'}</span></td>
-        <td>${(canManage && u.role !== 'super_admin') ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="toggleUserStatus('${u.id}', ${active})">${active ? 'Desactivar' : 'Activar'}</button>` : ''}</td>
+        <td>${(canManage && u.role !== 'super_admin') ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="toggleUserStatus('${u.id}', ${active})">${active ? 'Remover acceso' : 'Reactivar'}</button>` : ''}</td>
       </tr>
     `;
     }).join('');
@@ -7008,7 +7022,7 @@
 
   async function toggleUserStatus(userId, currentlyActive){
     const newStatus = currentlyActive ? 'inactive' : 'active';
-    if(currentlyActive && !confirm('¿Desactivar este usuario? No va a poder iniciar sesión hasta que lo actives de nuevo.')) return;
+    if(currentlyActive && !confirm('¿Remover el acceso de este usuario? No va a poder iniciar sesión hasta que lo actives de nuevo. Su historial de pólizas y transacciones se conserva intacto.')) return;
     const { error } = await sb.from('profiles').update({ status: newStatus }).eq('id', userId);
     if(error){ alert('No se pudo actualizar: ' + error.message); return; }
     await loadUsers();
@@ -7033,7 +7047,7 @@
         <td>${formatDateUS(a.created_at?.split('T')[0])}</td>
         <td>
           ${a.status === 'pending' ? `
-            <button class="tbl-btn approve" onclick="updateAppStatus('${a.id}','approved')">Aprobar</button>
+            <button class="tbl-btn approve" onclick="approveApplication('${a.id}', '${(a.full_name || '').replace(/'/g,"\\'")}', '${(a.email || '').replace(/'/g,"\\'")}')">Aprobar</button>
             <button class="tbl-btn reject" onclick="updateAppStatus('${a.id}','rejected')">Rechazar</button>
           ` : '—'}
         </td>
@@ -7041,29 +7055,63 @@
     `).join('');
   }
 
+  async function approveApplication(id, fullName, email){
+    await updateAppStatus(id, 'approved');
+    switchTab('usuarios');
+    document.getElementById('addUserCard').style.display = 'block';
+    document.getElementById('nu-nombre').value = fullName;
+    document.getElementById('nu-correo').value = email;
+    document.getElementById('nu-password').value = generateRandomPassword();
+    setTimeout(() => { document.getElementById('addUserCard').scrollIntoView({ behavior: 'smooth' }); }, 150);
+  }
+
   async function updateAppStatus(id, status){
     await sb.from('agent_applications').update({ status }).eq('id', id);
     await loadApplications();
   }
 
+  function generateRandomPassword(){
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$';
+    let pass = '';
+    for(let i = 0; i < 12; i++) pass += chars[Math.floor(Math.random() * chars.length)];
+    return pass;
+  }
+
   document.getElementById('addUserForm').addEventListener('submit', async function(e){
     e.preventDefault();
-    const payload = {
-      id: document.getElementById('nu-uid').value.trim(),
-      full_name: document.getElementById('nu-nombre').value,
-      email: document.getElementById('nu-correo').value,
-      backup_email: document.getElementById('nu-correo-respaldo').value || null,
-      role: document.getElementById('nu-rol').value,
-      status: 'active'
-    };
-    const { error } = await sb.from('profiles').insert(payload);
-    if(error){
-      showMsg('addUserMsg','error','No se pudo guardar: ' + error.message);
-      return;
+    const submitBtn = e.target.querySelector('button[type=submit]');
+    submitBtn.disabled = true; submitBtn.textContent = 'Creando...';
+
+    const { data: { session } } = await sb.auth.getSession();
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/create-agent-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          fullName: document.getElementById('nu-nombre').value,
+          email: document.getElementById('nu-correo').value,
+          backupEmail: document.getElementById('nu-correo-respaldo').value,
+          password: document.getElementById('nu-password').value,
+          role: document.getElementById('nu-rol').value
+        })
+      });
+      const data = await resp.json();
+      submitBtn.disabled = false; submitBtn.textContent = 'Crear usuario';
+      if(!resp.ok || data.error){
+        showMsg('addUserMsg','error','No se pudo crear el usuario: ' + (data.error || 'error desconocido'));
+        return;
+      }
+      showMsg('addUserMsg','success', `Usuario creado correctamente. Código de agente asignado: ${data.producerCode}. Ya le puedes compartir el correo y la contraseña a la persona.`);
+      document.getElementById('addUserForm').reset();
+      await loadUsers();
+    } catch(err){
+      submitBtn.disabled = false; submitBtn.textContent = 'Crear usuario';
+      showMsg('addUserMsg','error','Error de conexión: ' + err.message);
     }
-    showMsg('addUserMsg','success','Usuario agregado correctamente.');
-    document.getElementById('addUserForm').reset();
-    await loadUsers();
   });
 
   function showMsg(id, type, text){
@@ -7237,7 +7285,9 @@
     }
 
     document.getElementById('appForm').reset();
-    showMsg('appMsg','success','¡Gracias! Tu solicitud fue enviada. Alguien de nuestro equipo se pondrá en contacto contigo pronto.');
+    document.getElementById('appView').style.display = 'none';
+    document.getElementById('appThankYouView').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   });
 
   // Check if already logged in
