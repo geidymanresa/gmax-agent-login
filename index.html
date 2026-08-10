@@ -461,7 +461,7 @@
   <div class="form-box wide" id="appThankYouView" style="display:none; text-align:center;">
     <div style="font-size:56px; margin-bottom:10px;">✅</div>
     <h3 style="margin-bottom:10px;">¡Solicitud enviada!</h3>
-    <p class="sub" style="font-size:16px; margin-bottom:28px;">Gracias por tu interés en GMAX Agent. Alguien de nuestro equipo se pondrá en contacto contigo en breve.</p>
+    <p class="sub" style="font-size:16px; margin-bottom:28px;">Gracias por tu interés en GMAX Agent. Alguien de nuestro equipo se estará comunicando contigo.</p>
     <button type="button" class="btn-primary" style="width:auto; padding:14px 34px;" onclick="document.getElementById('appThankYouView').style.display='none'; document.getElementById('appView').style.display='block'; window.scrollTo({top:0, behavior:'smooth'});">← Volver</button>
   </div>
 
@@ -2135,46 +2135,155 @@
       </section>
 
       <section class="dash-tab" id="tab-usuarios" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-          <div>
-            <h2>Usuarios</h2>
-            <p class="sub">Agentes y administradores con acceso al sistema.</p>
+
+        <!-- ============ LISTA DE USUARIOS ============ -->
+        <div id="usersListView">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h2>Usuarios</h2>
+              <p class="sub">Agentes y administradores con acceso al sistema.</p>
+            </div>
+            <button class="btn-primary" style="width:auto; padding:12px 22px;" onclick="toggleAddUser()">+ Agregar usuario</button>
           </div>
-          <button class="btn-primary" style="width:auto; padding:12px 22px;" onclick="toggleAddUser()">+ Agregar usuario</button>
+
+          <div class="dash-card" id="addUserCard" style="display:none;">
+            <h4>Agregar usuario nuevo</h4>
+            <p class="sub" style="margin-bottom:16px;">Se crea la cuenta de verdad — la persona podrá iniciar sesión de inmediato con el correo y la contraseña que le pongas aquí. Su código de agente (GM###) se asigna solo.</p>
+            <div class="msg" id="addUserMsg"></div>
+            <form id="addUserForm">
+              <div class="form-row"><label>Nombre completo</label><input type="text" id="nu-nombre" required></div>
+              <div class="form-row"><label>Correo</label><input type="email" id="nu-correo" required></div>
+              <div class="form-row"><label>Correo de respaldo (opcional)</label><input type="email" id="nu-correo-respaldo" placeholder="Por si pierde acceso al correo principal"></div>
+              <div class="form-row">
+                <label>Contraseña temporal</label>
+                <div style="display:flex; gap:10px;">
+                  <input type="text" id="nu-password" required minlength="8" style="flex:1;">
+                  <button type="button" class="btn-ghost" style="width:auto; padding:10px 16px;" onclick="document.getElementById('nu-password').value = generateRandomPassword();">Generar</button>
+                </div>
+                <p class="sub" style="margin-top:6px;">Cópiala y comunícasela tú misma a la persona (llamada, mensaje) — el sistema no la envía por correo automáticamente.</p>
+              </div>
+              <div class="form-row"><label>Rol</label>
+                <select id="nu-rol" required>
+                  <option value="agent">Agente</option>
+                  <option value="admin">Administrador</option>
+                </select>
+              </div>
+              <button type="submit" class="btn-primary">Crear usuario</button>
+            </form>
+          </div>
+
+          <div class="form-row" style="max-width:420px; margin-top:18px;">
+            <input type="text" id="userSearchInput" placeholder="Buscar por nombre, correo o código de agente..." oninput="renderUsersList()">
+          </div>
+
+          <div class="dash-table-wrap">
+            <table class="dash-table" id="usersTable">
+              <thead><tr><th>Nombre</th><th>Correo</th><th>Código de agente</th></tr></thead>
+              <tbody id="usersTableBody"><tr><td colspan="3">Cargando...</td></tr></tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="dash-card" id="addUserCard" style="display:none;">
-          <h4>Agregar usuario nuevo</h4>
-          <p class="sub" style="margin-bottom:16px;">Se crea la cuenta de verdad — la persona podrá iniciar sesión de inmediato con el correo y la contraseña que le pongas aquí. Su código de agente (GM###) se asigna solo.</p>
-          <div class="msg" id="addUserMsg"></div>
-          <form id="addUserForm">
-            <div class="form-row"><label>Nombre completo</label><input type="text" id="nu-nombre" required></div>
-            <div class="form-row"><label>Correo</label><input type="email" id="nu-correo" required></div>
-            <div class="form-row"><label>Correo de respaldo (opcional)</label><input type="email" id="nu-correo-respaldo" placeholder="Por si pierde acceso al correo principal"></div>
-            <div class="form-row">
-              <label>Contraseña temporal</label>
-              <div style="display:flex; gap:10px;">
-                <input type="text" id="nu-password" required minlength="8" style="flex:1;">
-                <button type="button" class="btn-ghost" style="width:auto; padding:10px 16px;" onclick="document.getElementById('nu-password').value = generateRandomPassword();">Generar</button>
+        <!-- ============ PERFIL DE UN USUARIO/AGENTE ============ -->
+        <div id="userDetailView" style="display:none;">
+          <button class="btn-ghost" style="width:auto; padding:8px 16px; margin-bottom:16px;" onclick="backToUsersList()">← Volver a Usuarios</button>
+
+          <div class="dash-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+              <div>
+                <h2 id="ud-nombre" style="margin-bottom:4px;">—</h2>
+                <p class="sub" id="ud-correo" style="margin:0;">—</p>
+                <p class="sub" style="margin:4px 0 0;">Código de agente: <strong id="ud-codigo">—</strong> · Rol: <span id="ud-rol">—</span> · <span id="ud-estado-badge"></span></p>
               </div>
-              <p class="sub" style="margin-top:6px;">Cópiala y comunícasela tú misma a la persona (llamada, mensaje) — el sistema no la envía por correo automáticamente.</p>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn-ghost" style="width:auto; padding:10px 16px;" id="ud-btn-toggle" onclick="toggleUserStatusFromProfile()">Remover acceso</button>
+                <button class="btn-ghost" style="width:auto; padding:10px 16px; color:#c0392b; border-color:#c0392b;" id="ud-btn-delete" onclick="deleteUserFromProfile()">Eliminar cuenta</button>
+              </div>
             </div>
-            <div class="form-row"><label>Rol</label>
-              <select id="nu-rol" required>
-                <option value="agent">Agente</option>
-                <option value="admin">Administrador</option>
+            <div class="msg" id="udMsg" style="margin-top:12px;"></div>
+          </div>
+
+          <!-- Tipo de agente -->
+          <div class="dash-card">
+            <h4>Tipo de agente</h4>
+            <p class="sub" style="margin-bottom:14px;">Define a qué aseguradoras tiene acceso este agente al vender pólizas.</p>
+            <div class="form-row">
+              <select id="ud-tipo-agente" onchange="onAgentTypeChange()">
+                <option value="">— Sin definir —</option>
+                <option value="personal_lines">Personal Lines (acceso limitado a ciertas aseguradoras)</option>
+                <option value="property_casualty">Property &amp; Casualty (acceso completo a todas)</option>
               </select>
             </div>
-            <button type="submit" class="btn-primary">Crear usuario</button>
-          </form>
+            <div id="ud-restringidas-wrap" style="display:none; margin-top:10px;">
+              <p class="sub" style="margin-bottom:8px;">Marca las aseguradoras que SÍ puede vender:</p>
+              <div id="ud-restringidas-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+            </div>
+            <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:14px;" onclick="saveAgentType()">Guardar tipo de agente</button>
+          </div>
+
+          <!-- Carriers apuntados -->
+          <div class="dash-card">
+            <h4>Aseguradoras con las que está apuntado</h4>
+            <p class="sub" style="margin-bottom:14px;">Marca con cuáles carriers ya se gestionó la apuntación de este agente, y opcionalmente su código con esa aseguradora.</p>
+            <div id="ud-carriers-list">Cargando...</div>
+          </div>
+
+          <!-- Licencia y E&O (lo que el agente llenó) -->
+          <div class="dash-card">
+            <h4>Licencia y Seguro de Errores y Omisiones</h4>
+            <p class="sub" style="margin-bottom:14px;">Información que el agente llenó desde su cuenta.</p>
+            <div id="ud-licencia-eo-info">Cargando...</div>
+          </div>
+
+          <!-- Documentos -->
+          <div class="dash-card">
+            <h4>Documentos</h4>
+            <p class="sub" style="margin-bottom:14px;">Contrato, licencia, seguro E&amp;O y otros. Solo visible para administradores.</p>
+            <form id="ud-uploadDocForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+              <div class="form-row" style="flex:1; min-width:220px; margin:0;">
+                <label>Archivo</label>
+                <input type="file" id="ud-doc-archivo" required>
+              </div>
+              <div class="form-row" style="min-width:180px; margin:0;">
+                <label>Categoría</label>
+                <select id="ud-doc-categoria">
+                  <option value="Contrato">Contrato</option>
+                  <option value="Licencia">Licencia</option>
+                  <option value="Seguro E&O">Seguro E&amp;O</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Subir</button>
+            </form>
+            <div class="msg" id="udDocMsg"></div>
+            <div id="ud-documentos-list"></div>
+          </div>
+
+          <!-- Notas -->
+          <div class="dash-card">
+            <h4>Notas internas</h4>
+            <form id="ud-noteForm" style="display:flex; gap:10px; margin-bottom:16px;">
+              <textarea id="ud-nota-texto" rows="2" style="flex:1;" placeholder="Escribe una nota sobre este agente..." required></textarea>
+              <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px; align-self:flex-start;">Agregar</button>
+            </form>
+            <div id="ud-notas-list"></div>
+          </div>
+
+          <!-- Alertas -->
+          <div class="dash-card">
+            <h4>Alertas para este agente</h4>
+            <p class="sub" style="margin-bottom:14px;">Le aparecerá en su dashboard hasta que la resuelvas o suba el documento pedido.</p>
+            <form id="ud-alertForm" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:flex-end;">
+              <div class="form-row" style="flex:1; min-width:220px; margin:0;">
+                <label>Mensaje</label>
+                <input type="text" id="ud-alerta-texto" placeholder="Ej: Sube tu nuevo seguro de E&O, el actual venció." required>
+              </div>
+              <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Crear alerta</button>
+            </form>
+            <div id="ud-alertas-list"></div>
+          </div>
         </div>
 
-        <div class="dash-table-wrap">
-          <table class="dash-table" id="usersTable">
-            <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Código productor</th><th>Estado</th><th></th></tr></thead>
-            <tbody id="usersTableBody"><tr><td colspan="6">Cargando...</td></tr></tbody>
-          </table>
-        </div>
       </section>
 
       <!-- TAB: SOLICITUDES -->
@@ -6975,58 +7084,371 @@
   // =================== FIN DÍAS FESTIVOS ===================
 
 
+  // ===================== USUARIOS + PERFIL DE AGENTE =====================
+  let allUsers = [];
+  let currentUserDetailId = null;
+
   async function loadUsers(){
     const { data: users } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
-    const agentes = (users || []).filter(u => u.role === 'agent').length;
-    const admins = (users || []).filter(u => u.role === 'admin' || u.role === 'super_admin').length;
+    allUsers = users || [];
+    const agentes = allUsers.filter(u => u.role === 'agent').length;
+    const admins = allUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length;
     document.getElementById('statAgentes').textContent = agentes;
     document.getElementById('statAdmins').textContent = admins;
+    renderUsersList();
+  }
 
+  function renderUsersList(){
     const tbody = document.getElementById('usersTableBody');
-    if(!users || users.length === 0){
-      tbody.innerHTML = '<tr><td colspan="6">Aún no hay usuarios.</td></tr>';
+    if(!tbody) return;
+    const term = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
+    let list = allUsers;
+    if(term){
+      list = allUsers.filter(u =>
+        (u.full_name || '').toLowerCase().includes(term) ||
+        (u.email || '').toLowerCase().includes(term) ||
+        (u.producer_code || '').toLowerCase().includes(term)
+      );
+    }
+    if(list.length === 0){
+      tbody.innerHTML = `<tr><td colspan="3">${allUsers.length === 0 ? 'Aún no hay usuarios.' : 'Sin resultados para esa búsqueda.'}</td></tr>`;
       return;
     }
-    const canManage = isAdminUser();
-    tbody.innerHTML = users.map(u => {
-      const active = u.status !== 'inactive' && u.status !== 'disabled';
-      return `
-      <tr>
-        <td>${u.full_name}</td>
-        <td>${u.email}</td>
-        <td>${u.role}</td>
-        <td>
-          ${u.producer_code || '<span class="sub" style="margin:0;">Sin asignar</span>'}
-          ${canManage ? `<button class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:6px;" onclick="editProducerCode('${u.id}', '${(u.producer_code || '').replace(/'/g,"\\'")}')">Editar</button>` : ''}
-        </td>
-        <td><span class="badge ${active ? 'active' : 'gray'}">${active ? 'Activo' : 'Inactivo'}</span></td>
-        <td>${(canManage && u.role !== 'super_admin') ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="toggleUserStatus('${u.id}', ${active})">${active ? 'Remover acceso' : 'Reactivar'}</button>` : ''}</td>
+    tbody.innerHTML = list.map(u => `
+      <tr style="cursor:pointer;" onclick="openUserProfile('${u.id}')">
+        <td>${u.full_name || '—'}</td>
+        <td>${u.email || '—'}</td>
+        <td>${u.producer_code || '<span class="sub" style="margin:0;">Sin asignar</span>'}</td>
       </tr>
-    `;
-    }).join('');
+    `).join('');
   }
 
-  async function editProducerCode(userId, currentCode){
-    const newCode = prompt('Código de productor/agente para este usuario:', currentCode || '');
-    if(newCode === null) return; // canceló
-    const { error } = await sb.from('profiles').update({ producer_code: newCode.trim() || null }).eq('id', userId);
-    if(error){ alert('No se pudo actualizar: ' + error.message); return; }
+  function backToUsersList(){
+    document.getElementById('userDetailView').style.display = 'none';
+    document.getElementById('usersListView').style.display = 'block';
+    currentUserDetailId = null;
+  }
+
+  async function openUserProfile(userId){
+    const u = allUsers.find(x => x.id === userId);
+    if(!u) return;
+    currentUserDetailId = userId;
+    document.getElementById('usersListView').style.display = 'none';
+    document.getElementById('userDetailView').style.display = 'block';
+    document.getElementById('udMsg').textContent = '';
+    document.getElementById('udMsg').className = 'msg';
+
+    document.getElementById('ud-nombre').textContent = u.full_name || '—';
+    document.getElementById('ud-correo').textContent = u.email || '—';
+    document.getElementById('ud-codigo').textContent = u.producer_code || 'Sin asignar';
+    document.getElementById('ud-rol').textContent = u.role;
+    const active = u.status !== 'inactive' && u.status !== 'disabled';
+    document.getElementById('ud-estado-badge').innerHTML = `<span class="badge ${active ? 'active' : 'gray'}">${active ? 'Activo' : 'Inactivo'}</span>`;
+
+    const canManage = isAdminUser();
+    const toggleBtn = document.getElementById('ud-btn-toggle');
+    const deleteBtn = document.getElementById('ud-btn-delete');
+    const showManageBtns = canManage && u.role !== 'super_admin';
+    toggleBtn.style.display = showManageBtns ? 'inline-block' : 'none';
+    deleteBtn.style.display = showManageBtns ? 'inline-block' : 'none';
+    toggleBtn.textContent = active ? 'Remover acceso' : 'Reactivar';
+
+    document.getElementById('ud-tipo-agente').value = u.agent_type || '';
+    onAgentTypeChange();
+
+    await Promise.all([
+      loadAgentCarriers(userId),
+      loadAgentDocuments(userId),
+      loadAgentNotes(userId),
+      loadAgentAlerts(userId),
+      loadAgentLicenseEo(userId),
+    ]);
+  }
+
+  async function toggleUserStatusFromProfile(){
+    if(!currentUserDetailId) return;
+    const u = allUsers.find(x => x.id === currentUserDetailId);
+    if(!u) return;
+    const active = u.status !== 'inactive' && u.status !== 'disabled';
+    const newStatus = active ? 'inactive' : 'active';
+    if(active && !confirm('¿Remover el acceso de este usuario? No va a poder iniciar sesión hasta que lo actives de nuevo. Su historial de pólizas y transacciones se conserva intacto.')) return;
+    const { error } = await sb.from('profiles').update({ status: newStatus }).eq('id', currentUserDetailId);
+    if(error){ showMsg('udMsg','error','No se pudo actualizar: ' + error.message); return; }
+    showMsg('udMsg','success', active ? 'Acceso removido.' : 'Usuario reactivado.');
     await loadUsers();
-    // Si editó su propio código, refrescar el perfil en memoria para que se refleje de inmediato
+    await openUserProfile(currentUserDetailId);
+  }
+
+  async function deleteUserFromProfile(){
+    if(!currentUserDetailId) return;
+    const u = allUsers.find(x => x.id === currentUserDetailId);
+    if(!u) return;
+    if(!confirm(`¿Eliminar PERMANENTEMENTE la cuenta de ${u.full_name}? Esto borra su acceso al sistema y no se puede deshacer. Su historial de pólizas y transacciones NO se borra.`)) return;
+    if(!confirm('Confírmalo una vez más: esta acción no se puede deshacer. ¿Eliminar la cuenta?')) return;
+
     const { data: { session } } = await sb.auth.getSession();
-    if(session && session.user.id === userId){
-      const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
-      if(profile) currentProfile = profile;
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/delete-agent-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ userId: currentUserDetailId })
+      });
+      const data = await resp.json();
+      if(!resp.ok || data.error){
+        showMsg('udMsg','error','No se pudo eliminar: ' + (data.error || 'error desconocido'));
+        return;
+      }
+      alert('Cuenta eliminada.');
+      backToUsersList();
+      await loadUsers();
+    } catch(err){
+      showMsg('udMsg','error','Error de conexión: ' + err.message);
     }
   }
 
-  async function toggleUserStatus(userId, currentlyActive){
-    const newStatus = currentlyActive ? 'inactive' : 'active';
-    if(currentlyActive && !confirm('¿Remover el acceso de este usuario? No va a poder iniciar sesión hasta que lo actives de nuevo. Su historial de pólizas y transacciones se conserva intacto.')) return;
-    const { error } = await sb.from('profiles').update({ status: newStatus }).eq('id', userId);
-    if(error){ alert('No se pudo actualizar: ' + error.message); return; }
+  function editProducerCode(userId, currentCode){
+    const newCode = prompt('Código de productor/agente para este usuario:', currentCode || '');
+    if(newCode === null) return;
+    sb.from('profiles').update({ producer_code: newCode.trim() || null }).eq('id', userId).then(async ({ error }) => {
+      if(error){ alert('No se pudo actualizar: ' + error.message); return; }
+      await loadUsers();
+      const { data: { session } } = await sb.auth.getSession();
+      if(session && session.user.id === userId){
+        const { data: profile } = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+        if(profile) currentProfile = profile;
+      }
+    });
+  }
+
+  // ---- Tipo de agente y restricción de aseguradoras ----
+  function onAgentTypeChange(){
+    const tipo = document.getElementById('ud-tipo-agente').value;
+    const wrap = document.getElementById('ud-restringidas-wrap');
+    wrap.style.display = tipo === 'personal_lines' ? 'block' : 'none';
+    if(tipo === 'personal_lines'){
+      const u = allUsers.find(x => x.id === currentUserDetailId);
+      const restricted = (u && u.restricted_company_ids) || [];
+      const list = document.getElementById('ud-restringidas-list');
+      if(allCompanies.length === 0){
+        list.innerHTML = '<p class="sub">No hay aseguradoras registradas todavía en Compañías.</p>';
+        return;
+      }
+      list.innerHTML = allCompanies.map(co => `
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+          <input type="checkbox" value="${co.id}" class="ud-restringida-cb" ${restricted.includes(co.id) ? 'checked' : ''}>
+          ${co.name}
+        </label>
+      `).join('');
+    }
+  }
+
+  async function saveAgentType(){
+    if(!currentUserDetailId) return;
+    const tipo = document.getElementById('ud-tipo-agente').value || null;
+    let restricted = [];
+    if(tipo === 'personal_lines'){
+      restricted = [...document.querySelectorAll('.ud-restringida-cb:checked')].map(el => el.value);
+    }
+    const { error } = await sb.from('profiles').update({ agent_type: tipo, restricted_company_ids: restricted }).eq('id', currentUserDetailId);
+    if(error){ showMsg('udMsg','error','No se pudo guardar: ' + error.message); return; }
+    showMsg('udMsg','success','Tipo de agente guardado.');
     await loadUsers();
   }
+
+  // ---- Carriers apuntados ----
+  async function loadAgentCarriers(agentId){
+    const container = document.getElementById('ud-carriers-list');
+    if(allCompanies.length === 0){
+      container.innerHTML = '<p class="sub">No hay aseguradoras registradas todavía en Compañías.</p>';
+      return;
+    }
+    const { data: rows } = await sb.from('agent_carriers').select('*').eq('agent_id', agentId);
+    const byCompany = {};
+    (rows || []).forEach(r => { byCompany[r.company_id] = r; });
+    container.innerHTML = allCompanies.map(co => {
+      const row = byCompany[co.id] || {};
+      return `
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 0; border-bottom:1px solid var(--line);">
+          <label style="display:flex; align-items:center; gap:8px; font-weight:400; min-width:220px;">
+            <input type="checkbox" id="cc-${co.id}" ${row.appointed ? 'checked' : ''}>
+            ${co.name}
+          </label>
+          <input type="text" id="cc-code-${co.id}" placeholder="Código con esta aseguradora (opcional)" value="${row.agent_code || ''}" style="flex:1; min-width:180px;">
+        </div>
+      `;
+    }).join('') + `<button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:14px;" onclick="saveAgentCarriers('${agentId}')">Guardar carriers</button>`;
+  }
+
+  async function saveAgentCarriers(agentId){
+    const rows = allCompanies.map(co => ({
+      agent_id: agentId,
+      company_id: co.id,
+      appointed: document.getElementById('cc-' + co.id).checked,
+      agent_code: document.getElementById('cc-code-' + co.id).value.trim() || null,
+      updated_at: new Date().toISOString()
+    }));
+    const { error } = await sb.from('agent_carriers').upsert(rows, { onConflict: 'agent_id,company_id' });
+    if(error){ showMsg('udMsg','error','No se pudieron guardar los carriers: ' + error.message); return; }
+    showMsg('udMsg','success','Carriers actualizados.');
+  }
+
+  // ---- Licencia y E&O (llenados por el agente) ----
+  async function loadAgentLicenseEo(agentId){
+    const container = document.getElementById('ud-licencia-eo-info');
+    const [{ data: eo }, { data: licenses }] = await Promise.all([
+      sb.from('agent_eo').select('*').eq('agent_id', agentId).maybeSingle(),
+      sb.from('agent_licenses').select('*').eq('agent_id', agentId).order('is_primary', { ascending: false })
+    ]);
+    let html = '<h5 style="margin-bottom:6px;">Seguro E&O</h5>';
+    if(eo && eo.insurer_name){
+      html += `<p class="sub" style="margin:0 0 14px;">${eo.insurer_name} · Póliza ${eo.policy_number || '—'} · Vigencia ${formatDateUS(eo.effective_date)} a ${formatDateUS(eo.expiration_date)}</p>`;
+    } else {
+      html += '<p class="sub" style="margin:0 0 14px;">Este agente todavía no ha llenado su información de E&amp;O.</p>';
+    }
+    html += '<h5 style="margin-bottom:6px;">Licencias</h5>';
+    if(licenses && licenses.length > 0){
+      html += licenses.map(l => `<p class="sub" style="margin:0 0 4px;">${l.is_primary ? '⭐ ' : ''}${l.state} — #${l.license_number} — vence ${formatDateUS(l.expiration_date)} ${l.is_resident ? '(residente)' : '(no residente)'}</p>`).join('');
+    } else {
+      html += '<p class="sub" style="margin:0;">Este agente todavía no ha registrado ninguna licencia.</p>';
+    }
+    container.innerHTML = html;
+  }
+
+  // ---- Documentos del agente ----
+  async function loadAgentDocuments(agentId){
+    const { data: docs } = await sb.from('agent_documents').select('*').eq('agent_id', agentId).order('uploaded_at', { ascending: false });
+    const container = document.getElementById('ud-documentos-list');
+    if(!docs || docs.length === 0){
+      container.innerHTML = '<p class="sub">Aún no se han subido documentos.</p>';
+      return;
+    }
+    const rows = await Promise.all(docs.map(async doc => {
+      const { data: signed } = await sb.storage.from('agent-documents').createSignedUrl(doc.storage_path, 300);
+      const url = signed ? signed.signedUrl : '#';
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);">
+          <div>
+            <a href="${url}" target="_blank" rel="noopener">${doc.file_name}</a>
+            <div style="font-size:13px; color:var(--slate-light);">${doc.category || 'Sin categoría'} — subido ${formatDateTimeUS(doc.uploaded_at)}</div>
+          </div>
+          <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="deleteAgentDocument('${doc.id}','${doc.storage_path}')">Eliminar</button>
+        </div>
+      `;
+    }));
+    container.innerHTML = rows.join('');
+  }
+
+  document.getElementById('ud-uploadDocForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    if(!currentUserDetailId) return;
+    const file = document.getElementById('ud-doc-archivo').files[0];
+    if(!file){ showMsg('udDocMsg','error','Selecciona un archivo primero.'); return; }
+    const category = document.getElementById('ud-doc-categoria').value;
+    const { data: { session } } = await sb.auth.getSession();
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${currentUserDetailId}/${Date.now()}_${safeName}`;
+
+    const { error: uploadError } = await sb.storage.from('agent-documents').upload(path, file);
+    if(uploadError){ showMsg('udDocMsg','error','No se pudo subir el archivo: ' + uploadError.message); return; }
+
+    const { error: dbError } = await sb.from('agent_documents').insert({
+      agent_id: currentUserDetailId,
+      file_name: file.name,
+      storage_path: path,
+      category,
+      uploaded_by: session.user.id
+    });
+    if(dbError){ showMsg('udDocMsg','error','El archivo se subió pero no se pudo registrar: ' + dbError.message); return; }
+
+    showMsg('udDocMsg','success','Documento subido.');
+    document.getElementById('ud-uploadDocForm').reset();
+    await loadAgentDocuments(currentUserDetailId);
+  });
+
+  async function deleteAgentDocument(id, storagePath){
+    if(!confirm('¿Eliminar este documento?')) return;
+    if(storagePath) await sb.storage.from('agent-documents').remove([storagePath]);
+    const { error } = await sb.from('agent_documents').delete().eq('id', id);
+    if(error){ showMsg('udDocMsg','error','No se pudo eliminar: ' + error.message); return; }
+    await loadAgentDocuments(currentUserDetailId);
+  }
+
+  // ---- Notas internas ----
+  async function loadAgentNotes(agentId){
+    const { data: notes } = await sb.from('agent_notes').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
+    const container = document.getElementById('ud-notas-list');
+    if(!notes || notes.length === 0){
+      container.innerHTML = '<p class="sub">Aún no hay notas.</p>';
+      return;
+    }
+    container.innerHTML = notes.map(n => `
+      <div style="padding:10px 0; border-bottom:1px solid var(--line);">
+        <p style="margin:0 0 4px;">${escapeHtml(n.note_text)}</p>
+        <div style="font-size:12px; color:var(--slate-light);">${n.author_name || ''} — ${formatDateTimeUS(n.created_at)}</div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('ud-noteForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    if(!currentUserDetailId) return;
+    const text = document.getElementById('ud-nota-texto').value.trim();
+    if(!text) return;
+    const { error } = await sb.from('agent_notes').insert({
+      agent_id: currentUserDetailId,
+      note_text: text,
+      author_name: currentProfile ? currentProfile.full_name : ''
+    });
+    if(error){ alert('No se pudo agregar la nota: ' + error.message); return; }
+    document.getElementById('ud-nota-texto').value = '';
+    await loadAgentNotes(currentUserDetailId);
+  });
+
+  // ---- Alertas ----
+  async function loadAgentAlerts(agentId){
+    const { data: alerts } = await sb.from('agent_alerts').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
+    const container = document.getElementById('ud-alertas-list');
+    if(!alerts || alerts.length === 0){
+      container.innerHTML = '<p class="sub">No hay alertas para este agente.</p>';
+      return;
+    }
+    container.innerHTML = alerts.map(a => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);">
+        <div>
+          <p style="margin:0;">${escapeHtml(a.message)}</p>
+          <div style="font-size:12px; color:var(--slate-light);">${formatDateTimeUS(a.created_at)} — <span class="badge ${a.resolved ? 'active' : 'gray'}">${a.resolved ? 'Resuelta' : 'Pendiente'}</span></div>
+        </div>
+        ${!a.resolved ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="resolveAgentAlert('${a.id}')">Marcar resuelta</button>` : ''}
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('ud-alertForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    if(!currentUserDetailId) return;
+    const text = document.getElementById('ud-alerta-texto').value.trim();
+    if(!text) return;
+    const { data: { session } } = await sb.auth.getSession();
+    const { error } = await sb.from('agent_alerts').insert({
+      agent_id: currentUserDetailId,
+      message: text,
+      created_by: session.user.id
+    });
+    if(error){ alert('No se pudo crear la alerta: ' + error.message); return; }
+    document.getElementById('ud-alerta-texto').value = '';
+    await loadAgentAlerts(currentUserDetailId);
+  });
+
+  async function resolveAgentAlert(id){
+    const { error } = await sb.from('agent_alerts').update({ resolved: true, resolved_at: new Date().toISOString() }).eq('id', id);
+    if(error){ alert('No se pudo actualizar: ' + error.message); return; }
+    await loadAgentAlerts(currentUserDetailId);
+  }
+  // =================== FIN USUARIOS + PERFIL DE AGENTE ===================
 
   async function loadApplications(){
     const { data: apps } = await sb.from('agent_applications').select('*').order('created_at', { ascending: false });
