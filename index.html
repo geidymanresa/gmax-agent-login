@@ -255,14 +255,40 @@
     </p>
 
     <div id="forgotPasswordCard" style="display:none; margin-top:14px; padding:16px; border:1.5px solid var(--line); border-radius:10px;">
-      <p class="sub" style="margin-top:0;">Escribe tu correo y tu código de agente (GM###) para confirmar que eres tú, y te enviamos un link para restablecer tu contraseña.</p>
-      <div class="msg" id="forgotPasswordMsg"></div>
-      <form id="forgotPasswordForm">
-        <div class="form-row"><label>Correo electrónico</label><input type="email" id="fp-email" required></div>
-        <div class="form-row"><label>Código de agente</label><input type="text" id="fp-codigo" placeholder="GM001" required></div>
-        <button type="submit" class="btn-primary">Enviar link de recuperación</button>
-      </form>
+
+      <!-- PASO 1: correo + código de agente -->
+      <div id="fp-step1">
+        <p class="sub" style="margin-top:0;">Escribe tu correo y tu código de agente (GM###) para confirmar que eres tú, y te enviamos un código de 6 dígitos.</p>
+        <div class="msg" id="forgotPasswordMsg"></div>
+        <form id="forgotPasswordForm">
+          <div class="form-row"><label>Correo electrónico</label><input type="email" id="fp-email" required></div>
+          <div class="form-row"><label>Código de agente</label><input type="text" id="fp-codigo" placeholder="GM001" required></div>
+          <button type="submit" class="btn-primary">Enviar código</button>
+        </form>
+      </div>
+
+      <!-- PASO 2: código de 6 dígitos + nueva contraseña -->
+      <div id="fp-step2" style="display:none;">
+        <p class="sub" style="margin-top:0;">Te llegó un código de 6 dígitos a tu correo. Escríbelo aquí junto con tu nueva contraseña.</p>
+        <div class="msg" id="fpStep2Msg"></div>
+        <form id="fpStep2Form">
+          <div class="form-row"><label>Código de 6 dígitos</label><input type="text" id="fp-otp" inputmode="numeric" maxlength="6" placeholder="123456" required></div>
+          <div class="form-row"><label>Nueva contraseña</label><input type="password" id="fp-new-password" required oninput="renderPasswordRules('fp-new-password','fp-rules')"></div>
+          <ul id="fp-rules" style="font-size:13px; color:var(--slate-light); margin:0 0 14px; padding-left:18px; list-style:none;"></ul>
+          <div class="form-row"><label>Confirmar nueva contraseña</label><input type="password" id="fp-new-password-2" required></div>
+          <button type="submit" class="btn-primary">Restablecer contraseña</button>
+          <button type="button" class="btn-ghost" style="margin-top:8px;" onclick="backToForgotStep1()">← Volver a empezar</button>
+        </form>
+      </div>
+
+      <!-- PASO 3: listo -->
+      <div id="fp-step3" style="display:none; text-align:center;">
+        <p style="color:#1a7f37; font-weight:600;">✓ Tu contraseña se actualizó correctamente.</p>
+        <button type="button" class="btn-primary" onclick="backToLoginFromForgot()">Iniciar sesión</button>
+      </div>
+
     </div>
+
 
     <div class="divider">¿Primera vez aquí?</div>
     <button class="btn-ghost" onclick="showView('app')">Convertirse en Agente</button>
@@ -2324,8 +2350,49 @@
 
   function toggleForgotPassword(){
     const card = document.getElementById('forgotPasswordCard');
-    card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    const opening = card.style.display === 'none';
+    card.style.display = opening ? 'block' : 'none';
+    if(opening) backToForgotStep1();
   }
+
+  function backToForgotStep1(){
+    document.getElementById('fp-step1').style.display = 'block';
+    document.getElementById('fp-step2').style.display = 'none';
+    document.getElementById('fp-step3').style.display = 'none';
+    document.getElementById('forgotPasswordForm').reset();
+    document.getElementById('fpStep2Form').reset();
+    document.getElementById('forgotPasswordMsg').textContent = '';
+    document.getElementById('forgotPasswordMsg').className = 'msg';
+  }
+
+  function backToLoginFromForgot(){
+    document.getElementById('forgotPasswordCard').style.display = 'none';
+    backToForgotStep1();
+  }
+
+  // ---- Reglas de contraseña reutilizables (recuperación y primer login de agente) ----
+  const PASSWORD_RULES = [
+    { label: 'Al menos 10 caracteres', test: p => p.length >= 10 },
+    { label: 'Una letra mayúscula', test: p => /[A-Z]/.test(p) },
+    { label: 'Una letra minúscula', test: p => /[a-z]/.test(p) },
+    { label: 'Un número', test: p => /[0-9]/.test(p) },
+    { label: 'Un carácter especial (!@#$%^&*...)', test: p => /[^A-Za-z0-9]/.test(p) },
+  ];
+
+  function passwordMeetsAllRules(password){
+    return PASSWORD_RULES.every(r => r.test(password || ''));
+  }
+
+  function renderPasswordRules(inputId, listId){
+    const password = document.getElementById(inputId).value || '';
+    const list = document.getElementById(listId);
+    list.innerHTML = PASSWORD_RULES.map(r => {
+      const ok = r.test(password);
+      return `<li style="color:${ok ? '#1a7f37' : 'var(--slate-light)'};">${ok ? '✓' : '○'} ${r.label}</li>`;
+    }).join('');
+  }
+
+  let fpVerifiedEmail = null;
 
   document.getElementById('forgotPasswordForm').addEventListener('submit', async function(e){
     e.preventDefault();
@@ -2343,26 +2410,84 @@
       const data = await resp.json();
       if(!resp.ok || !data.match){
         showMsg('forgotPasswordMsg','error','El correo y el código de agente no coinciden con ninguna cuenta registrada.');
-        btn.disabled = false; btn.textContent = 'Enviar link de recuperación';
+        btn.disabled = false; btn.textContent = 'Enviar código';
         return;
       }
     } catch(err){
       showMsg('forgotPasswordMsg','error','Error de conexión: ' + err.message);
-      btn.disabled = false; btn.textContent = 'Enviar link de recuperación';
+      btn.disabled = false; btn.textContent = 'Enviar código';
       return;
     }
 
-    const { error } = await sb.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + window.location.pathname
-    });
-    btn.disabled = false; btn.textContent = 'Enviar link de recuperación';
+    const { error } = await sb.auth.resetPasswordForEmail(email);
+    btn.disabled = false; btn.textContent = 'Enviar código';
     if(error){
-      showMsg('forgotPasswordMsg','error','No se pudo enviar el correo: ' + error.message);
+      showMsg('forgotPasswordMsg','error','No se pudo enviar el código: ' + error.message);
       return;
     }
-    showMsg('forgotPasswordMsg','success','Correo y código verificados. Te llegó un link para restablecer tu contraseña. Revisa tu bandeja (y spam).');
-    document.getElementById('forgotPasswordForm').reset();
+    fpVerifiedEmail = email;
+    document.getElementById('fp-step1').style.display = 'none';
+    document.getElementById('fp-step2').style.display = 'block';
+    document.getElementById('fpStep2Msg').textContent = '';
+    document.getElementById('fpStep2Msg').className = 'msg';
   });
+
+  document.getElementById('fpStep2Form').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    const otp = document.getElementById('fp-otp').value.trim();
+    const p1 = document.getElementById('fp-new-password').value;
+    const p2 = document.getElementById('fp-new-password-2').value;
+
+    if(!passwordMeetsAllRules(p1)){
+      showMsg('fpStep2Msg','error','La contraseña no cumple con todos los requisitos de la lista.');
+      return;
+    }
+    if(p1 !== p2){
+      showMsg('fpStep2Msg','error','Las contraseñas no coinciden.');
+      return;
+    }
+
+    btn.disabled = true; btn.textContent = 'Verificando código...';
+
+    const { data: otpData, error: otpError } = await sb.auth.verifyOtp({
+      email: fpVerifiedEmail,
+      token: otp,
+      type: 'recovery'
+    });
+    if(otpError || !otpData.session){
+      showMsg('fpStep2Msg','error','El código no es correcto o ya venció: ' + (otpError ? otpError.message : ''));
+      btn.disabled = false; btn.textContent = 'Restablecer contraseña';
+      return;
+    }
+
+    btn.textContent = 'Guardando nueva contraseña...';
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/update-password-with-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + otpData.session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ newPassword: p1 })
+      });
+      const result = await resp.json();
+      await sb.auth.signOut();
+      if(!resp.ok || result.error){
+        showMsg('fpStep2Msg','error', result.error || 'No se pudo actualizar la contraseña.');
+        btn.disabled = false; btn.textContent = 'Restablecer contraseña';
+        return;
+      }
+      document.getElementById('fp-step2').style.display = 'none';
+      document.getElementById('fp-step3').style.display = 'block';
+    } catch(err){
+      await sb.auth.signOut();
+      showMsg('fpStep2Msg','error','Error de conexión: ' + err.message);
+      btn.disabled = false; btn.textContent = 'Restablecer contraseña';
+    }
+  });
+
 
   // Cuando Supabase redirige de vuelta desde el link del correo de recuperación
   sb.auth.onAuthStateChange((event, session) => {
