@@ -644,7 +644,10 @@
           </div>
 
           <div class="dash-card" id="newClientCard" style="display:none;">
-            <h4>Nuevo cliente</h4>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h4 style="margin:0;">Nuevo cliente</h4>
+              <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="toggleNewClient()">✕ Cerrar</button>
+            </div>
             <div class="msg" id="newClientMsg"></div>
             <div class="msg" id="dupWarning" style="display:none; background:#FFF8EA; border:1px solid #F3DFAE; color:#8a6116;"></div>
             <form id="newClientForm">
@@ -670,6 +673,10 @@
               <div class="form-row-2">
                 <div class="form-row"><label>Teléfono principal</label><input type="text" id="nc-telefono"></div>
                 <div class="form-row"><label>Teléfono secundario</label><input type="text" id="nc-telefono2"></div>
+              </div>
+              <div class="form-row-2">
+                <div class="form-row"><label>Número de licencia de conducir <span style="font-weight:400; color:var(--slate-light);">(solo pólizas de auto/trucking)</span></label><input type="text" id="nc-licencia"></div>
+                <div class="form-row"><label>Estado de la licencia</label><input type="text" id="nc-licencia-estado" placeholder="TX"></div>
               </div>
               <div class="form-row-2">
                 <div class="form-row"><label>Fecha de nacimiento</label><input type="text" id="nc-nacimiento" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
@@ -954,6 +961,7 @@
             <div style="display:flex; gap:10px;">
               <button class="btn-primary" style="width:auto; padding:10px 18px;" onclick="toggleNewTransaction()">+ Nueva Transacción</button>
               <button class="btn-primary" id="cd-editBtn" style="width:auto; padding:10px 18px;" onclick="toggleEditClient()">Editar</button>
+              <button class="btn-ghost" id="cd-deleteBtn" style="width:auto; padding:10px 18px; display:none; color:#c0392b; border-color:#c0392b;" onclick="deleteCurrentClient()">Eliminar cliente</button>
             </div>
           </div>
 
@@ -1248,6 +1256,7 @@
               <div class="profile-field"><div class="label">Correo alternativo</div><div class="num" id="cd-view-correo-alt">—</div></div>
               <div class="profile-field"><div class="label">Teléfono</div><div class="num" id="cd-view-telefono">—</div></div>
               <div class="profile-field"><div class="label">Teléfono secundario</div><div class="num" id="cd-view-telefono2">—</div></div>
+              <div class="profile-field"><div class="label">Licencia de conducir</div><div class="num" id="cd-view-licencia">—</div></div>
               <div class="profile-field"><div class="label">Fecha de nacimiento</div><div class="num" id="cd-view-nacimiento">—</div></div>
               <div class="profile-field"><div class="label">Sexo / Estado civil</div><div class="num" id="cd-view-sexocivil">—</div></div>
               <div class="profile-field"><div class="label">Idioma preferido</div><div class="num" id="cd-view-idioma">—</div></div>
@@ -1636,6 +1645,8 @@
               <div class="form-row-2">
                 <div class="form-row"><label>Teléfono principal</label><input type="text" id="ec-telefono"></div>
                 <div class="form-row"><label>Teléfono secundario</label><input type="text" id="ec-telefono2"></div>
+                <div class="form-row"><label>Número de licencia de conducir <span style="font-weight:400; color:var(--slate-light);">(solo pólizas de auto/trucking)</span></label><input type="text" id="ec-licencia"></div>
+                <div class="form-row"><label>Estado de la licencia</label><input type="text" id="ec-licencia-estado" placeholder="TX"></div>
               </div>
               <div class="form-row-2">
                 <div class="form-row"><label>Fecha de nacimiento</label><input type="text" id="ec-nacimiento" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
@@ -3339,6 +3350,8 @@
       email_alt: document.getElementById('nc-correo-alt').value || null,
       phone: document.getElementById('nc-telefono').value || null,
       secondary_phone: document.getElementById('nc-telefono2').value || null,
+      drivers_license_number: document.getElementById('nc-licencia').value || null,
+      drivers_license_state: document.getElementById('nc-licencia-estado').value || null,
       date_of_birth: mmddyyyyToISO(document.getElementById('nc-nacimiento').value),
       preferred_language: document.getElementById('nc-idioma').value,
       sex: document.getElementById('nc-sexo').value || null,
@@ -3650,6 +3663,7 @@
     document.getElementById('cd-viewCard').style.display = 'block';
     document.getElementById('clientDetailMsg').className = 'msg';
     document.getElementById('clientDetailMsg').textContent = '';
+    document.getElementById('cd-deleteBtn').style.display = isSuperAdminUser() ? 'inline-block' : 'none';
 
     // Siempre cerrar y limpiar la papelera de transacciones eliminadas al entrar
     // a un perfil, para que nunca se vean las eliminadas de otro cliente anterior.
@@ -3726,7 +3740,7 @@
         <td>${p.notes || ''}</td>
         <td style="white-space:nowrap;">
           ${!cancelled ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" title="Iniciar transacción sobre esta póliza (endorsement, pago asistido, cancelación o reinstalación)" onclick="quickTransactionFromPolicy('${p.id}')">⚡</button>` : ''}
-          ${isSA ? `<button class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="openEditPolicy('${p.id}')">Editar</button>` : ''}
+          ${isAdmin ? `<button class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="openEditPolicy('${p.id}')">Editar</button>` : ''}
           ${cancelled && isAdmin ? `<button class="btn-primary" style="width:auto; padding:6px 14px;" onclick="restorePolicy('${p.id}')">Restaurar</button>` : ''}
         </td>
       </tr>
@@ -3847,6 +3861,7 @@
     document.getElementById('cd-view-correo-alt').textContent = c.email_alt || '—';
     document.getElementById('cd-view-telefono').textContent = c.phone || '—';
     document.getElementById('cd-view-telefono2').textContent = c.secondary_phone || '—';
+    document.getElementById('cd-view-licencia').textContent = c.drivers_license_number ? (c.drivers_license_number + (c.drivers_license_state ? ' (' + c.drivers_license_state + ')' : '')) : '—';
     document.getElementById('cd-view-nacimiento').textContent = formatDateUS(c.date_of_birth) || '—';
     document.getElementById('cd-view-sexocivil').textContent = [c.sex, c.marital_status].filter(Boolean).join(' / ') || '—';
     document.getElementById('cd-view-idioma').textContent = c.preferred_language === 'en' ? 'Inglés' : 'Español';
@@ -3904,6 +3919,8 @@
     document.getElementById('ec-correo-alt').value = c.email_alt || '';
     document.getElementById('ec-telefono').value = c.phone || '';
     document.getElementById('ec-telefono2').value = c.secondary_phone || '';
+    document.getElementById('ec-licencia').value = c.drivers_license_number || '';
+    document.getElementById('ec-licencia-estado').value = c.drivers_license_state || '';
     document.getElementById('ec-nacimiento').value = formatDateUS(c.date_of_birth) || '';
     document.getElementById('ec-idioma').value = c.preferred_language || 'es';
     document.getElementById('ec-sexo').value = c.sex || '';
@@ -3959,6 +3976,21 @@
     loadClients();
   }
 
+  async function deleteCurrentClient(){
+    if(!currentClientId || !isSuperAdminUser()) return;
+    const nombre = document.getElementById('cd-nombre').textContent;
+    if(!confirm(`¿Eliminar PERMANENTEMENTE a ${nombre}? Esto borra toda su información: pólizas, transacciones, documentos y notas. No se puede deshacer.`)) return;
+    if(!confirm('Confírmalo una vez más: esta acción no se puede deshacer. ¿Eliminar este cliente?')) return;
+
+    const { error } = await sb.from('clients').delete().eq('id', currentClientId);
+    if(error){
+      showMsg('clientDetailMsg','error','No se pudo eliminar: ' + error.message);
+      return;
+    }
+    alert('Cliente eliminado.');
+    backToClientsList();
+  }
+
   function toggleEditClient(){
     const editCard = document.getElementById('cd-editCard');
     const viewCard = document.getElementById('cd-viewCard');
@@ -4005,6 +4037,8 @@
       email_alt: document.getElementById('ec-correo-alt').value || null,
       phone: document.getElementById('ec-telefono').value || null,
       secondary_phone: document.getElementById('ec-telefono2').value || null,
+      drivers_license_number: document.getElementById('ec-licencia').value || null,
+      drivers_license_state: document.getElementById('ec-licencia-estado').value || null,
       date_of_birth: mmddyyyyToISO(document.getElementById('ec-nacimiento').value),
       preferred_language: document.getElementById('ec-idioma').value,
       sex: document.getElementById('ec-sexo').value || null,
