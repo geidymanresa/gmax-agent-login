@@ -9,6 +9,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://js.stripe.com/v3/"></script>
+<script>
+  // Pon aquí tu API key de Google (con "Places API" y "Maps JavaScript API" habilitadas).
+  const GOOGLE_PLACES_API_KEY = "AIzaSyDVEeKqMk6rIwmjTqx-OqcMRd8ST_F5bZA";
+  (function loadGoogleMapsScript(){
+    if(!GOOGLE_PLACES_API_KEY || GOOGLE_PLACES_API_KEY.indexOf('PON_AQUI') === 0) return;
+    const s = document.createElement('script');
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + GOOGLE_PLACES_API_KEY + '&libraries=places&callback=initGooglePlacesAutocomplete';
+    s.async = true; s.defer = true;
+    document.head.appendChild(s);
+  })();
+</script>
 <style>
   :root{
     --blue:#1E4FA0;
@@ -2375,6 +2386,61 @@
     if(view === 'forgotPassword') backToForgotStep1();
     if(view === 'dashboard') loadDashboard();
   }
+
+  // ===================== AUTOCOMPLETADO DE DIRECCIONES (Google Places) =====================
+  function attachAddressAutocomplete(inputId, parts){
+    const input = document.getElementById(inputId);
+    if(!input || !window.google || !google.maps || !google.maps.places) return;
+    const autocomplete = new google.maps.places.Autocomplete(input, {
+      types: ['address'],
+      fields: ['address_components', 'formatted_address']
+    });
+    autocomplete.addListener('place_changed', function(){
+      const place = autocomplete.getPlace();
+      if(!place || !place.address_components) return;
+
+      const get = (type) => {
+        const comp = place.address_components.find(c => c.types.includes(type));
+        return comp ? comp.long_name : '';
+      };
+      const getShort = (type) => {
+        const comp = place.address_components.find(c => c.types.includes(type));
+        return comp ? comp.short_name : '';
+      };
+
+      const streetNumber = get('street_number');
+      const route = get('route');
+      const calle = [streetNumber, route].filter(Boolean).join(' ');
+      input.value = calle || place.formatted_address || input.value;
+
+      if(parts && parts.cityId){
+        const cityEl = document.getElementById(parts.cityId);
+        if(cityEl) cityEl.value = get('locality') || get('sublocality') || get('postal_town') || '';
+      }
+      if(parts && parts.stateId){
+        const stateEl = document.getElementById(parts.stateId);
+        if(stateEl) stateEl.value = getShort('administrative_area_level_1') || '';
+      }
+      if(parts && parts.zipId){
+        const zipEl = document.getElementById(parts.zipId);
+        if(zipEl) zipEl.value = get('postal_code') || '';
+      }
+    });
+  }
+
+  // Se llama sola cuando termina de cargar el script de Google Maps (ver <head>).
+  function initGooglePlacesAutocomplete(){
+    attachAddressAutocomplete('nc-direccion', { cityId: 'nc-ciudad', stateId: 'nc-estado', zipId: 'nc-zip' });
+    attachAddressAutocomplete('nc-direccionpostal', {});
+    attachAddressAutocomplete('nc-b-direccion', {});
+    attachAddressAutocomplete('nc-b-direccionpostal', {});
+    attachAddressAutocomplete('ec-direccion', { cityId: 'ec-ciudad', stateId: 'ec-estado', zipId: 'ec-zip' });
+    attachAddressAutocomplete('ec-direccionpostal', {});
+    attachAddressAutocomplete('ec-b-direccion', {});
+    attachAddressAutocomplete('ec-b-direccionpostal', {});
+    attachAddressAutocomplete('a-direccion', {});
+  }
+  // ===================== FIN AUTOCOMPLETADO DE DIRECCIONES =====================
 
   function backToForgotStep1(){
     document.getElementById('fp-step1').style.display = 'block';
@@ -5492,9 +5558,17 @@
     resumen.dataset.cargoAmount = cargoAmount;
   }
 
+  let txSubmitting = false;
+
   document.getElementById('newTransactionForm').addEventListener('submit', async function(e){
     e.preventDefault();
     if(!currentClientId) return;
+    if(txSubmitting) return; // ya se está procesando un cobro — ignora clics repetidos
+    const txSubmitBtn = e.target.querySelector('button[type="submit"]');
+    const txSubmitBtnOriginalText = txSubmitBtn ? txSubmitBtn.textContent : '';
+    txSubmitting = true;
+    if(txSubmitBtn){ txSubmitBtn.disabled = true; txSubmitBtn.textContent = 'Procesando, no cierres ni le des clic de nuevo...'; }
+    try {
     const tipo = document.getElementById('tx-tipo').value;
     if(!tipo){
       showMsg('newTransactionMsg','error','Selecciona el tipo de transacción.');
@@ -5696,15 +5770,18 @@
       }
       showMsg('newTransactionMsg','success','Procesando el pago con Stripe, un momento...');
       try {
+        const paymentIdempotencyKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
         const resp = await fetch(SUPABASE_URL + '/functions/v1/create-payment-intent', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+            'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+            'Idempotency-Key': paymentIdempotencyKey
           },
           body: JSON.stringify({
             amount: totalACobrar,
-            description: 'GMAX All Insurance - ' + (SERVICE_TYPE_LABELS[tipo] || tipo)
+            description: 'GMAX All Insurance - ' + (SERVICE_TYPE_LABELS[tipo] || tipo),
+            idempotencyKey: paymentIdempotencyKey
           })
         });
         const intentData = await resp.json();
@@ -5997,6 +6074,10 @@
     const { data: refreshedClient } = await sb.from('clients').select('*').eq('id', currentClientId).single();
     if(refreshedClient) fillClientDetail(refreshedClient);
     setTimeout(() => { document.getElementById('newTransactionCard').style.display = 'none'; }, 900);
+    } finally {
+      txSubmitting = false;
+      if(txSubmitBtn){ txSubmitBtn.disabled = false; txSubmitBtn.textContent = txSubmitBtnOriginalText; }
+    }
   });
 
   async function loadClientTransactions(clientId){
