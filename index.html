@@ -574,6 +574,11 @@
           <div class="dash-stat"><div class="num" id="statPendientes">—</div><div class="label">Solicitudes pendientes</div></div>
         </div>
 
+        <div class="dash-card" id="dashPendingPolicyCard" style="display:none; margin-top:20px; background:#FFF8EA; border:1.5px solid #F0D28A;">
+          <h4 style="margin-top:0; color:#8a6116;">⚠ Pólizas pendientes de número (falta emitir recibo)</h4>
+          <div id="dashPendingPolicyList"></div>
+        </div>
+
         <div class="dash-card" id="dashAlertsCard" style="display:none; margin-top:20px; background:#FDEAEA; border:1.5px solid #E39C9C;">
           <h4 style="margin-top:0; color:#8a3030;">⚠ Clientes con documentos pendientes</h4>
           <div id="dashAlertsList"></div>
@@ -2884,6 +2889,7 @@
     await safeLoad(loadServiceFees, 'Service Fees');
     await safeLoad(loadTesoreria, 'Tesorería');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
+    await safeLoad(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
     await safeLoad(loadDashboardAlerts, 'Alertas del dashboard');
     await safeLoad(loadDashboardFollowups, 'Recordatorios de seguimiento');
     await safeLoad(loadRenewals, 'Próximas renovaciones');
@@ -6853,6 +6859,29 @@
     await loadClientRequirements(currentClientId);
   }
   // =================== FIN ALERTAS DE DOCUMENTOS PENDIENTES ===================
+
+  // ---- Pólizas pendientes de número (para el dashboard principal) ----
+  async function loadDashboardPendingPolicies(){
+    const { data: pendings, error } = await sb.from('client_transactions')
+      .select('*, client:client_id(full_name)')
+      .eq('status', 'pendiente_poliza')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+
+    const card = document.getElementById('dashPendingPolicyCard');
+    const list = document.getElementById('dashPendingPolicyList');
+    if(error || !pendings || pendings.length === 0){
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = 'block';
+    list.innerHTML = pendings.map(t => `
+      <div style="padding:8px 0; border-bottom:1px solid #F0D28A; cursor:pointer;" onclick="goToClientFromUnderwriting('${t.client_id}')">
+        <strong>${t.client ? t.client.full_name : 'Cliente'}</strong> — ${INSURANCE_TYPE_LABELS[t.product] || t.product || 'un producto'} con ${t.company_name || 'la aseguradora'}
+        <span class="sub">(se cobró $${Number(t.total_reference || 0).toFixed(2)} el ${formatDateUS(t.created_at?.split('T')[0])})</span>
+      </div>
+    `).join('');
+  }
 
   async function loadDashboardAlerts(){
     await sb.rpc('cancel_overdue_requirement_policies');
