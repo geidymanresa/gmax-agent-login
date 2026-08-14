@@ -12,13 +12,6 @@
 <script>
   // Pon aquí tu API key de Google (con "Places API" y "Maps JavaScript API" habilitadas).
   const GOOGLE_PLACES_API_KEY = "AIzaSyDVEeKqMk6rIwmjTqx-OqcMRd8ST_F5bZA";
-  (function loadGoogleMapsScript(){
-    if(!GOOGLE_PLACES_API_KEY || GOOGLE_PLACES_API_KEY.indexOf('PON_AQUI') === 0) return;
-    const s = document.createElement('script');
-    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + GOOGLE_PLACES_API_KEY + '&libraries=places&callback=initGooglePlacesAutocomplete';
-    s.async = true; s.defer = true;
-    document.head.appendChild(s);
-  })();
 </script>
 <style>
   :root{
@@ -994,7 +987,10 @@
 
           <!-- Nueva Transacción -->
           <div class="dash-card" id="newTransactionCard" style="display:none;">
-            <h4>Nueva transacción</h4>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h4 style="margin:0;">Nueva transacción</h4>
+              <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="toggleNewTransaction()">✕ Cerrar</button>
+            </div>
             <div class="msg" id="newTransactionMsg"></div>
             <form id="newTransactionForm">
 
@@ -1631,7 +1627,10 @@
 
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
-            <h4>Editar cliente</h4>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <h4 style="margin:0;">Editar cliente</h4>
+              <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="toggleEditClient()">✕ Cancelar</button>
+            </div>
             <form id="editClientForm">
 
               <div class="form-row">
@@ -2454,6 +2453,20 @@
     attachAddressAutocomplete('ec-b-direccionpostal', {});
     attachAddressAutocomplete('a-direccion', {});
   }
+  // Se declara la función arriba PRIMERO, y solo hasta ahora pedimos que
+  // se cargue el script de Google Maps — así, cuando Google llegue a
+  // llamar a initGooglePlacesAutocomplete, ya existe seguro (antes había
+  // una carrera de tiempos que a veces la cargaba primero y tronaba).
+  window.initGooglePlacesAutocomplete = initGooglePlacesAutocomplete;
+  (function loadGoogleMapsScript(){
+    if(!GOOGLE_PLACES_API_KEY || GOOGLE_PLACES_API_KEY.indexOf('PON_AQUI') === 0) return;
+    if(document.getElementById('googleMapsScriptTag')) return; // ya se cargó, no la dupliques
+    const s = document.createElement('script');
+    s.id = 'googleMapsScriptTag';
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + GOOGLE_PLACES_API_KEY + '&libraries=places&callback=initGooglePlacesAutocomplete';
+    s.async = true;
+    document.head.appendChild(s);
+  })();
   // ===================== FIN AUTOCOMPLETADO DE DIRECCIONES =====================
 
   function backToForgotStep1(){
@@ -6274,6 +6287,28 @@
     `).join('');
   }
 
+  async function completePolicyNumberViaEdge(policyId, policyNumber){
+    const { data: { session } } = await sb.auth.getSession();
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/complete-policy-number', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ policyId, policyNumber })
+      });
+      const data = await resp.json();
+      if(!resp.ok || data.error){
+        return { error: { message: data.error || 'Error desconocido.' } };
+      }
+      return { error: null };
+    } catch(err){
+      return { error: { message: 'Error de conexión: ' + err.message } };
+    }
+  }
+
   async function issueReceipt(transactionId, policyId){
     const input = document.getElementById('pending-numero-' + transactionId);
     const numero = input.value.trim();
@@ -6281,7 +6316,7 @@
       showMsg('pending-msg-' + transactionId, 'error', 'Escribe el número de póliza.');
       return;
     }
-    const { error } = await sb.rpc('complete_policy_number', { p_policy_id: policyId, p_policy_number: numero });
+    const { error } = await completePolicyNumberViaEdge(policyId, numero);
     if(error){
       showMsg('pending-msg-' + transactionId, 'error', 'No se pudo completar: ' + error.message);
       return;
@@ -6548,7 +6583,7 @@
       showMsg('paymentSuccessMsg','error','Escribe el número de póliza.');
       return;
     }
-    const { error } = await sb.rpc('complete_policy_number', { p_policy_id: paymentSuccessPolicyId, p_policy_number: numero });
+    const { error } = await completePolicyNumberViaEdge(paymentSuccessPolicyId, numero);
     if(error){
       showMsg('paymentSuccessMsg','error','No se pudo completar: ' + error.message);
       return;
