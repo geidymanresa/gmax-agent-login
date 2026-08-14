@@ -6293,7 +6293,7 @@
     `).join('');
   }
 
-  async function completePolicyNumberViaEdge(policyId, policyNumber){
+  async function completePolicyNumberViaEdge(policyId, policyNumber, transactionId){
     const { data: { session } } = await sb.auth.getSession();
     try {
       const resp = await fetch(SUPABASE_URL + '/functions/v1/complete-policy-number', {
@@ -6303,7 +6303,7 @@
           'Authorization': 'Bearer ' + session.access_token,
           'apikey': SUPABASE_ANON_KEY
         },
-        body: JSON.stringify({ policyId, policyNumber })
+        body: JSON.stringify({ policyId, policyNumber, transactionId })
       });
       const data = await resp.json();
       if(!resp.ok || data.error){
@@ -6322,7 +6322,7 @@
       showMsg('pending-msg-' + transactionId, 'error', 'Escribe el número de póliza.');
       return;
     }
-    const { error } = await completePolicyNumberViaEdge(policyId, numero);
+    const { error } = await completePolicyNumberViaEdge(policyId, numero, transactionId);
     if(error){
       showMsg('pending-msg-' + transactionId, 'error', 'No se pudo completar: ' + error.message);
       return;
@@ -6589,7 +6589,7 @@
       showMsg('paymentSuccessMsg','error','Escribe el número de póliza.');
       return;
     }
-    const { error } = await completePolicyNumberViaEdge(paymentSuccessPolicyId, numero);
+    const { error } = await completePolicyNumberViaEdge(paymentSuccessPolicyId, numero, paymentSuccessTxId);
     if(error){
       showMsg('paymentSuccessMsg','error','No se pudo completar: ' + error.message);
       return;
