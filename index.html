@@ -338,7 +338,46 @@
   </div>
 
   <!-- APPLICATION VIEW -->
-  <div class="form-box wide" id="appView">
+  <!-- FIRMA PÚBLICA (link ?firmar=TOKEN — sin necesitar cuenta) -->
+  <div class="form-box wide" id="signPageView" style="display:none;">
+    <div id="sign-loading">
+      <p class="sub">Cargando documento...</p>
+    </div>
+
+    <div id="sign-content" style="display:none;">
+      <h2 id="sign-doc-title">Documento</h2>
+      <p class="sub">Revisa el documento completo abajo. Al firmar, confirmas que estás de acuerdo con lo que dice.</p>
+
+      <div id="sign-doc-html" style="border:1.5px solid var(--line); border-radius:12px; padding:20px; margin:16px 0; max-height:420px; overflow-y:auto; background:#fff;"></div>
+
+      <div class="form-row">
+        <label>Tu nombre completo (como firma)</label>
+        <input type="text" id="sign-name" placeholder="Escribe tu nombre completo" required>
+      </div>
+
+      <div class="form-row">
+        <label>Firma aquí abajo</label>
+        <canvas id="sign-canvas" width="600" height="180" style="width:100%; max-width:600px; height:180px; border:1.5px dashed var(--line); border-radius:10px; touch-action:none; background:#fff; cursor:crosshair;"></canvas>
+        <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px; margin-top:8px;" onclick="clearSignaturePad()">Borrar firma</button>
+      </div>
+
+      <div class="msg" id="sign-msg"></div>
+      <button type="button" class="btn-primary" onclick="submitSignaturePad()">Firmar y enviar</button>
+
+      <p class="sub" style="margin-top:14px; font-size:11.5px;">Al firmar, se guarda tu nombre, la fecha y hora, y tu dirección IP como parte de este documento.</p>
+    </div>
+
+    <div id="sign-already-done" style="display:none; text-align:center;">
+      <p style="color:#1a7f37; font-weight:600; font-size:18px;">✓ Este documento ya fue firmado.</p>
+      <p class="sub" id="sign-already-done-detail"></p>
+    </div>
+
+    <div id="sign-error" style="display:none;">
+      <p class="sub" id="sign-error-text" style="color:#C23B3B;"></p>
+    </div>
+  </div>
+
+
     <a href="#" class="back-link" onclick="showView('login'); return false;">← Volver a iniciar sesión</a>
 
     <div class="recruit-hero">
@@ -2431,6 +2470,7 @@
     document.getElementById('appView').style.display = view === 'app' ? 'block' : 'none';
     document.getElementById('resetPasswordView').style.display = view === 'resetPassword' ? 'block' : 'none';
     document.getElementById('forcePasswordChangeView').style.display = view === 'forcePasswordChange' ? 'block' : 'none';
+    document.getElementById('signPageView').style.display = view === 'signPage' ? 'block' : 'none';
     document.body.classList.toggle('app-mode', view === 'app');
     document.body.classList.toggle('dashboard-mode', view === 'dashboard');
     if(view === 'forgotPassword') backToForgotStep1();
@@ -2679,6 +2719,146 @@
 
 
   // Cuando Supabase redirige de vuelta desde el link del correo de recuperación
+  // ===================== FIRMA PÚBLICA (sin necesitar cuenta) =====================
+  const urlParamsFirma = new URLSearchParams(window.location.search);
+  const tokenFirma = urlParamsFirma.get('firmar');
+
+  if(tokenFirma){
+    showView('signPage');
+    loadSignatureDocument(tokenFirma);
+  }
+
+  async function loadSignatureDocument(token){
+    document.getElementById('sign-loading').style.display = 'block';
+    document.getElementById('sign-content').style.display = 'none';
+    document.getElementById('sign-already-done').style.display = 'none';
+    document.getElementById('sign-error').style.display = 'none';
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/get-signature-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ token })
+      });
+      const data = await resp.json();
+      document.getElementById('sign-loading').style.display = 'none';
+
+      if(!resp.ok || data.error){
+        document.getElementById('sign-error').style.display = 'block';
+        document.getElementById('sign-error-text').textContent = data.error || 'No se pudo cargar el documento.';
+        return;
+      }
+
+      if(data.status === 'firmado'){
+        document.getElementById('sign-already-done').style.display = 'block';
+        document.getElementById('sign-already-done-detail').textContent = 'Firmado por ' + data.signer_name + ' el ' + new Date(data.signed_at).toLocaleString('es-US') + '.';
+        return;
+      }
+
+      document.getElementById('sign-content').style.display = 'block';
+      document.getElementById('sign-doc-title').textContent = data.document_title || 'Documento';
+      document.getElementById('sign-doc-html').innerHTML = data.document_html || '';
+      initSignaturePad();
+    } catch(err){
+      document.getElementById('sign-loading').style.display = 'none';
+      document.getElementById('sign-error').style.display = 'block';
+      document.getElementById('sign-error-text').textContent = 'Error de conexión: ' + err.message;
+    }
+  }
+
+  let signPadCtx = null;
+  let signPadDrawing = false;
+  let signPadHasStrokes = false;
+
+  function initSignaturePad(){
+    const canvas = document.getElementById('sign-canvas');
+    // El canvas se dibuja a resolución fija (600x180) pero se muestra a
+    // ancho variable — hay que convertir la posición del mouse/dedo a esa
+    // resolución fija para que la firma no quede desalineada.
+    signPadCtx = canvas.getContext('2d');
+    signPadCtx.lineWidth = 2.4;
+    signPadCtx.lineCap = 'round';
+    signPadCtx.strokeStyle = '#0D1424';
+    signPadHasStrokes = false;
+
+    function getPos(e){
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        x: (clientX - rect.left) * (canvas.width / rect.width),
+        y: (clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function start(e){
+      e.preventDefault();
+      signPadDrawing = true;
+      signPadHasStrokes = true;
+      const p = getPos(e);
+      signPadCtx.beginPath();
+      signPadCtx.moveTo(p.x, p.y);
+    }
+    function move(e){
+      if(!signPadDrawing) return;
+      e.preventDefault();
+      const p = getPos(e);
+      signPadCtx.lineTo(p.x, p.y);
+      signPadCtx.stroke();
+    }
+    function end(){ signPadDrawing = false; }
+
+    canvas.addEventListener('mousedown', start);
+    canvas.addEventListener('mousemove', move);
+    canvas.addEventListener('mouseup', end);
+    canvas.addEventListener('mouseleave', end);
+    canvas.addEventListener('touchstart', start, { passive: false });
+    canvas.addEventListener('touchmove', move, { passive: false });
+    canvas.addEventListener('touchend', end);
+  }
+
+  function clearSignaturePad(){
+    const canvas = document.getElementById('sign-canvas');
+    signPadCtx.clearRect(0, 0, canvas.width, canvas.height);
+    signPadHasStrokes = false;
+  }
+
+  async function submitSignaturePad(){
+    const nombre = document.getElementById('sign-name').value.trim();
+    if(!nombre){
+      showMsg('sign-msg','error','Escribe tu nombre completo.');
+      return;
+    }
+    if(!signPadHasStrokes){
+      showMsg('sign-msg','error','Dibuja tu firma en el recuadro antes de continuar.');
+      return;
+    }
+
+    const canvas = document.getElementById('sign-canvas');
+    const signatureImage = canvas.toDataURL('image/png');
+    const token = new URLSearchParams(window.location.search).get('firmar');
+
+    showMsg('sign-msg','success','Guardando tu firma...');
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/submit-signature', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ token, signerName: nombre, signatureImage })
+      });
+      const data = await resp.json();
+      if(!resp.ok || data.error){
+        showMsg('sign-msg','error', data.error || 'No se pudo guardar la firma.');
+        return;
+      }
+      document.getElementById('sign-content').style.display = 'none';
+      document.getElementById('sign-already-done').style.display = 'block';
+      document.getElementById('sign-already-done-detail').textContent = 'Gracias, ' + nombre + '. Tu firma quedó guardada correctamente.';
+    } catch(err){
+      showMsg('sign-msg','error','Error de conexión: ' + err.message);
+    }
+  }
+  // ===================== FIN FIRMA PÚBLICA =====================
+
   sb.auth.onAuthStateChange((event, session) => {
     if(event === 'PASSWORD_RECOVERY'){
       showView('resetPassword');
@@ -6749,13 +6929,58 @@
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
         <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">Descargar recibo</button>
         <button type="button" class="btn-ghost" id="cd-receipt-email-btn" style="width:auto; padding:10px 18px;" onclick="sendReceiptByEmail('${transactionId}')">Enviar por correo</button>
-        <button type="button" class="btn-ghost" disabled style="width:auto; padding:10px 18px; opacity:0.5; cursor:not-allowed;" title="Falta conectar DocuSign">Enviar a firmar (DocuSign)</button>
+        <button type="button" class="btn-ghost" id="cd-receipt-sign-btn" style="width:auto; padding:10px 18px;" onclick="requestSignature('${transactionId}')">✍️ Enviar a firmar</button>
       </div>
       <div class="msg" id="cd-receipt-email-msg" style="margin-top:8px;"></div>
-      <p class="sub" style="margin-top:8px;">El botón "Enviar a firmar" se activa en cuanto conectemos DocuSign — mientras tanto, este recibo queda guardado aquí y lo puedes volver a abrir cuando quieras desde el historial de Transacciones.</p>
+      <div class="msg" id="cd-receipt-sign-msg" style="margin-top:8px;"></div>
+      <p class="sub" style="margin-top:8px;">"Enviar a firmar" genera un link único para mandarle al cliente — ahí va a poder ver este documento y firmarlo con el dedo o el mouse, sin necesitar cuenta.</p>
     `;
     document.getElementById('cd-receiptCard').style.display = 'block';
     document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  async function requestSignature(transactionId){
+    const btn = document.getElementById('cd-receipt-sign-btn');
+    const msgEl = document.getElementById('cd-receipt-sign-msg');
+    btn.disabled = true;
+    showMsg('cd-receipt-sign-msg','success','Generando link de firma...');
+
+    const receiptHtml = document.getElementById('cd-receiptContent') ? document.getElementById('cd-receiptContent').innerHTML : document.getElementById('cd-receiptCard').innerHTML;
+
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/create-signature-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          transactionId,
+          clientId: currentClientId,
+          documentTitle: 'Recibo de pago — GMAX All Insurance',
+          documentHtml: receiptHtml
+        })
+      });
+      const data = await resp.json();
+      btn.disabled = false;
+      if(!resp.ok || data.error){
+        showMsg('cd-receipt-sign-msg','error', data.error || 'No se pudo generar el link de firma.');
+        return;
+      }
+
+      const link = window.location.origin + window.location.pathname + '?firmar=' + data.token;
+      msgEl.className = 'msg success';
+      msgEl.innerHTML = `
+        ✓ Link de firma generado. Mándaselo al cliente:<br>
+        <input type="text" readonly value="${link}" onclick="this.select()" style="width:100%; margin-top:6px; padding:8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px;">
+        <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px; margin-top:6px; font-size:13px;" onclick="navigator.clipboard.writeText('${link}'); this.textContent='¡Copiado!';">Copiar link</button>
+      `;
+    } catch(err){
+      btn.disabled = false;
+      showMsg('cd-receipt-sign-msg','error','Error de conexión: ' + err.message);
+    }
   }
 
   function downloadReceiptPDF(){
@@ -8320,6 +8545,7 @@
 
   // Check if already logged in
   (async function(){
+    if(tokenFirma) return; // ya estamos mostrando la pantalla de firma, no la tapes con el dashboard
     const { data: { session } } = await sb.auth.getSession();
     if(session){
       showView('dashboard');
