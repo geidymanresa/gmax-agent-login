@@ -1824,17 +1824,49 @@
           <!-- Alertas / Recordatorios de seguimiento -->
           <div class="dash-card" style="background:#F1E9FB; border:1.5px solid #D6C2EF;">
             <h4 style="color:#6B3FA0;">🔔 Alertas de seguimiento</h4>
-            <p class="sub">Recuérdate llamar a este cliente, dar seguimiento a un lead, etc. Se te va a mostrar en el Dashboard principal a partir de la fecha que elijas.</p>
+            <p class="sub">Recuérdate llamar a este cliente, dar seguimiento a un lead, etc. Se te va a mostrar en el Dashboard principal mientras esté activa.</p>
             <form id="addAlertForm" style="margin-bottom:16px;">
-              <div class="form-row-2">
+              <div class="form-row">
+                <label>Tipo de alerta</label>
+                <select id="cd-nuevaAlertaTipo" onchange="onAlertTypeChange()">
+                  <option value="single_date">Una fecha específica</option>
+                  <option value="monthly_range">Rango de días que se repite cada mes (ej. del 20 al 25)</option>
+                  <option value="countdown">Los próximos N días desde una fecha (ej. los próximos 5 días)</option>
+                </select>
+              </div>
+
+              <div id="cd-alerta-single-block" class="form-row-2">
                 <div class="form-row">
                   <label>Recuérdame el</label>
-                  <input type="text" id="cd-nuevaAlertaFecha" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)" required>
+                  <input type="text" id="cd-nuevaAlertaFecha" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)">
+                </div>
+              </div>
+
+              <div id="cd-alerta-range-block" class="form-row-2" style="display:none;">
+                <div class="form-row">
+                  <label>Del día (1-31) de cada mes</label>
+                  <input type="number" id="cd-nuevaAlertaRangoInicio" min="1" max="31" placeholder="20">
                 </div>
                 <div class="form-row">
-                  <label>Nota</label>
-                  <input type="text" id="cd-nuevaAlertaNota" placeholder="Ej: Llamar al cliente a las 6pm para ver si quiere la póliza" required>
+                  <label>Al día (1-31) de cada mes</label>
+                  <input type="number" id="cd-nuevaAlertaRangoFin" min="1" max="31" placeholder="25">
                 </div>
+              </div>
+
+              <div id="cd-alerta-countdown-block" class="form-row-2" style="display:none;">
+                <div class="form-row">
+                  <label>Empieza a contar desde</label>
+                  <input type="text" id="cd-nuevaAlertaCountdownFecha" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)">
+                </div>
+                <div class="form-row">
+                  <label>Durante cuántos días</label>
+                  <input type="number" id="cd-nuevaAlertaCountdownDias" min="1" placeholder="5">
+                </div>
+              </div>
+
+              <div class="form-row">
+                <label>Nota (para qué es esta alerta)</label>
+                <input type="text" id="cd-nuevaAlertaNota" placeholder="Ej: Llamar al cliente para recordarle el pago mensual" required>
               </div>
               <button type="submit" class="btn-primary" style="width:auto; padding:10px 18px;">Agregar alerta</button>
             </form>
@@ -4326,6 +4358,48 @@
     await loadClientNotes(currentClientId);
   });
 
+  function onAlertTypeChange(){
+    const tipo = document.getElementById('cd-nuevaAlertaTipo').value;
+    document.getElementById('cd-alerta-single-block').style.display = tipo === 'single_date' ? 'grid' : 'none';
+    document.getElementById('cd-alerta-range-block').style.display = tipo === 'monthly_range' ? 'grid' : 'none';
+    document.getElementById('cd-alerta-countdown-block').style.display = tipo === 'countdown' ? 'grid' : 'none';
+  }
+
+  // ¿Esta alerta está activa hoy? Sirve tanto en el perfil del cliente como en el dashboard.
+  function isAlertActiveToday(a){
+    if(a.active === false) return false;
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    if(a.alert_type === 'monthly_range'){
+      const diaHoy = hoy.getDate();
+      if(a.range_start_day == null || a.range_end_day == null) return false;
+      if(a.range_start_day <= a.range_end_day){
+        return diaHoy >= a.range_start_day && diaHoy <= a.range_end_day;
+      }
+      // rango que cruza fin de mes (ej. del 28 al 3)
+      return diaHoy >= a.range_start_day || diaHoy <= a.range_end_day;
+    }
+    if(a.alert_type === 'countdown'){
+      if(!a.countdown_start_date || !a.countdown_days) return false;
+      const inicio = new Date(a.countdown_start_date + 'T00:00:00');
+      const fin = new Date(inicio); fin.setDate(fin.getDate() + a.countdown_days - 1);
+      return hoy >= inicio && hoy <= fin;
+    }
+    // single_date: activa desde ese día en adelante (como funcionaba antes)
+    const todayISO = toISODateLocal(new Date());
+    return a.alert_date && a.alert_date <= todayISO;
+  }
+
+  function describeAlertSchedule(a){
+    if(a.alert_type === 'monthly_range'){
+      return `Cada mes, del día ${a.range_start_day} al ${a.range_end_day}`;
+    }
+    if(a.alert_type === 'countdown'){
+      return `Los ${a.countdown_days} días desde el ${formatDateUS(a.countdown_start_date)}`;
+    }
+    return formatDateUS(a.alert_date);
+  }
+
+
   // ===================== ALERTAS / RECORDATORIOS DE SEGUIMIENTO =====================
   async function loadClientAlerts(clientId){
     const { data: alerts } = await sb.from('client_alerts').select('*').eq('client_id', clientId).order('alert_date', { ascending: true });
@@ -4338,54 +4412,22 @@
     }
     const today = toISODateLocal(new Date());
     container.innerHTML = alerts.map(a => {
-      const vencida = a.alert_date <= today;
+      const activa = isAlertActiveToday(a);
       return `
       <div style="padding:10px 0; border-bottom:1px solid #E1D6F2;">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
-          <span style="font-weight:700; color:${vencida ? '#8a3030' : '#6B3FA0'};">📅 ${formatDateUS(a.alert_date)}${vencida ? ' — ¡pendiente!' : ''}</span>
+          <span style="font-weight:700; color:${activa ? '#8a3030' : '#6B3FA0'};">📅 ${describeAlertSchedule(a)}${activa ? ' — ¡activa hoy!' : ''}</span>
           <span style="flex-shrink:0; display:flex; gap:6px;">
-            <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="toggleEditAlert('${a.id}')">Editar</button>
-            <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; color:#C23B3B;" onclick="removeAlert('${a.id}')">Quitar</button>
+            <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="removeAlert('${a.id}')">Quitar</button>
           </span>
         </div>
         <div id="alert-text-${a.id}" style="white-space:pre-line; margin-top:4px;">${escapeHtml(a.note)}</div>
-        <div id="alert-edit-${a.id}" style="display:none; margin-top:8px;">
-          <input type="text" id="alert-edit-fecha-${a.id}" value="${formatDateUS(a.alert_date)}" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)" style="margin-bottom:8px;">
-          <textarea id="alert-edit-nota-${a.id}" rows="2" style="width:100%; padding:10px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;">${escapeHtml(a.note)}</textarea>
-          <div style="margin-top:8px; display:flex; gap:8px;">
-            <button type="button" class="btn-primary" style="width:auto; padding:8px 16px;" onclick="saveEditedAlert('${a.id}')">Guardar</button>
-            <button type="button" class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="toggleEditAlert('${a.id}')">Cancelar</button>
-          </div>
-        </div>
       </div>
     `;
     }).join('');
   }
 
   let currentClientAlerts = [];
-
-  function toggleEditAlert(id){
-    const textDiv = document.getElementById('alert-text-' + id);
-    const editDiv = document.getElementById('alert-edit-' + id);
-    const opening = editDiv.style.display === 'none';
-    editDiv.style.display = opening ? 'block' : 'none';
-    textDiv.style.display = opening ? 'none' : 'block';
-  }
-
-  async function saveEditedAlert(id){
-    const fechaISO = mmddyyyyToISO(document.getElementById('alert-edit-fecha-' + id).value);
-    const nota = document.getElementById('alert-edit-nota-' + id).value.trim();
-    if(!fechaISO || !nota){
-      alert('Completa la fecha y la nota.');
-      return;
-    }
-    const { error } = await sb.from('client_alerts').update({ alert_date: fechaISO, note: nota, updated_at: new Date().toISOString() }).eq('id', id);
-    if(error){
-      alert('No se pudo guardar la alerta: ' + error.message);
-      return;
-    }
-    await loadClientAlerts(currentClientId);
-  }
 
   async function removeAlert(id){
     if(!confirm('¿Quitar esta alerta? Ya no te va a aparecer en el Dashboard.')) return;
@@ -4397,25 +4439,55 @@
   document.getElementById('addAlertForm').addEventListener('submit', async function(e){
     e.preventDefault();
     if(!currentClientId) return;
-    const fechaISO = mmddyyyyToISO(document.getElementById('cd-nuevaAlertaFecha').value);
+
+    const tipo = document.getElementById('cd-nuevaAlertaTipo').value;
     const nota = document.getElementById('cd-nuevaAlertaNota').value.trim();
-    if(!fechaISO || !nota){
-      showMsg('clientDetailMsg','error','Completa la fecha y la nota de la alerta.');
+    if(!nota){
+      showMsg('clientDetailMsg','error','Escribe la nota: para qué es esta alerta.');
       return;
     }
+
+    const payload = { client_id: currentClientId, note: nota, alert_type: tipo, active: true };
+
+    if(tipo === 'single_date'){
+      const fechaISO = mmddyyyyToISO(document.getElementById('cd-nuevaAlertaFecha').value);
+      if(!fechaISO){
+        showMsg('clientDetailMsg','error','Escribe la fecha de la alerta.');
+        return;
+      }
+      payload.alert_date = fechaISO;
+    } else if(tipo === 'monthly_range'){
+      const inicio = parseInt(document.getElementById('cd-nuevaAlertaRangoInicio').value, 10);
+      const fin = parseInt(document.getElementById('cd-nuevaAlertaRangoFin').value, 10);
+      if(!inicio || !fin || inicio < 1 || inicio > 31 || fin < 1 || fin > 31){
+        showMsg('clientDetailMsg','error','Escribe del día 1 al 31 en que empieza y termina de avisarte cada mes.');
+        return;
+      }
+      payload.range_start_day = inicio;
+      payload.range_end_day = fin;
+      payload.alert_date = toISODateLocal(new Date()); // solo de referencia, no se usa para calcular
+    } else if(tipo === 'countdown'){
+      const fechaISO = mmddyyyyToISO(document.getElementById('cd-nuevaAlertaCountdownFecha').value);
+      const dias = parseInt(document.getElementById('cd-nuevaAlertaCountdownDias').value, 10);
+      if(!fechaISO || !dias || dias < 1){
+        showMsg('clientDetailMsg','error','Escribe desde qué fecha empieza a contar y durante cuántos días.');
+        return;
+      }
+      payload.countdown_start_date = fechaISO;
+      payload.countdown_days = dias;
+      payload.alert_date = fechaISO; // solo de referencia
+    }
+
     const { data: { session } } = await sb.auth.getSession();
-    const { error } = await sb.from('client_alerts').insert({
-      client_id: currentClientId,
-      alert_date: fechaISO,
-      note: nota,
-      created_by: session.user.id
-    });
+    payload.created_by = session.user.id;
+
+    const { error } = await sb.from('client_alerts').insert(payload);
     if(error){
       showMsg('clientDetailMsg','error','No se pudo agregar la alerta: ' + error.message);
       return;
     }
-    document.getElementById('cd-nuevaAlertaFecha').value = '';
-    document.getElementById('cd-nuevaAlertaNota').value = '';
+    document.getElementById('addAlertForm').reset();
+    onAlertTypeChange();
     await loadClientAlerts(currentClientId);
   });
   // =================== FIN ALERTAS / RECORDATORIOS ===================
@@ -6907,23 +6979,31 @@
 
   // ---- Recordatorios de seguimiento (alertas de clientes) ----
   async function loadDashboardFollowups(){
-    const today = toISODateLocal(new Date());
     const { data: alerts, error } = await sb.from('client_alerts')
-      .select('*, client:client_id(full_name)')
-      .lte('alert_date', today)
-      .order('alert_date', { ascending: true });
+      .select('*, client:client_id(full_name, assigned_agent_id)')
+      .eq('active', true);
 
     const card = document.getElementById('dashFollowupCard');
     const list = document.getElementById('dashFollowupList');
     if(!card || !list) return;
-    if(error || !alerts || alerts.length === 0){
+
+    let activos = (alerts || []).filter(a => a.client && isAlertActiveToday(a));
+
+    // Si no eres admin/super_admin, solo ves las alertas de tus propios clientes.
+    if(!isAdminUser() && currentProfile){
+      activos = activos.filter(a => a.client.assigned_agent_id === currentProfile.id);
+    }
+
+    activos.sort((a, b) => (a.client.full_name || '').localeCompare(b.client.full_name || ''));
+
+    if(error || activos.length === 0){
       card.style.display = 'none';
       return;
     }
     card.style.display = 'block';
-    list.innerHTML = alerts.map(a => `
+    list.innerHTML = activos.map(a => `
       <div style="padding:8px 0; border-bottom:1px solid #E1D6F2; cursor:pointer;" onclick="goToClientFromUnderwriting('${a.client_id}')">
-        <strong>${a.client ? a.client.full_name : 'Cliente'}</strong> — ${formatDateUS(a.alert_date)}
+        <strong>${a.client ? a.client.full_name : 'Cliente'}</strong> — ${describeAlertSchedule(a)}
         <div class="sub" style="margin-top:2px;">${escapeHtml(a.note)}</div>
       </div>
     `).join('');
