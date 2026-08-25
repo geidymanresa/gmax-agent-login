@@ -1123,6 +1123,7 @@
               <tbody id="clientsTableBody"><tr><td colspan="4">Cargando...</td></tr></tbody>
             </table>
           </div>
+          <div id="clientsPager" style="display:flex; align-items:center; margin-top:12px; flex-wrap:wrap;"></div>
         </div>
 
         <!-- Vista de detalle -->
@@ -4047,10 +4048,14 @@
     renderClientsList();
   }
 
+  let clientsCurrentPage = 1;
+  const CLIENTS_PAGE_SIZE = 10;
+  let filteredClientsList = [];
+
   function renderClientsList(){
     const term = (document.getElementById('clientSearch')?.value || '').toLowerCase();
     const productFilter = document.getElementById('clientProductFilter')?.value || '';
-    const filtered = allClients.filter(c => {
+    filteredClientsList = allClients.filter(c => {
       if(currentClientStatusFilter && c.client_status !== currentClientStatusFilter) return false;
       if(productFilter){
         const policies = allClientPoliciesByClient[c.id] || [];
@@ -4061,12 +4066,31 @@
              (c.email || '').toLowerCase().includes(term) ||
              (c.phone || '').toLowerCase().includes(term);
     });
+    clientsCurrentPage = 1;
+    renderClientsPage();
+  }
+
+  function changeClientsPage(delta){
+    clientsCurrentPage += delta;
+    renderClientsPage();
+  }
+
+  function renderClientsPage(){
     const tbody = document.getElementById('clientsTableBody');
+    const pager = document.getElementById('clientsPager');
     if(!tbody) return;
-    if(filtered.length === 0){
+    if(filteredClientsList.length === 0){
       tbody.innerHTML = '<tr><td colspan="4">No se encontraron clientes.</td></tr>';
+      if(pager) pager.innerHTML = '';
       return;
     }
+
+    const totalPages = Math.max(1, Math.ceil(filteredClientsList.length / CLIENTS_PAGE_SIZE));
+    if(clientsCurrentPage > totalPages) clientsCurrentPage = totalPages;
+    if(clientsCurrentPage < 1) clientsCurrentPage = 1;
+    const start = (clientsCurrentPage - 1) * CLIENTS_PAGE_SIZE;
+    const filtered = filteredClientsList.slice(start, start + CLIENTS_PAGE_SIZE);
+
     tbody.innerHTML = filtered.map(c => {
       const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${c.source_public_form ? ' <span class="badge blue" title="Este lead llegó por el formulario público de la página web">🌐 Web</span>' : ''}`;
       const policies = allClientPoliciesByClient[c.id] || [];
@@ -4104,6 +4128,14 @@
         `;
       }).join('');
     }).join('');
+
+    if(pager){
+      pager.innerHTML = `
+        <button class="btn-ghost" style="width:auto; padding:6px 14px;" ${clientsCurrentPage <= 1 ? 'disabled' : ''} onclick="changeClientsPage(-1)">← Anteriores</button>
+        <span class="sub" style="margin:0 10px;">Página ${clientsCurrentPage} de ${totalPages} (${filteredClientsList.length} clientes)</span>
+        <button class="btn-ghost" style="width:auto; padding:6px 14px;" ${clientsCurrentPage >= totalPages ? 'disabled' : ''} onclick="changeClientsPage(1)">Siguientes →</button>
+      `;
+    }
   }
 
   function buildFullName(first, middle, last){
