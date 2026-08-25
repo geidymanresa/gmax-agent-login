@@ -211,6 +211,13 @@
   .addr-suggest-item:last-child{border-bottom:none;}
   .addr-suggest-item:hover{background:var(--canvas);}
 
+  /* Tarjetas colapsables (perfil de cliente) */
+  .dash-card[data-collapsible]{position:relative;}
+  .dash-card[data-collapsible] .cc-header{cursor:pointer; user-select:none; padding-right:26px;}
+  .cc-chevron{position:absolute; top:24px; right:22px; font-size:13px; color:var(--slate-light); transition:transform .15s; pointer-events:none;}
+  .dash-card.cc-collapsed .cc-chevron{transform:rotate(-90deg);}
+  .dash-card.cc-collapsed .cc-body{display:none;}
+
   @media (max-width:820px){
     .dash-wrap{flex-direction:column;}
     .dash-sidebar{width:100%; min-height:auto; flex-direction:row; align-items:center; padding:14px 18px; overflow-x:auto;}
@@ -580,7 +587,8 @@
       <nav class="dash-nav">
         <button class="dash-nav-btn active" data-tab="inicio" onclick="switchTab('inicio')">Inicio</button>
         <button class="dash-nav-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
-        <button class="dash-nav-btn" style="background:var(--gold); color:var(--navy); font-weight:800;" onclick="startVenderPoliza()">💰 Vender Póliza</button>
+        <button class="dash-nav-btn" style="color:var(--gold); font-weight:800;" onclick="startVenderPoliza()">💰 Vender Póliza</button>
+        <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
         <button class="dash-nav-btn" data-tab="companias" id="navCompanias" onclick="switchTab('companias')" style="display:none;">Compañías</button>
         <button class="dash-nav-btn" data-tab="servicefees" id="navServiceFees" onclick="switchTab('servicefees')" style="display:none;">Service Fees</button>
         <button class="dash-nav-btn" data-tab="tesoreria" id="navTesoreria" onclick="switchTab('tesoreria')" style="display:none;">Tesorería</button>
@@ -629,7 +637,25 @@
 
         <div id="mc-tab-documentos" class="mc-tab-content dash-card" style="display:none;">
           <h4 style="margin-top:0;">Mis documentos</h4>
-          <p class="sub">Próximamente: aquí podrás subir tus documentos personales (licencias, seguro de errores y omisiones, y otros que te solicite la agencia).</p>
+          <p class="sub" style="margin-bottom:14px;">Sube tu licencia, tu seguro de errores y omisiones (E&amp;O), y cualquier otro documento que te pida la agencia. La administradora los puede ver desde tu perfil.</p>
+          <form id="mc-uploadDocForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+            <div class="form-row" style="flex:1; min-width:220px; margin:0;">
+              <label>Archivo</label>
+              <input type="file" id="mc-doc-archivo" required>
+            </div>
+            <div class="form-row" style="min-width:180px; margin:0;">
+              <label>Categoría</label>
+              <select id="mc-doc-categoria">
+                <option value="Licencia">Licencia</option>
+                <option value="Seguro E&O">Seguro E&amp;O</option>
+                <option value="Contrato">Contrato</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Subir</button>
+          </form>
+          <div class="msg" id="mcDocMsg"></div>
+          <div id="mc-documentos-list"></div>
         </div>
 
         <div id="mc-tab-banco" class="mc-tab-content dash-card" style="display:none;">
@@ -1475,7 +1501,7 @@
           </div>
 
           <!-- Cotizaciones guardadas (no son ventas) -->
-          <div class="dash-card">
+          <div class="dash-card" data-collapsible="true">
             <h4>Cotizaciones</h4>
             <p class="sub">Cotizaciones guardadas para este cliente (no son pólizas activas, solo referencia de lo que se le ofreció).</p>
             <div class="dash-table-wrap">
@@ -1532,7 +1558,7 @@
           </div>
 
           <!-- Historial de transacciones -->
-          <div class="dash-card">
+          <div class="dash-card" data-collapsible="true">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h4 style="margin:0;">Transacciones</h4>
               <button class="btn-ghost" id="cd-verEliminadasBtn" style="display:none; width:auto; padding:6px 14px;" onclick="toggleDeletedTransactions()">🗑 Ver eliminadas (papelera)</button>
@@ -1558,7 +1584,7 @@
           </div>
 
           <!-- Conductores -->
-          <div class="dash-card">
+          <div class="dash-card" data-collapsible="true">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h4 style="margin:0;">Conductores</h4>
               <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="toggleNewDriver()">+ Agregar conductor</button>
@@ -1634,7 +1660,7 @@
           </div>
 
           <!-- Vehículos -->
-          <div class="dash-card">
+          <div class="dash-card" data-collapsible="true">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <h4 style="margin:0;">Vehículos</h4>
               <button class="btn-primary" style="width:auto; padding:8px 16px;" onclick="toggleNewVehicle()">+ Agregar vehículo</button>
@@ -1696,7 +1722,7 @@
           </div>
 
           <!-- Documentos -->
-          <div class="dash-card dash-card-docs">
+          <div class="dash-card dash-card-docs" data-collapsible="true">
             <h4>📁 Documentos</h4>
             <p class="sub">Licencias, identificaciones, fotos de vehículos, propiedades y cualquier archivo relacionado con este cliente.</p>
             <div class="msg" id="docUploadMsg"></div>
@@ -1911,7 +1937,7 @@
           </div>
 
           <!-- Notas internas -->
-          <div class="dash-card">
+          <div class="dash-card" data-collapsible="true">
             <h4>Notas internas</h4>
             <form id="addNoteForm" style="display:flex; gap:10px; align-items:flex-start; margin-bottom:16px;">
               <textarea id="cd-nuevaNota" rows="2" placeholder="Escribe una nota interna..." style="flex:1; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea>
@@ -1921,7 +1947,7 @@
           </div>
 
           <!-- Alertas / Recordatorios de seguimiento -->
-          <div class="dash-card" style="background:#F1E9FB; border:1.5px solid #D6C2EF;">
+          <div class="dash-card" data-collapsible="true" style="background:#F1E9FB; border:1.5px solid #D6C2EF;">
             <h4 style="color:#6B3FA0;">🔔 Alertas de seguimiento</h4>
             <p class="sub">Recuérdate llamar a este cliente, dar seguimiento a un lead, etc. Se te va a mostrar en el Dashboard principal mientras esté activa.</p>
             <form id="addAlertForm" style="margin-bottom:16px;">
@@ -1973,7 +1999,7 @@
           </div>
 
           <!-- Historial de cambios (auditoría) -->
-          <div class="dash-card" style="background:var(--canvas);">
+          <div class="dash-card" data-collapsible="true" style="background:var(--canvas);">
             <h4>🕓 Historial de cambios</h4>
             <p class="sub">Registro de quién editó la información de este cliente y cuándo.</p>
             <div id="cd-auditLogList"><p class="sub" style="margin:0;">Cargando...</p></div>
@@ -1982,6 +2008,58 @@
 
         </div>
 
+      </section>
+
+      <!-- TAB: RECURSOS -->
+      <section class="dash-tab" id="tab-recursos" style="display:none;">
+        <h2>Recursos</h2>
+        <p class="sub">Formularios e información de las aseguradoras, todo en un solo lugar.</p>
+
+        <!-- Solo administradores: agregar recursos -->
+        <div class="dash-card" id="res-adminAddCard" style="display:none;">
+          <h4>Agregar recurso</h4>
+          <div class="form-row">
+            <label>Tipo de recurso</label>
+            <select id="res-tipo" onchange="onResourceTypeChange()">
+              <option value="formulario">Formulario (archivo para descargar)</option>
+              <option value="aseguradora">Información de una aseguradora</option>
+              <option value="otro">Otro (solo texto)</option>
+            </select>
+          </div>
+          <div class="form-row"><label>Título</label><input type="text" id="res-titulo" required placeholder="Ej: Formulario de cancelación, o el nombre de la aseguradora"></div>
+
+          <div id="res-block-aseguradora" style="display:none;">
+            <div class="form-row-2">
+              <div class="form-row"><label>Teléfono de la aseguradora</label><input type="text" id="res-telefono"></div>
+              <div class="form-row"><label>Código de agencia con esa aseguradora</label><input type="text" id="res-codigo-agencia"></div>
+            </div>
+          </div>
+
+          <div id="res-block-archivo">
+            <div class="form-row"><label>Archivo</label><input type="file" id="res-archivo"></div>
+          </div>
+
+          <div class="form-row"><label>Notas</label><textarea id="res-notas" rows="3" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;" placeholder="Cualquier información extra que los agentes deban ver"></textarea></div>
+          <div class="msg" id="resAddMsg"></div>
+          <button type="button" class="btn-primary" style="width:auto; padding:10px 20px;" onclick="submitResource()">Guardar recurso</button>
+        </div>
+
+        <div class="dash-card">
+          <h4>📄 Formularios</h4>
+          <p class="sub" style="margin-bottom:10px;">Formularios de cancelación, de aseguradoras, y otros documentos listos para usar.</p>
+          <div id="res-formulariosList"><p class="sub">Cargando...</p></div>
+        </div>
+
+        <div class="dash-card">
+          <h4>🏢 Información de aseguradoras</h4>
+          <p class="sub" style="margin-bottom:10px;">Teléfonos, códigos de agencia y notas por aseguradora.</p>
+          <div id="res-aseguradorasList"><p class="sub">Cargando...</p></div>
+        </div>
+
+        <div class="dash-card" id="res-otrosCard" style="display:none;">
+          <h4>Otros recursos</h4>
+          <div id="res-otrosList"></div>
+        </div>
       </section>
 
       <!-- TAB: COMPAÑÍAS -->
@@ -2690,6 +2768,56 @@
   initGooglePlacesAutocomplete();
   // ===================== FIN AUTOCOMPLETADO DE DIRECCIONES =====================
 
+  // ===================== TARJETAS COLAPSABLES (perfil de cliente) =====================
+  // Las secciones marcadas con data-collapsible empiezan cerradas; se abren
+  // al hacer clic en su título. Todo lo que no sea la fila del título se
+  // mete adentro de un "cuerpo" que se oculta/muestra con una clase.
+  function setupCollapsibleCards(){
+    document.querySelectorAll('[data-collapsible]').forEach(card => {
+      if(card.dataset.collapsibleReady) return;
+      card.dataset.collapsibleReady = '1';
+      const header = card.querySelector('h4');
+      if(!header) return;
+
+      // La "fila de encabezado" es el h4 mismo, o el div que lo envuelve
+      // junto a un botón (ej. "+ Agregar conductor"), lo que sea hijo
+      // directo de la tarjeta.
+      let headerRow = header;
+      while(headerRow.parentElement && headerRow.parentElement !== card){
+        headerRow = headerRow.parentElement;
+      }
+
+      const body = document.createElement('div');
+      body.className = 'cc-body';
+      Array.from(card.children).forEach(child => {
+        if(child !== headerRow) body.appendChild(child);
+      });
+      card.appendChild(body);
+
+      headerRow.classList.add('cc-header');
+      const chevron = document.createElement('span');
+      chevron.className = 'cc-chevron';
+      chevron.textContent = '▾';
+      card.appendChild(chevron);
+
+      card.classList.add('cc-collapsed'); // cerrada por defecto
+
+      headerRow.addEventListener('click', (ev) => {
+        const actionEl = ev.target.closest('button, a, input, select, textarea');
+        if(actionEl){
+          // Si lo que se tocó es un botón como "+ Agregar conductor",
+          // abrimos la tarjeta para que se vea lo que ese botón revela,
+          // en vez de solo alternar el colapso.
+          card.classList.remove('cc-collapsed');
+          return;
+        }
+        card.classList.toggle('cc-collapsed');
+      });
+    });
+  }
+  setupCollapsibleCards();
+  // ===================== FIN TARJETAS COLAPSABLES =====================
+
   function backToForgotStep1(){
     document.getElementById('fp-step1').style.display = 'block';
     document.getElementById('fp-step2').style.display = 'none';
@@ -3177,6 +3305,7 @@
     document.querySelectorAll('.mc-tab-content').forEach(el => el.style.display = 'none');
     document.getElementById('mc-tab-' + tab).style.display = 'block';
     document.querySelectorAll('.mc-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.mctab === tab));
+    if(tab === 'documentos' && currentProfile) loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
   }
 
   async function saveMiCuentaInfo(){
@@ -3299,6 +3428,7 @@
     await safeLoad(loadLeads, 'Leads');
     await safeLoad(() => setBookOfBusinessRange('today'), 'Libro de negocio');
     await safeLoad(loadUnderwriting, 'Underwriting');
+    await safeLoad(loadResources, 'Recursos');
   }
 
   // ===================== COMPAÑÍAS =====================
@@ -7599,6 +7729,132 @@
     return currentProfile && currentProfile.role === 'super_admin';
   }
 
+  // ===================== RECURSOS (formularios + info de aseguradoras) =====================
+  let allResources = [];
+
+  function onResourceTypeChange(){
+    const tipo = document.getElementById('res-tipo').value;
+    document.getElementById('res-block-aseguradora').style.display = tipo === 'aseguradora' ? 'block' : 'none';
+    document.getElementById('res-block-archivo').style.display = tipo === 'formulario' ? 'block' : 'none';
+  }
+
+  async function loadResources(){
+    const addCard = document.getElementById('res-adminAddCard');
+    if(addCard) addCard.style.display = isAdminUser() ? 'block' : 'none';
+
+    const { data, error } = await sb.from('resources').select('*').order('created_at', { ascending: false });
+    if(error){ console.error(error); allResources = []; }
+    else { allResources = data || []; }
+
+    renderResourceList('formulario', 'res-formulariosList', 'Aún no hay formularios.');
+    renderResourceList('aseguradora', 'res-aseguradorasList', 'Aún no hay información de aseguradoras.');
+
+    const otros = allResources.filter(r => r.tipo === 'otro');
+    const otrosCard = document.getElementById('res-otrosCard');
+    if(otrosCard) otrosCard.style.display = otros.length > 0 ? 'block' : 'none';
+    renderResourceList('otro', 'res-otrosList', '');
+  }
+
+  async function resourceFileUrl(storagePath){
+    if(!storagePath) return '#';
+    const { data } = await sb.storage.from('resources').createSignedUrl(storagePath, 300);
+    return data ? data.signedUrl : '#';
+  }
+
+  function renderResourceList(tipo, containerId, emptyMsg){
+    const container = document.getElementById(containerId);
+    if(!container) return;
+    const list = allResources.filter(r => r.tipo === tipo);
+    if(list.length === 0){
+      container.innerHTML = emptyMsg ? `<p class="sub">${emptyMsg}</p>` : '';
+      return;
+    }
+    const admin = isAdminUser();
+    container.innerHTML = list.map(r => {
+      const detalles = [];
+      if(r.telefono) detalles.push('📞 ' + r.telefono);
+      if(r.codigo_agencia) detalles.push('Código de agencia: ' + r.codigo_agencia);
+      const detallesHtml = detalles.length ? `<div style="font-size:13px; color:var(--slate-light); margin-top:2px;">${detalles.join(' · ')}</div>` : '';
+      const notasHtml = r.notas ? `<div style="font-size:13.5px; margin-top:6px; white-space:pre-wrap;">${r.notas}</div>` : '';
+      const archivoHtml = r.storage_path
+        ? `<a href="javascript:void(0)" onclick="openResourceFile('${r.id}')" style="font-weight:600;">⬇ ${r.file_name || 'Descargar archivo'}</a>`
+        : '';
+      const delBtn = admin
+        ? `<button class="btn-ghost" style="width:auto; padding:6px 10px; margin-top:8px;" onclick="deleteResource('${r.id}','${r.storage_path || ''}')">Eliminar</button>`
+        : '';
+      return `
+        <div style="padding:12px 0; border-bottom:1px solid var(--line);">
+          <div style="font-weight:700;">${r.titulo}</div>
+          ${detallesHtml}
+          ${archivoHtml ? `<div style="margin-top:6px;">${archivoHtml}</div>` : ''}
+          ${notasHtml}
+          ${delBtn}
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function openResourceFile(id){
+    const r = allResources.find(x => x.id === id);
+    if(!r || !r.storage_path) return;
+    const url = await resourceFileUrl(r.storage_path);
+    if(url && url !== '#') window.open(url, '_blank');
+  }
+
+  async function submitResource(){
+    const msg = document.getElementById('resAddMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    if(!isAdminUser()){ msg.className = 'msg error'; msg.textContent = 'No tienes permiso para agregar recursos.'; return; }
+
+    const tipo = document.getElementById('res-tipo').value;
+    const titulo = document.getElementById('res-titulo').value.trim();
+    if(!titulo){ msg.className = 'msg error'; msg.textContent = 'Escribe un título.'; return; }
+
+    const telefono = document.getElementById('res-telefono').value.trim();
+    const codigoAgencia = document.getElementById('res-codigo-agencia').value.trim();
+    const notas = document.getElementById('res-notas').value.trim();
+    const file = document.getElementById('res-archivo').files[0];
+
+    let fileName = null, storagePath = null;
+    if(tipo === 'formulario' && file){
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      storagePath = `${Date.now()}_${safeName}`;
+      const { error: uploadError } = await sb.storage.from('resources').upload(storagePath, file);
+      if(uploadError){ msg.className = 'msg error'; msg.textContent = 'No se pudo subir el archivo: ' + uploadError.message; return; }
+      fileName = file.name;
+    }
+
+    const { error } = await sb.from('resources').insert({
+      tipo,
+      titulo,
+      telefono: telefono || null,
+      codigo_agencia: codigoAgencia || null,
+      notas: notas || null,
+      file_name: fileName,
+      storage_path: storagePath,
+      created_by: currentProfile.id
+    });
+    if(error){ msg.className = 'msg error'; msg.textContent = 'No se pudo guardar: ' + error.message; return; }
+
+    msg.className = 'msg success'; msg.textContent = 'Recurso agregado.';
+    document.getElementById('res-titulo').value = '';
+    document.getElementById('res-telefono').value = '';
+    document.getElementById('res-codigo-agencia').value = '';
+    document.getElementById('res-notas').value = '';
+    document.getElementById('res-archivo').value = '';
+    await loadResources();
+  }
+
+  async function deleteResource(id, storagePath){
+    if(!isAdminUser()) return;
+    if(!confirm('¿Eliminar este recurso?')) return;
+    if(storagePath) await sb.storage.from('resources').remove([storagePath]);
+    const { error } = await sb.from('resources').delete().eq('id', id);
+    if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+    await loadResources();
+  }
+  // ===================== FIN RECURSOS =====================
+
   function setServiceTypeFilter(type){
     currentServiceTypeFilter = type;
     document.querySelectorAll('.sf-type-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.type === type));
@@ -7854,10 +8110,6 @@
   // ===================== UNDERWRITING (administradores) =====================
   function isAdminUser(){
     return currentProfile && (currentProfile.role === 'admin' || currentProfile.role === 'super_admin');
-  }
-
-  function isSuperAdminUser(){
-    return currentProfile && currentProfile.role === 'super_admin';
   }
 
   async function loadUnderwriting(){
@@ -8354,9 +8606,12 @@
   }
 
   // ---- Documentos del agente ----
-  async function loadAgentDocuments(agentId){
+  // agentId: dueño de los documentos. containerId: dónde se dibuja la lista.
+  // msgId: dónde mostrar errores del botón "Eliminar" (opcional).
+  async function loadAgentDocumentsInto(agentId, containerId, msgId){
     const { data: docs } = await sb.from('agent_documents').select('*').eq('agent_id', agentId).order('uploaded_at', { ascending: false });
-    const container = document.getElementById('ud-documentos-list');
+    const container = document.getElementById(containerId);
+    if(!container) return;
     if(!docs || docs.length === 0){
       container.innerHTML = '<p class="sub">Aún no se han subido documentos.</p>';
       return;
@@ -8370,11 +8625,16 @@
             <a href="${url}" target="_blank" rel="noopener">${doc.file_name}</a>
             <div style="font-size:13px; color:var(--slate-light);">${doc.category || 'Sin categoría'} — subido ${formatDateTimeUS(doc.uploaded_at)}</div>
           </div>
-          <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="deleteAgentDocument('${doc.id}','${doc.storage_path}')">Eliminar</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="deleteAgentDocument('${doc.id}','${doc.storage_path}','${agentId}','${containerId}','${msgId || ''}')">Eliminar</button>
         </div>
       `;
     }));
     container.innerHTML = rows.join('');
+  }
+
+  // Se mantiene por compatibilidad con el código ya existente (perfil de agente, vista admin).
+  async function loadAgentDocuments(agentId){
+    return loadAgentDocumentsInto(agentId, 'ud-documentos-list', 'udDocMsg');
   }
 
   document.getElementById('ud-uploadDocForm').addEventListener('submit', async function(e){
@@ -8404,12 +8664,43 @@
     await loadAgentDocuments(currentUserDetailId);
   });
 
-  async function deleteAgentDocument(id, storagePath){
+  // Formulario de "Mis documentos" dentro de Mi Cuenta (el agente sube sus propios documentos).
+  document.getElementById('mc-uploadDocForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    if(!currentProfile) return;
+    const file = document.getElementById('mc-doc-archivo').files[0];
+    if(!file){ showMsg('mcDocMsg','error','Selecciona un archivo primero.'); return; }
+    const category = document.getElementById('mc-doc-categoria').value;
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${currentProfile.id}/${Date.now()}_${safeName}`;
+
+    const { error: uploadError } = await sb.storage.from('agent-documents').upload(path, file);
+    if(uploadError){ showMsg('mcDocMsg','error','No se pudo subir el archivo: ' + uploadError.message); return; }
+
+    const { error: dbError } = await sb.from('agent_documents').insert({
+      agent_id: currentProfile.id,
+      file_name: file.name,
+      storage_path: path,
+      category,
+      uploaded_by: currentProfile.id
+    });
+    if(dbError){ showMsg('mcDocMsg','error','El archivo se subió pero no se pudo registrar: ' + dbError.message); return; }
+
+    showMsg('mcDocMsg','success','Documento subido.');
+    document.getElementById('mc-uploadDocForm').reset();
+    await loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
+  });
+
+  async function deleteAgentDocument(id, storagePath, agentId, containerId, msgId){
     if(!confirm('¿Eliminar este documento?')) return;
     if(storagePath) await sb.storage.from('agent-documents').remove([storagePath]);
     const { error } = await sb.from('agent_documents').delete().eq('id', id);
-    if(error){ showMsg('udDocMsg','error','No se pudo eliminar: ' + error.message); return; }
-    await loadAgentDocuments(currentUserDetailId);
+    if(error){
+      if(msgId) showMsg(msgId,'error','No se pudo eliminar: ' + error.message);
+      else alert('No se pudo eliminar: ' + error.message);
+      return;
+    }
+    await loadAgentDocumentsInto(agentId, containerId, msgId);
   }
 
   // ---- Notas internas ----
