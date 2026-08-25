@@ -200,6 +200,9 @@
   .tbl-btn.reject{color:#C23B3B; border-color:#C23B3B;}
   .mc-tab-btn{background:none; border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:600; cursor:pointer; color:var(--slate);}
   .mc-tab-btn.active{background:var(--navy); color:#fff; border-color:var(--navy);}
+  .mp-style-opt.mp-selected{border-color:var(--navy) !important; box-shadow:0 0 0 2px rgba(11,45,110,0.15);}
+  .mp-social-row{display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap;}
+  .mp-license-row{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); gap:10px; flex-wrap:wrap;}
 
   /* Menú desplegable de sugerencias de dirección (Google Places) */
   .addr-suggest-list{
@@ -695,7 +698,110 @@
 
         <div id="mc-tab-pagina" class="mc-tab-content dash-card" style="display:none;">
           <h4 style="margin-top:0;">Mi página</h4>
-          <p class="sub">Próximamente: aquí podrás personalizar tu página pública (foto, colores, tipografía, licencias) y obtener tu link para compartir.</p>
+          <p class="sub" style="margin-bottom:14px;">Esta es tu página pública — el link que le compartes a tus clientes. Todo lo que cotice alguien desde tu link te va a llegar a ti a este CRM.</p>
+
+          <div class="dash-card" style="background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin-bottom:18px;">
+            <div style="font-size:11.5px; color:var(--slate-light); text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Tu link</div>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:8px;">
+              <input type="text" id="mp-linkPreview" readonly style="flex:1; min-width:220px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13.5px; color:var(--slate);">
+              <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="copyMiPaginaLink()">Copiar link</button>
+              <a id="mp-verLink" href="#" target="_blank" rel="noopener" class="btn-ghost" style="width:auto; padding:8px 14px;">Ver mi página ↗</a>
+            </div>
+          </div>
+
+          <div class="form-row"><label>Tu link personalizado (parte final)</label><input type="text" id="mp-slug" placeholder="ej: roberta-ramirez" autocomplete="off"></div>
+
+          <div class="form-row">
+            <label>Foto de perfil</label>
+            <div style="display:flex; align-items:center; gap:14px;">
+              <img id="mp-fotoPreview" src="" style="width:64px; height:64px; border-radius:50%; object-fit:cover; background:var(--canvas); border:1px solid var(--line); display:none;">
+              <input type="file" id="mp-foto" accept="image/*">
+            </div>
+          </div>
+
+          <div class="form-row"><label>Biografía (opcional)</label><textarea id="mp-bio" rows="3" placeholder="Unas líneas sobre ti para tus clientes..."></textarea></div>
+
+          <div class="form-row"><label>WhatsApp Business (con código de país, ej: 19561234567)</label><input type="tel" id="mp-whatsapp" placeholder="19561234567" autocomplete="off"></div>
+
+          <div class="form-row"><label>Link para agendar una cita/llamada (Calendly, Google Calendar, etc.)</label><input type="url" id="mp-calendly" placeholder="https://calendly.com/tu-usuario" autocomplete="off"></div>
+
+          <div class="form-row">
+            <label>Redes sociales</label>
+            <div id="mp-socialRows"></div>
+            <button type="button" class="btn-ghost" style="width:auto; padding:7px 14px; margin-top:6px;" onclick="addMiPaginaSocialRow()">+ Agregar red social</button>
+          </div>
+
+          <div class="form-row">
+            <label>Colores de tu página</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <div class="mp-style-opt" data-mpfield="palette" data-mpval="a" onclick="chooseMiPaginaStyle('palette','a')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:8px; width:88px;">
+                <div style="display:flex; gap:3px; margin-bottom:4px;"><span style="flex:1; height:20px; border-radius:4px; background:#0B2D6E;"></span><span style="flex:1; height:20px; border-radius:4px; background:#EFAF3E;"></span></div>
+                <div style="font-size:11px; text-align:center; color:var(--slate);">Clásico</div>
+              </div>
+              <div class="mp-style-opt" data-mpfield="palette" data-mpval="b" onclick="chooseMiPaginaStyle('palette','b')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:8px; width:88px;">
+                <div style="display:flex; gap:3px; margin-bottom:4px;"><span style="flex:1; height:20px; border-radius:4px; background:#0F172A;"></span><span style="flex:1; height:20px; border-radius:4px; background:#38BDF8;"></span></div>
+                <div style="font-size:11px; text-align:center; color:var(--slate);">Moderno</div>
+              </div>
+              <div class="mp-style-opt" data-mpfield="palette" data-mpval="c" onclick="chooseMiPaginaStyle('palette','c')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:8px; width:88px;">
+                <div style="display:flex; gap:3px; margin-bottom:4px;"><span style="flex:1; height:20px; border-radius:4px; background:#065F46;"></span><span style="flex:1; height:20px; border-radius:4px; background:#F5F5F0;"></span></div>
+                <div style="font-size:11px; text-align:center; color:var(--slate);">Cálido</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label>Tipografía</label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <div class="mp-style-opt" data-mpfield="typography" data-mpval="a" onclick="chooseMiPaginaStyle('typography','a')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:10px 14px;">
+                <div style="font-family:'Poppins',sans-serif; font-weight:700; font-size:14px;">Aa Poppins</div>
+              </div>
+              <div class="mp-style-opt" data-mpfield="typography" data-mpval="b" onclick="chooseMiPaginaStyle('typography','b')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:10px 14px;">
+                <div style="font-family:Georgia,serif; font-weight:700; font-size:14px;">Aa Georgia</div>
+              </div>
+              <div class="mp-style-opt" data-mpfield="typography" data-mpval="c" onclick="chooseMiPaginaStyle('typography','c')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:10px 14px;">
+                <div style="font-family:'Courier New',monospace; font-weight:700; font-size:14px;">Aa Mono</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label>Estilo de tu foto</label>
+            <div style="display:flex; gap:14px; flex-wrap:wrap;">
+              <div class="mp-style-opt" data-mpfield="photoStyle" data-mpval="a" onclick="chooseMiPaginaStyle('photoStyle','a')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:10px; text-align:center; width:76px;">
+                <div style="width:36px; height:36px; border-radius:50%; background:var(--slate-light); margin:0 auto 6px;"></div>
+                <div style="font-size:11px; color:var(--slate);">Circular</div>
+              </div>
+              <div class="mp-style-opt" data-mpfield="photoStyle" data-mpval="b" onclick="chooseMiPaginaStyle('photoStyle','b')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:10px; text-align:center; width:76px;">
+                <div style="width:36px; height:36px; border-radius:10px; background:var(--slate-light); margin:0 auto 6px;"></div>
+                <div style="font-size:11px; color:var(--slate);">Redondeada</div>
+              </div>
+              <div class="mp-style-opt" data-mpfield="photoStyle" data-mpval="c" onclick="chooseMiPaginaStyle('photoStyle','c')" style="cursor:pointer; border:2px solid var(--line); border-radius:10px; padding:10px; text-align:center; width:76px;">
+                <div style="width:36px; height:36px; border-radius:0; background:var(--slate-light); margin:0 auto 6px;"></div>
+                <div style="font-size:11px; color:var(--slate);">Cuadrada</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg" id="mpPaginaMsg"></div>
+          <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:6px;" onclick="saveMiPagina()">Guardar mi página</button>
+
+          <div style="margin-top:32px; padding-top:24px; border-top:1px solid var(--line);">
+            <h4 style="margin-top:0;">Mis licencias</h4>
+            <p class="sub" style="margin-bottom:14px;">Sube el PDF de cada licencia que tengas. Van a salir públicas en tu página para que tus clientes puedan verificarte.</p>
+            <form id="mp-licenseForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+              <div class="form-row" style="min-width:140px; margin:0;"><label>Estado</label><input type="text" id="mp-lic-estado" placeholder="ej: TX" maxlength="2" required></div>
+              <div class="form-row" style="min-width:160px; margin:0;"><label>Número de licencia</label><input type="text" id="mp-lic-numero" required></div>
+              <div class="form-row" style="min-width:160px; margin:0;"><label>Vence</label><input type="date" id="mp-lic-vence"></div>
+              <div class="form-row" style="min-width:130px; margin:0;">
+                <label>&nbsp;</label>
+                <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:13px; padding-top:8px;"><input type="checkbox" id="mp-lic-residente" style="width:auto;" checked> Residente</label>
+              </div>
+              <div class="form-row" style="min-width:200px; margin:0;"><label>PDF de la licencia</label><input type="file" id="mp-lic-archivo" accept="application/pdf" required></div>
+              <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Agregar licencia</button>
+            </form>
+            <div class="msg" id="mpLicMsg"></div>
+            <div id="mp-licensesList"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2537,6 +2643,27 @@
             <div class="msg" id="udMsg" style="margin-top:12px;"></div>
           </div>
 
+          <!-- Producción / validación del agente (solo administradores) -->
+          <div class="dash-card">
+            <h4>Producción de este agente</h4>
+            <div style="display:flex; gap:14px; flex-wrap:wrap; margin-bottom:16px;">
+              <div style="flex:1; min-width:130px; background:var(--canvas); border-radius:10px; padding:14px 16px;">
+                <div style="font-size:22px; font-weight:800; color:var(--navy);" id="ud-prod-total">—</div>
+                <div class="sub" style="margin:2px 0 0;">Clientes totales</div>
+              </div>
+              <div style="flex:1; min-width:130px; background:var(--canvas); border-radius:10px; padding:14px 16px;">
+                <div style="font-size:22px; font-weight:800; color:#177A54;" id="ud-prod-activos">—</div>
+                <div class="sub" style="margin:2px 0 0;">Clientes activos</div>
+              </div>
+              <div style="flex:1; min-width:130px; background:var(--canvas); border-radius:10px; padding:14px 16px;">
+                <div style="font-size:22px; font-weight:800; color:var(--gold-deep);" id="ud-prod-leads">—</div>
+                <div class="sub" style="margin:2px 0 0;">Leads</div>
+              </div>
+            </div>
+            <p class="sub" style="margin-bottom:8px;">Clic en un cliente para abrir y editar su perfil.</p>
+            <div id="ud-prod-clientesList">Cargando...</div>
+          </div>
+
           <!-- Tipo de agente -->
           <div class="dash-card">
             <h4>Tipo de agente</h4>
@@ -3359,6 +3486,7 @@
     document.querySelectorAll('.mc-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.mctab === tab));
     if(tab === 'documentos' && currentProfile) loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
     if(tab === 'banco' && currentProfile) loadMiCuentaBanco();
+    if(tab === 'pagina' && currentProfile) loadMiPagina();
   }
 
   async function saveMiCuentaInfo(){
@@ -3475,6 +3603,259 @@
     msg.className = 'msg'; msg.textContent = '';
   }
   // ===================== FIN INFORMACIÓN BANCARIA =====================
+
+  // ===================== MI PÁGINA (página pública del agente) =====================
+  const PUBLIC_AGENT_PAGE_BASE = 'https://gmaxallinsurance.com/pagina-agente.html';
+  const SOCIAL_PLATFORM_OPTIONS = ['Facebook','Instagram','YouTube','TikTok','LinkedIn','X (Twitter)','Otro'];
+
+  let mpAgentPageRow = null;
+  let mpSocialLinksState = [];
+  let mpSelected = { palette: 'a', typography: 'a', photoStyle: 'a' };
+  let mpFotoFile = null;
+
+  function slugifyText(s){
+    return (s || '').toString().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60);
+  }
+
+  async function loadMiPagina(){
+    if(!currentProfile) return;
+    const msg = document.getElementById('mpPaginaMsg');
+    msg.className = 'msg'; msg.textContent = '';
+
+    const [{ data: page }, { data: links }, { data: licenses }] = await Promise.all([
+      sb.from('agent_pages').select('*').eq('agent_id', currentProfile.id).maybeSingle(),
+      sb.from('agent_social_links').select('*').eq('agent_id', currentProfile.id).order('sort_order', { ascending: true }),
+      sb.from('agent_licenses').select('*').eq('agent_id', currentProfile.id).order('is_primary', { ascending: false })
+    ]);
+
+    mpAgentPageRow = page || null;
+    mpSocialLinksState = (links || []).map(l => ({ platform: l.platform, url: l.url }));
+    mpSelected = {
+      palette: page?.color_palette || 'a',
+      typography: page?.typography || 'a',
+      photoStyle: page?.photo_style || 'a'
+    };
+    mpFotoFile = null;
+
+    document.getElementById('mp-slug').value = page?.slug || slugifyText(currentProfile.full_name);
+    document.getElementById('mp-bio').value = page?.bio || '';
+    document.getElementById('mp-whatsapp').value = page?.whatsapp_number || '';
+    document.getElementById('mp-calendly').value = page?.calendly_url || '';
+
+    const fotoImg = document.getElementById('mp-fotoPreview');
+    if(page?.photo_storage_path){
+      const { data } = sb.storage.from('agent-page-photos').getPublicUrl(page.photo_storage_path);
+      fotoImg.src = data.publicUrl;
+      fotoImg.style.display = 'block';
+    } else {
+      fotoImg.style.display = 'none';
+    }
+
+    applyMiPaginaStyleSelection();
+    renderMpSocialRows();
+    renderMpLicensesList(licenses || []);
+    updateMiPaginaLinkPreview();
+  }
+
+  function updateMiPaginaLinkPreview(){
+    const slug = document.getElementById('mp-slug').value.trim() || slugifyText(currentProfile?.full_name);
+    const link = PUBLIC_AGENT_PAGE_BASE + '?a=' + encodeURIComponent(slug);
+    document.getElementById('mp-linkPreview').value = link;
+    document.getElementById('mp-verLink').href = link;
+  }
+  document.getElementById('mp-slug').addEventListener('input', updateMiPaginaLinkPreview);
+
+  document.getElementById('mp-foto').addEventListener('change', function(e){
+    const file = e.target.files[0];
+    if(!file) return;
+    mpFotoFile = file;
+    const reader = new FileReader();
+    reader.onload = function(ev){
+      const img = document.getElementById('mp-fotoPreview');
+      img.src = ev.target.result;
+      img.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function chooseMiPaginaStyle(field, val){
+    mpSelected[field] = val;
+    applyMiPaginaStyleSelection();
+  }
+
+  function applyMiPaginaStyleSelection(){
+    document.querySelectorAll('.mp-style-opt').forEach(el => {
+      const field = el.dataset.mpfield;
+      const val = el.dataset.mpval;
+      el.classList.toggle('mp-selected', mpSelected[field] === val);
+    });
+  }
+
+  function renderMpSocialRows(){
+    const container = document.getElementById('mp-socialRows');
+    if(mpSocialLinksState.length === 0){
+      container.innerHTML = '<p class="sub" style="margin:0;">Aún no has agregado ninguna red social.</p>';
+      return;
+    }
+    container.innerHTML = mpSocialLinksState.map((row, idx) => `
+      <div class="mp-social-row">
+        <select onchange="updateMpSocialRow(${idx}, 'platform', this.value)" style="width:auto; min-width:130px;">
+          ${SOCIAL_PLATFORM_OPTIONS.map(p => `<option value="${p}" ${row.platform === p ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
+        <input type="url" placeholder="https://..." value="${(row.url || '').replace(/"/g, '&quot;')}" oninput="updateMpSocialRow(${idx}, 'url', this.value)" style="flex:1; min-width:200px;">
+        <button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="removeMpSocialRow(${idx})">✕</button>
+      </div>
+    `).join('');
+  }
+
+  function addMiPaginaSocialRow(){
+    mpSocialLinksState.push({ platform: SOCIAL_PLATFORM_OPTIONS[0], url: '' });
+    renderMpSocialRows();
+  }
+
+  function removeMpSocialRow(idx){
+    mpSocialLinksState.splice(idx, 1);
+    renderMpSocialRows();
+  }
+
+  function updateMpSocialRow(idx, field, value){
+    if(!mpSocialLinksState[idx]) return;
+    mpSocialLinksState[idx][field] = value;
+  }
+
+  function copyMiPaginaLink(){
+    const input = document.getElementById('mp-linkPreview');
+    input.select();
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(input.value).then(() => {
+        showMsg('mpPaginaMsg', 'success', 'Link copiado.');
+      }).catch(() => {});
+    } else {
+      document.execCommand('copy');
+    }
+  }
+
+  async function saveMiPagina(){
+    if(!currentProfile) return;
+    const msg = document.getElementById('mpPaginaMsg');
+    msg.className = 'msg'; msg.textContent = '';
+
+    let slug = document.getElementById('mp-slug').value.trim() || slugifyText(currentProfile.full_name);
+    slug = slugifyText(slug);
+    if(!slug){ showMsg('mpPaginaMsg', 'error', 'Escribe un link válido para tu página.'); return; }
+
+    let photoPath = mpAgentPageRow?.photo_storage_path || null;
+    if(mpFotoFile){
+      const safeName = mpFotoFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${currentProfile.id}/${Date.now()}_${safeName}`;
+      const { error: uploadError } = await sb.storage.from('agent-page-photos').upload(path, mpFotoFile);
+      if(uploadError){ showMsg('mpPaginaMsg', 'error', 'No se pudo subir la foto: ' + uploadError.message); return; }
+      photoPath = path;
+    }
+
+    const { error: upsertError } = await sb.from('agent_pages').upsert({
+      agent_id: currentProfile.id,
+      slug,
+      whatsapp_number: document.getElementById('mp-whatsapp').value.trim() || null,
+      calendly_url: document.getElementById('mp-calendly').value.trim() || null,
+      bio: document.getElementById('mp-bio').value.trim() || null,
+      color_palette: mpSelected.palette,
+      typography: mpSelected.typography,
+      photo_style: mpSelected.photoStyle,
+      photo_storage_path: photoPath,
+      published: true,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'agent_id' });
+
+    if(upsertError){
+      if(String(upsertError.message).toLowerCase().includes('duplicate') || String(upsertError.message).toLowerCase().includes('unique')){
+        showMsg('mpPaginaMsg', 'error', 'Ese link ya lo está usando otro agente — prueba con otro.');
+      } else {
+        showMsg('mpPaginaMsg', 'error', 'No se pudo guardar: ' + upsertError.message);
+      }
+      return;
+    }
+
+    await sb.from('agent_social_links').delete().eq('agent_id', currentProfile.id);
+    const validLinks = mpSocialLinksState.filter(r => r.url && r.url.trim());
+    if(validLinks.length > 0){
+      await sb.from('agent_social_links').insert(validLinks.map((r, idx) => ({
+        agent_id: currentProfile.id,
+        platform: r.platform,
+        url: r.url.trim(),
+        sort_order: idx
+      })));
+    }
+
+    showMsg('mpPaginaMsg', 'success', 'Tu página se guardó correctamente.');
+    await loadMiPagina();
+  }
+
+  function renderMpLicensesList(licenses){
+    const container = document.getElementById('mp-licensesList');
+    if(!licenses || licenses.length === 0){
+      container.innerHTML = '<p class="sub" style="margin:0;">Aún no has agregado ninguna licencia.</p>';
+      return;
+    }
+    container.innerHTML = licenses.map(l => {
+      const url = l.storage_path ? sb.storage.from('agent-licenses').getPublicUrl(l.storage_path).data.publicUrl : null;
+      return `
+        <div class="mp-license-row">
+          <div>
+            <strong>${l.state || ''}</strong> — #${l.license_number || ''} ${l.expiration_date ? '— vence ' + formatDateUS(l.expiration_date) : ''} ${l.is_resident === false ? '(no residente)' : ''}
+            ${url ? `<div><a href="${url}" target="_blank" rel="noopener">Ver PDF</a></div>` : ''}
+          </div>
+          <button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="deleteMpLicense('${l.id}','${l.storage_path || ''}')">Eliminar</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('mp-licenseForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    if(!currentProfile) return;
+    const estado = document.getElementById('mp-lic-estado').value.trim().toUpperCase();
+    const numero = document.getElementById('mp-lic-numero').value.trim();
+    const vence = document.getElementById('mp-lic-vence').value || null;
+    const residente = document.getElementById('mp-lic-residente').checked;
+    const file = document.getElementById('mp-lic-archivo').files[0];
+    if(!estado || !numero || !file){ showMsg('mpLicMsg', 'error', 'Completa estado, número de licencia y sube el PDF.'); return; }
+
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${currentProfile.id}/${Date.now()}_${safeName}`;
+    const { error: uploadError } = await sb.storage.from('agent-licenses').upload(path, file);
+    if(uploadError){ showMsg('mpLicMsg', 'error', 'No se pudo subir el PDF: ' + uploadError.message); return; }
+
+    const { error: dbError } = await sb.from('agent_licenses').insert({
+      agent_id: currentProfile.id,
+      state: estado,
+      license_number: numero,
+      expiration_date: vence,
+      is_resident: residente,
+      is_primary: false,
+      storage_path: path,
+      file_name: file.name
+    });
+    if(dbError){ showMsg('mpLicMsg', 'error', 'La licencia no se pudo guardar: ' + dbError.message); return; }
+
+    showMsg('mpLicMsg', 'success', 'Licencia agregada.');
+    document.getElementById('mp-licenseForm').reset();
+    document.getElementById('mp-lic-residente').checked = true;
+    await loadMiPagina();
+  });
+
+  async function deleteMpLicense(id, storagePath){
+    if(!confirm('¿Eliminar esta licencia?')) return;
+    if(storagePath) await sb.storage.from('agent-licenses').remove([storagePath]);
+    const { error } = await sb.from('agent_licenses').delete().eq('id', id);
+    if(error){ showMsg('mpLicMsg', 'error', 'No se pudo eliminar: ' + error.message); return; }
+    await loadMiPagina();
+  }
+  // ===================== FIN MI PÁGINA =====================
 
   async function startMfaEnroll(){
     const content = document.getElementById('securityPanelContent');
@@ -5783,7 +6164,7 @@
     'Licencias','Años de experiencia','Ingresos proyectados (12 meses)','Tipo de entidad','Año de creación',
     'Dirección de la compañía','Dirección de correspondencia','Líneas de seguro','Proyección de ganancias (12 meses)',
     'Cantidad de empleados','Payroll de empleados','Estado civil','Identificación fiscal',
-    'Ingresos mensuales del hogar','Miembros del núcleo familiar','SSN / ITIN','Estatus legal',
+    'Ingresos mensuales del hogar','Miembros del núcleo familiar','Detalle de los miembros del núcleo familiar','SSN / ITIN','Estatus legal',
     'Monto de cobertura deseado','Tipo de seguro','Años del término','Presupuesto mensual'
   ];
 
@@ -8715,7 +9096,48 @@
       loadAgentAlerts(userId),
       loadAgentLicenseEo(userId),
       loadAgentBankInfoAdmin(userId),
+      loadAgentProduction(userId),
     ]);
+  }
+
+  // Producción/validación del agente: cuántos clientes tiene, cuántos están
+  // activos, cuántos leads, y una lista clicable para poder abrir/editar
+  // cualquiera de sus clientes desde aquí (esto solo lo puede hacer un admin —
+  // esta pantalla completa de "Usuarios" ya está oculta para agentes).
+  async function loadAgentProduction(agentId){
+    const listEl = document.getElementById('ud-prod-clientesList');
+    listEl.innerHTML = 'Cargando...';
+    const { data, error } = await sb.from('clients')
+      .select('id, full_name, client_status')
+      .eq('assigned_agent_id', agentId)
+      .order('full_name', { ascending: true });
+
+    if(error){
+      listEl.innerHTML = '<p class="sub" style="margin:0;">No se pudo cargar: ' + error.message + '</p>';
+      return;
+    }
+
+    const clientsList = data || [];
+    const uniqueClients = Object.values(clientsList.reduce((acc, c) => { acc[c.id] = c; return acc; }, {}));
+    const totalCount = uniqueClients.length;
+    const activeCount = uniqueClients.filter(c => c.client_status === 'activo').length;
+    const leadCount = uniqueClients.filter(c => LEAD_STATUSES.includes(c.client_status)).length;
+
+    document.getElementById('ud-prod-total').textContent = totalCount;
+    document.getElementById('ud-prod-activos').textContent = activeCount;
+    document.getElementById('ud-prod-leads').textContent = leadCount;
+
+    if(uniqueClients.length === 0){
+      listEl.innerHTML = '<p class="sub" style="margin:0;">Este agente todavía no tiene clientes.</p>';
+      return;
+    }
+
+    listEl.innerHTML = uniqueClients.map(c => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); cursor:pointer;" onclick="goToClientFromUnderwriting('${c.id}')">
+        <strong>${c.full_name}</strong>
+        <span class="badge ${CLIENT_STATUS_BADGE[c.client_status] || 'blue'}">${CLIENT_STATUS_LABELS[c.client_status] || c.client_status || '—'}</span>
+      </div>
+    `).join('');
   }
 
   async function loadAgentBankInfoAdmin(agentId){
@@ -9324,6 +9746,15 @@
       showMsg('appMsg','error','Hubo un problema al enviar tu solicitud. Detalle: ' + (detalleError || 'sin detalle') + '. Intenta de nuevo.');
       return;
     }
+
+    // Le avisamos a la administradora por correo de que llegó una solicitud nueva.
+    // No bloqueamos ni mostramos error al usuario si esto falla — lo importante
+    // (guardar la solicitud) ya se hizo arriba.
+    fetch(SUPABASE_URL + '/functions/v1/notify-new-agent-application', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+      body: JSON.stringify(payload)
+    }).catch(() => {});
 
     document.getElementById('appForm').reset();
     document.getElementById('appView').style.display = 'none';
