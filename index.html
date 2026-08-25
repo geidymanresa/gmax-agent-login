@@ -649,6 +649,8 @@
                 <option value="Licencia">Licencia</option>
                 <option value="Seguro E&O">Seguro E&amp;O</option>
                 <option value="Contrato">Contrato</option>
+                <option value="W-9">Formulario W-9</option>
+                <option value="1099">Formulario 1099</option>
                 <option value="Otro">Otro</option>
               </select>
             </div>
@@ -660,7 +662,35 @@
 
         <div id="mc-tab-banco" class="mc-tab-content dash-card" style="display:none;">
           <h4 style="margin-top:0;">Información bancaria</h4>
-          <p class="sub">Próximamente: aquí podrás actualizar el número de cuenta y de ruta donde recibes tus comisiones, con un código de verificación por correo.</p>
+          <p class="sub" style="margin-bottom:14px;">Aquí va la cuenta donde recibes tus comisiones. Por seguridad, cualquier cambio te pide un código de verificación que te mandamos a tu correo.</p>
+
+          <div class="dash-card" style="background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin-bottom:18px;">
+            <div style="font-size:11.5px; color:var(--slate-light); text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Información actual</div>
+            <div id="mc-banco-actual" style="margin-top:8px;">Cargando...</div>
+          </div>
+
+          <div id="mc-banco-formStep">
+            <div class="form-row-2">
+              <div class="form-row"><label>Nombre del banco</label><input type="text" id="mc-banco-nombre"></div>
+              <div class="form-row"><label>Nombre del titular de la cuenta</label><input type="text" id="mc-banco-titular"></div>
+            </div>
+            <div class="form-row-2">
+              <div class="form-row"><label>Número de cuenta</label><input type="text" id="mc-banco-cuenta" inputmode="numeric" autocomplete="off"></div>
+              <div class="form-row"><label>Número de ruta (routing)</label><input type="text" id="mc-banco-ruta" inputmode="numeric" autocomplete="off"></div>
+            </div>
+            <div class="msg" id="mcBancoMsg"></div>
+            <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="requestBankInfoVerification()">Enviar código de verificación</button>
+          </div>
+
+          <div id="mc-banco-codeStep" style="display:none; margin-top:18px; padding-top:18px; border-top:1px solid var(--line);">
+            <p class="sub">Te mandamos un código de 6 dígitos a tu correo. Escríbelo aquí para confirmar el cambio.</p>
+            <div class="form-row" style="max-width:220px;"><label>Código de verificación</label><input type="text" id="mc-banco-codigo" maxlength="6" inputmode="numeric"></div>
+            <div class="msg" id="mcBancoCodeMsg"></div>
+            <div style="display:flex; gap:10px;">
+              <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="confirmBankInfoUpdate()">Confirmar cambio</button>
+              <button type="button" class="btn-ghost" style="width:auto; padding:10px 20px;" onclick="cancelBankInfoVerification()">Cancelar</button>
+            </div>
+          </div>
         </div>
 
         <div id="mc-tab-pagina" class="mc-tab-content dash-card" style="display:none;">
@@ -722,6 +752,7 @@
         <div class="dash-card" id="leadsCard" style="margin-top:20px; background:#EAF1FB; border:1.5px solid #C7D9F3;">
           <h4 style="margin-top:0; color:#1E4FA0;">🧲 Leads en proceso</h4>
           <div id="leadsList"><p class="sub">Cargando...</p></div>
+          <div id="leadsPager" style="display:flex; align-items:center; margin-top:10px; flex-wrap:wrap;"></div>
         </div>
 
         <div class="dash-card" style="margin-top:20px;">
@@ -2519,6 +2550,13 @@
             <div id="ud-carriers-list">Cargando...</div>
           </div>
 
+          <!-- Información bancaria (lo que el agente registró, con verificación por correo) -->
+          <div class="dash-card" style="background:#F7F9FC;">
+            <h4>🏦 Información bancaria</h4>
+            <p class="sub" style="margin-bottom:14px;">Cuenta donde se le paga la comisión a este agente. Solo visible para administradores.</p>
+            <div id="ud-banco-info">Cargando...</div>
+          </div>
+
           <!-- Licencia y E&O (lo que el agente llenó) -->
           <div class="dash-card">
             <h4>Licencia y Seguro de Errores y Omisiones</h4>
@@ -2541,6 +2579,8 @@
                   <option value="Contrato">Contrato</option>
                   <option value="Licencia">Licencia</option>
                   <option value="Seguro E&O">Seguro E&amp;O</option>
+                  <option value="W-9">Formulario W-9</option>
+                  <option value="1099">Formulario 1099</option>
                   <option value="Otro">Otro</option>
                 </select>
               </div>
@@ -3306,6 +3346,7 @@
     document.getElementById('mc-tab-' + tab).style.display = 'block';
     document.querySelectorAll('.mc-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.mctab === tab));
     if(tab === 'documentos' && currentProfile) loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
+    if(tab === 'banco' && currentProfile) loadMiCuentaBanco();
   }
 
   async function saveMiCuentaInfo(){
@@ -3328,6 +3369,100 @@
     msg.className = 'msg success';
     msg.textContent = 'Guardado correctamente.';
   }
+
+  // ===================== INFORMACIÓN BANCARIA (con verificación por correo) =====================
+  async function loadMiCuentaBanco(){
+    if(!currentProfile) return;
+    const container = document.getElementById('mc-banco-actual');
+    if(!container) return;
+    container.innerHTML = 'Cargando...';
+    const { data, error } = await sb.from('agent_bank_info').select('*').eq('agent_id', currentProfile.id).maybeSingle();
+    if(error || !data){
+      container.innerHTML = '<p class="sub" style="margin:0;">Aún no has registrado tu información bancaria.</p>';
+      return;
+    }
+    const last4 = (data.account_number || '').slice(-4);
+    container.innerHTML = `
+      <div style="font-weight:700;">${data.bank_name || 'Banco no especificado'}</div>
+      <div class="sub" style="margin:4px 0 0;">Cuenta terminada en ${last4 ? '••••' + last4 : '——'} · Titular: ${data.account_holder_name || '—'}</div>
+      <div class="sub" style="margin:2px 0 0;">Última actualización: ${formatDateTimeUS(data.updated_at)}</div>
+    `;
+  }
+
+  async function requestBankInfoVerification(){
+    const msg = document.getElementById('mcBancoMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    const bankName = document.getElementById('mc-banco-nombre').value.trim();
+    const holder = document.getElementById('mc-banco-titular').value.trim();
+    const account = document.getElementById('mc-banco-cuenta').value.trim();
+    const routing = document.getElementById('mc-banco-ruta').value.trim();
+    if(!account || !routing){ msg.className = 'msg error'; msg.textContent = 'Escribe el número de cuenta y de ruta.'; return; }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){ msg.className = 'msg error'; msg.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión.'; return; }
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/request-bank-info-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ accountNumber: account, routingNumber: routing, bankName, accountHolderName: holder })
+      });
+      const result = await resp.json();
+      if(!resp.ok || result.error){ msg.className = 'msg error'; msg.textContent = result.error || 'No se pudo enviar el código.'; return; }
+      msg.className = 'msg success';
+      msg.textContent = 'Te mandamos un código de verificación a tu correo.';
+      document.getElementById('mc-banco-codeStep').style.display = 'block';
+    } catch(err){
+      msg.className = 'msg error'; msg.textContent = 'No se pudo enviar el código: ' + err.message;
+    }
+  }
+
+  async function confirmBankInfoUpdate(){
+    const msg = document.getElementById('mcBancoCodeMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    const code = document.getElementById('mc-banco-codigo').value.trim();
+    if(!code){ msg.className = 'msg error'; msg.textContent = 'Escribe el código que te mandamos por correo.'; return; }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){ msg.className = 'msg error'; msg.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión.'; return; }
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/confirm-bank-info-update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ code })
+      });
+      const result = await resp.json();
+      if(!resp.ok || result.error){ msg.className = 'msg error'; msg.textContent = result.error || 'No se pudo confirmar el código.'; return; }
+
+      msg.className = 'msg success'; msg.textContent = 'Información bancaria actualizada.';
+      document.getElementById('mc-banco-codigo').value = '';
+      document.getElementById('mc-banco-codeStep').style.display = 'none';
+      document.getElementById('mc-banco-cuenta').value = '';
+      document.getElementById('mc-banco-ruta').value = '';
+      document.getElementById('mc-banco-nombre').value = '';
+      document.getElementById('mc-banco-titular').value = '';
+      await loadMiCuentaBanco();
+    } catch(err){
+      msg.className = 'msg error'; msg.textContent = 'No se pudo confirmar: ' + err.message;
+    }
+  }
+
+  function cancelBankInfoVerification(){
+    document.getElementById('mc-banco-codeStep').style.display = 'none';
+    document.getElementById('mc-banco-codigo').value = '';
+    const msg = document.getElementById('mcBancoCodeMsg');
+    msg.className = 'msg'; msg.textContent = '';
+  }
+  // ===================== FIN INFORMACIÓN BANCARIA =====================
 
   async function startMfaEnroll(){
     const content = document.getElementById('securityPanelContent');
@@ -7615,23 +7750,55 @@
 
   // ---- Leads en proceso ----
   const LEAD_STATUSES = ['lead_nuevo'];
+  let allLeadsData = [];
+  let leadsCurrentPage = 1;
+  const LEADS_PAGE_SIZE = 10;
+
   async function loadLeads(){
     const { data, error } = await sb.from('clients')
       .select('*')
       .in('client_status', LEAD_STATUSES)
       .order('created_at', { ascending: false });
 
+    allLeadsData = error ? [] : (data || []);
+    leadsCurrentPage = 1;
+    renderLeadsPage();
+  }
+
+  function renderLeadsPage(){
     const list = document.getElementById('leadsList');
-    if(error || !data || data.length === 0){
+    const pager = document.getElementById('leadsPager');
+    if(allLeadsData.length === 0){
       list.innerHTML = '<p class="sub">No hay leads en proceso ahora mismo.</p>';
+      if(pager) pager.innerHTML = '';
       return;
     }
-    list.innerHTML = data.map(c => `
+
+    const totalPages = Math.max(1, Math.ceil(allLeadsData.length / LEADS_PAGE_SIZE));
+    if(leadsCurrentPage > totalPages) leadsCurrentPage = totalPages;
+    if(leadsCurrentPage < 1) leadsCurrentPage = 1;
+    const start = (leadsCurrentPage - 1) * LEADS_PAGE_SIZE;
+    const pageItems = allLeadsData.slice(start, start + LEADS_PAGE_SIZE);
+
+    list.innerHTML = pageItems.map(c => `
       <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center;">
         <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span></div>
         <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
       </div>
     `).join('');
+
+    if(pager){
+      pager.innerHTML = `
+        <button class="btn-ghost" style="width:auto; padding:6px 14px;" ${leadsCurrentPage <= 1 ? 'disabled' : ''} onclick="changeLeadsPage(-1)">← Anteriores</button>
+        <span class="sub" style="margin:0 10px 0;">Página ${leadsCurrentPage} de ${totalPages} (${allLeadsData.length} en total)</span>
+        <button class="btn-ghost" style="width:auto; padding:6px 14px;" ${leadsCurrentPage >= totalPages ? 'disabled' : ''} onclick="changeLeadsPage(1)">Siguientes →</button>
+      `;
+    }
+  }
+
+  function changeLeadsPage(delta){
+    leadsCurrentPage += delta;
+    renderLeadsPage();
   }
 
   // ---- Libro de negocio ----
@@ -8449,7 +8616,30 @@
       loadAgentNotes(userId),
       loadAgentAlerts(userId),
       loadAgentLicenseEo(userId),
+      loadAgentBankInfoAdmin(userId),
     ]);
+  }
+
+  async function loadAgentBankInfoAdmin(agentId){
+    const container = document.getElementById('ud-banco-info');
+    if(!container) return;
+    container.innerHTML = 'Cargando...';
+    const { data, error } = await sb.from('agent_bank_info').select('*').eq('agent_id', agentId).maybeSingle();
+    if(error || !data){
+      container.innerHTML = '<p class="sub" style="margin:0;">Este agente aún no ha registrado su información bancaria.</p>';
+      return;
+    }
+    container.innerHTML = `
+      <div class="form-row-2" style="margin-bottom:0;">
+        <div class="profile-field"><div class="label">Banco</div><div class="num">${data.bank_name || '—'}</div></div>
+        <div class="profile-field"><div class="label">Titular de la cuenta</div><div class="num">${data.account_holder_name || '—'}</div></div>
+      </div>
+      <div class="form-row-2" style="margin-top:14px; margin-bottom:0;">
+        <div class="profile-field"><div class="label">Número de cuenta</div><div class="num">${data.account_number || '—'}</div></div>
+        <div class="profile-field"><div class="label">Número de ruta</div><div class="num">${data.routing_number || '—'}</div></div>
+      </div>
+      <p class="sub" style="margin-top:12px; margin-bottom:0;">Última actualización: ${formatDateTimeUS(data.updated_at)}</p>
+    `;
   }
 
   async function toggleUserStatusFromProfile(){
