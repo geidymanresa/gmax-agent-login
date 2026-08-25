@@ -701,6 +701,17 @@
     </div>
 
     <!-- Aparece solo justo después de cobrar una Nueva Póliza -->
+    <!-- Detalle de una cotización (lo que llenó el cliente en el formulario público) -->
+    <div id="quoteDetailOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(13,20,36,0.6); z-index:999; align-items:center; justify-content:center;">
+      <div style="background:#fff; border-radius:14px; padding:28px; max-width:600px; width:92%; max-height:82vh; overflow-y:auto;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h3 style="margin:0;">Detalle de la cotización</h3>
+          <button class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="closeQuoteDetail()">Cerrar</button>
+        </div>
+        <div id="quoteDetailBody" style="margin-top:16px; font-size:14.5px; line-height:1.8; color:var(--slate);"></div>
+      </div>
+    </div>
+
     <div id="paymentSuccessOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(13,20,36,0.6); z-index:999; align-items:center; justify-content:center;">
       <div style="background:#fff; border-radius:14px; padding:28px; max-width:440px; width:90%;">
         <p style="color:#177A54; font-weight:700; font-size:18px; margin-top:0;">✓ El pago se realizó correctamente</p>
@@ -5719,13 +5730,68 @@
         <td>${q.service_fee_amount != null ? '$' + Number(q.service_fee_amount).toFixed(2) : '—'}</td>
         <td>${q.total_reference != null ? '$' + Number(q.total_reference).toFixed(2) : '—'}</td>
         <td>${q.monthly_payment != null ? '$' + Number(q.monthly_payment).toFixed(2) : '—'}</td>
-        <td style="max-width:200px; white-space:normal;">${q.notes || '—'}</td>
+        <td>${q.notes ? `<button class="btn-ghost" style="width:auto; padding:6px 10px; font-size:12.5px;" onclick="openQuoteDetail('${q.id}')">📝 Ver detalle</button>` : '—'}</td>
         <td style="white-space:nowrap;">
           <button class="btn-primary" style="width:auto; padding:6px 12px;" onclick="sellQuote('${q.id}')">Vender</button>
           ${isSA ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="openEditQuote('${q.id}')">Editar</button>` : ''}
         </td>
       </tr>
     `).join('');
+  }
+
+  // Etiquetas conocidas que manda el formulario público de cotización
+  // (cotizar.html) dentro del texto de notas, para poder separarlas en
+  // líneas propias y que se vean claras en vez de todas pegadas.
+  const QUOTE_NOTE_LABELS = [
+    'Nombre completo','Fecha de nacimiento','Dirección de la propiedad','Personas en el hogar',
+    '¿Tiene mascotas?','Cantidad de mascotas','Tipo de mascotas','Cobertura específica solicitada',
+    'Nombre del propietario','Fecha de compra de la propiedad','¿Remodeló baño/cocina?','¿Tiene piscina?',
+    'Tipo de piscina','¿Tiene paneles solares?','Millas a la estación de bomberos','Pies al hidrante más cercano',
+    'Estatus de la propiedad','¿Reclamos en los últimos 5 años?','Detalle del reclamo','Deducible',
+    'Licencias','Años de experiencia','Ingresos proyectados (12 meses)','Tipo de entidad','Año de creación',
+    'Dirección de la compañía','Dirección de correspondencia','Líneas de seguro','Proyección de ganancias (12 meses)',
+    'Cantidad de empleados','Payroll de empleados','Estado civil','Identificación fiscal',
+    'Ingresos mensuales del hogar','Miembros del núcleo familiar','SSN / ITIN','Estatus legal',
+    'Monto de cobertura deseado','Tipo de seguro','Años del término','Presupuesto mensual'
+  ];
+
+  function escapeRegExpChars(s){
+    return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function escapeHtmlText(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Las notas que llegan del formulario público a veces vienen como un solo
+  // bloque de texto con varios "Etiqueta: valor" pegados uno detrás del otro.
+  // Aquí los separamos en líneas propias para que se vean claros, en vez de
+  // amontonados en un espacio chiquito.
+  function formatQuoteNotesHTML(text){
+    if(!text) return '<p class="sub" style="margin:0;">Sin notas.</p>';
+    let t = String(text);
+
+    // Separadores de sección tipo "--" o "---" -> aparte, como su propia línea.
+    t = t.replace(/\s*-{2,}\s*/g, '\n\n');
+
+    QUOTE_NOTE_LABELS.forEach(label => {
+      const re = new RegExp('\\s+(' + escapeRegExpChars(label) + ':)', 'g');
+      t = t.replace(re, '\n$1');
+    });
+    t = t.replace(/\n{3,}/g, '\n\n').trim();
+
+    return `<div style="white-space:pre-wrap;">${escapeHtmlText(t)}</div>`;
+  }
+
+  function openQuoteDetail(id){
+    const q = currentClientQuotes.find(x => x.id === id);
+    if(!q) return;
+    document.getElementById('quoteDetailBody').innerHTML = formatQuoteNotesHTML(q.notes);
+    document.getElementById('quoteDetailOverlay').style.display = 'flex';
+  }
+
+  function closeQuoteDetail(){
+    document.getElementById('quoteDetailOverlay').style.display = 'none';
   }
 
   // Editar cotización — de momento solo la puede editar la administradora suprema
