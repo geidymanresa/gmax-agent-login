@@ -590,7 +590,6 @@
       <nav class="dash-nav">
         <button class="dash-nav-btn active" data-tab="inicio" onclick="switchTab('inicio')">Inicio</button>
         <button class="dash-nav-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
-        <button class="dash-nav-btn" style="color:var(--gold); font-weight:800;" onclick="startVenderPoliza()">💰 Vender Póliza</button>
         <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
         <button class="dash-nav-btn" data-tab="companias" id="navCompanias" onclick="switchTab('companias')" style="display:none;">Compañías</button>
         <button class="dash-nav-btn" data-tab="servicefees" id="navServiceFees" onclick="switchTab('servicefees')" style="display:none;">Service Fees</button>
@@ -837,8 +836,6 @@
       <section class="dash-tab" id="tab-inicio">
         <h2>Bienvenida, <span id="welcomeName2">—</span></h2>
         <p class="sub">Resumen general de GMAX Agent.</p>
-
-        <button type="button" class="btn-primary" style="width:auto; padding:16px 28px; font-size:16px; background:var(--gold); color:var(--navy); font-weight:800; margin-bottom:20px;" onclick="startVenderPoliza()">💰 Vender Póliza</button>
 
         <div class="dash-stats">
           <div class="dash-stat"><div class="num" id="statAgentes">—</div><div class="label">Agentes activos</div></div>
@@ -1933,6 +1930,28 @@
               <div class="form-row" id="ec-closeReasonRow" style="display:none;">
                 <label>Motivo (requerido para este estado)</label>
                 <input type="text" id="ec-closeReason" placeholder="Ej: precio, se fue con otra agencia, no responde...">
+              </div>
+
+              <!-- Solo administradores: al marcar "Activo" un cliente que todavía no tiene
+                   ninguna póliza registrada, se abre el espacio para dejarla guardada
+                   (para cuando se le olvidó hacerlo desde la venta). -->
+              <div class="dash-card" id="ec-activaPolizaBlock" style="display:none; background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin:14px 0;">
+                <h5 style="margin-top:0;">Póliza activa</h5>
+                <div id="ec-activaPoliza-fields" style="display:none;">
+                  <p class="sub" style="margin-bottom:12px;">Este cliente todavía no tiene ninguna póliza registrada — deja aquí el número y la compañía.</p>
+                  <div class="form-row-2">
+                    <div class="form-row">
+                      <label>Compañía aseguradora</label>
+                      <select id="ec-act-companyid" onchange="toggleOtherCompanyEc()">
+                        <option value="">—</option>
+                        <option value="__otra__">Otra (no está en la lista)</option>
+                      </select>
+                      <input type="text" id="ec-act-compania" placeholder="Nombre de la compañía" style="margin-top:8px; display:none;">
+                    </div>
+                    <div class="form-row"><label>Número de póliza</label><input type="text" id="ec-act-numero"></div>
+                  </div>
+                </div>
+                <p class="sub" id="ec-activaPoliza-yaExiste" style="display:none; margin:0;">Este cliente ya tiene una póliza registrada — para editarla usa la sección "Pólizas" de su perfil.</p>
               </div>
 
               <h4 style="margin-top:18px;">Información personal</h4>
@@ -4015,9 +4034,11 @@
   async function populateCompanyDropdown(){
     const select = document.getElementById('nc-pol-companyid');
     const selectActiva = document.getElementById('nc-act-companyid');
-    if(!select && !selectActiva) return;
+    const selectEc = document.getElementById('ec-act-companyid');
+    if(!select && !selectActiva && !selectEc) return;
     const current = select ? select.value : '';
     const currentActiva = selectActiva ? selectActiva.value : '';
+    const currentEc = selectEc ? selectEc.value : '';
     const { data: activeCompanies, error } = await sb.rpc('list_active_companies');
     const list = error ? [] : (activeCompanies || []);
     const optionsHtml = '<option value="">—</option>' +
@@ -4025,6 +4046,28 @@
       '<option value="__otra__">Otra (no está en la lista)</option>';
     if(select){ select.innerHTML = optionsHtml; select.value = current || ''; }
     if(selectActiva){ selectActiva.innerHTML = optionsHtml; selectActiva.value = currentActiva || ''; }
+    if(selectEc){ selectEc.innerHTML = optionsHtml; selectEc.value = currentEc || ''; }
+  }
+
+  function toggleOtherCompanyEc(){
+    const select = document.getElementById('ec-act-companyid');
+    const other = document.getElementById('ec-act-compania');
+    other.style.display = select.value === '__otra__' ? 'block' : 'none';
+    if(select.value !== '__otra__') other.value = '';
+  }
+
+  // Solo se muestra a administradores, y solo cuando el cliente todavía no
+  // tiene ninguna póliza guardada — para todos los demás (agentes incluidos)
+  // el estado "Activo" se puede elegir igual, simplemente sin este espacio extra.
+  function toggleActivaPolizaFields(){
+    const status = document.getElementById('ec-clientstatus').value;
+    const block = document.getElementById('ec-activaPolizaBlock');
+    const isAdmin = isAdminUser();
+    const alreadyHasPolicy = !!(currentClientId && (allClientPoliciesByClient[currentClientId] || []).length > 0);
+    block.style.display = (status === 'activo' && isAdmin) ? 'block' : 'none';
+    document.getElementById('ec-activaPoliza-fields').style.display = (status === 'activo' && isAdmin && !alreadyHasPolicy) ? 'block' : 'none';
+    document.getElementById('ec-activaPoliza-yaExiste').style.display = (status === 'activo' && isAdmin && alreadyHasPolicy) ? 'block' : 'none';
+    if(status === 'activo' && isAdmin && !alreadyHasPolicy) populateCompanyDropdown();
   }
 
   function toggleOtherCompany(){
@@ -4385,6 +4428,7 @@
   function toggleCloseReason(){
     const status = document.getElementById('ec-clientstatus').value;
     document.getElementById('ec-closeReasonRow').style.display = CLOSE_STATES.includes(status) ? 'block' : 'none';
+    toggleActivaPolizaFields();
   }
 
   let allClientPoliciesByClient = {};
@@ -5295,10 +5339,38 @@
       }
     }
 
+    // Si la administradora marcó "Activo" y este cliente todavía no tenía
+    // ninguna póliza guardada, y dejó compañía + número, se crea esa póliza aquí.
+    const activaFieldsVisible = document.getElementById('ec-activaPoliza-fields').style.display !== 'none';
+    if(status === 'activo' && isAdminUser() && activaFieldsVisible){
+      const companySelect = document.getElementById('ec-act-companyid').value;
+      const companyOther = document.getElementById('ec-act-compania').value.trim();
+      const numero = document.getElementById('ec-act-numero').value.trim();
+      if((companySelect || companyOther) && numero){
+        const { data: { session } } = await sb.auth.getSession();
+        let companyNameSnapshot = companyOther || null;
+        if(companySelect && companySelect !== '__otra__'){
+          const selectEl = document.getElementById('ec-act-companyid');
+          const selectedOption = selectEl.options[selectEl.selectedIndex];
+          companyNameSnapshot = selectedOption ? selectedOption.textContent : null;
+        }
+        const { error: polError } = await sb.from('client_policies').insert({
+          client_id: currentClientId,
+          company_id: (companySelect && companySelect !== '__otra__') ? companySelect : null,
+          company: companyNameSnapshot,
+          policy_number: numero,
+          created_by: session.user.id
+        });
+        if(polError) showMsg('clientDetailMsg','error','Los datos del cliente se guardaron, pero la póliza no se pudo guardar: ' + polError.message);
+        else await loadClientPolicies(currentClientId);
+      }
+    }
+
     showMsg('clientDetailMsg','success','Cambios guardados.');
     const { data: client } = await sb.from('clients').select('*').eq('id', currentClientId).single();
     if(client) fillClientDetail(client);
     await loadClientAuditLog(currentClientId);
+    await loadClients();
     toggleEditClient();
   });
 
