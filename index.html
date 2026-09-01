@@ -4309,8 +4309,8 @@
     const serviceFee = parseFloat(document.getElementById('nc-quote-servicefee').value) || 0;
     const base = deposito + serviceFee;
     // Mismo cálculo que usa el resto del CRM para tarjeta manual: 2.9% + $0.30
-    const processingFee = base > 0 ? Math.round((base * 0.029 + 0.30) * 100) / 100 : 0;
-    const total = base > 0 ? Math.round((base + processingFee) * 100) / 100 : 0;
+    // (calculado sobre el total, no sobre el subtotal — ver calcStripeGrossUp)
+    const { total } = calcStripeGrossUp(base, 'tarjeta');
     document.getElementById('nc-quote-total').value = total > 0 ? total.toFixed(2) : '';
   }
 
@@ -6749,6 +6749,32 @@
   const STRIPE_MANUAL_RATE = 0.029;
   const STRIPE_MANUAL_FIXED = 0.30;
 
+  // Stripe cobra su comisión sobre el TOTAL que se le carga a la tarjeta del
+  // cliente, no sobre el subtotal que queremos que nos quede limpio. Por eso
+  // no basta con sumar "subtotal + (subtotal*tarifa + fijo)" — eso deja a la
+  // agencia recibiendo un poco MENOS de lo que debería (Stripe le sigue
+  // cobrando su % sobre el fijo de $0.30 y sobre su propia comisión también).
+  // La fórmula correcta ("gross-up") despeja el total para que, después de
+  // que Stripe se cobre su tarifa, lo que quede neto sea exactamente chargeBase:
+  //   total = (chargeBase + fijo) / (1 - tarifa)
+  // Para ACH la tarifa es 0.8% con tope de $5.00 — el tope no depende del
+  // total, así que arriba de ~$620 de base la comisión simplemente se queda
+  // fija en $5.00 (ahí no hace falta "engordar" nada).
+  function calcStripeGrossUp(chargeBase, metodoPago){
+    if(!(chargeBase > 0)) return { fee: 0, total: 0 };
+    let fee;
+    if(metodoPago === 'ach'){
+      const grossedFee = (chargeBase * 0.008) / (1 - 0.008);
+      fee = grossedFee <= 5.00 ? grossedFee : 5.00;
+    } else {
+      const grossedTotal = (chargeBase + STRIPE_MANUAL_FIXED) / (1 - STRIPE_MANUAL_RATE);
+      fee = grossedTotal - chargeBase;
+    }
+    fee = Math.round(fee * 100) / 100;
+    const total = Math.round((chargeBase + fee) * 100) / 100;
+    return { fee, total };
+  }
+
   // ---- Conexión con Stripe (modo prueba) ----
   const STRIPE_PUBLISHABLE_KEY = "pk_live_51SjlvHJH3gu0evl9PZRnplw57uA3FJo2sbtQsXZSJeyUFOFR2LkS7gNKlZ3fzBzqTs8F2ZXjauMdY61k64UgYDjY00hA8BBL1Y";
   const stripeClient = window.Stripe ? Stripe(STRIPE_PUBLISHABLE_KEY) : null;
@@ -6863,18 +6889,14 @@
     const chargeBase = serviceFee + (collectsDeposit ? cargoAmount : 0);
 
     const metodoPago = document.getElementById('tx-metodopago').value || 'tarjeta';
-    let processingFee = 0;
     let metodoLabel = '';
     if(metodoPago === 'ach'){
-      processingFee = chargeBase > 0 ? Math.min(chargeBase * 0.008, 5.00) : 0;
       metodoLabel = 'ACH, 0.8% (tope $5.00)';
     } else {
       // Tarjeta manual y Link de pago cobran la misma tarifa: 2.9% + $0.30
-      processingFee = chargeBase > 0 ? (chargeBase * STRIPE_MANUAL_RATE + STRIPE_MANUAL_FIXED) : 0;
       metodoLabel = metodoPago === 'link' ? 'Link de pago, 2.9% + $0.30' : 'Tarjeta, 2.9% + $0.30';
     }
-    processingFee = Math.round(processingFee * 100) / 100;
-    const total = Math.round((chargeBase + processingFee) * 100) / 100;
+    const { fee: processingFee, total } = calcStripeGrossUp(chargeBase, metodoPago);
 
     const metodoNota = document.getElementById('tx-metodopago-nota');
     if(metodoNota){
