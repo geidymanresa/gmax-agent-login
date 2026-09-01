@@ -858,8 +858,13 @@
           <div id="dashFollowupList"></div>
         </div>
 
+        <div class="dash-card" id="renewalsUrgentCard" style="display:none; margin-top:20px; background:#FDEAEA; border:1.5px solid #E39C9C;">
+          <h4 style="margin-top:0; color:#8a3030;">🚨 Renovaciones urgentes (5 días o menos)</h4>
+          <div id="renewalsUrgentList"></div>
+        </div>
+
         <div class="dash-card" id="renewalsCard" style="margin-top:20px; background:#FFF8EA; border:1.5px solid #F0D28A;">
-          <h4 style="margin-top:0; color:#8a6116;">📅 Próximas renovaciones (próximos 15 días)</h4>
+          <h4 style="margin-top:0; color:#8a6116;">📅 Próximas renovaciones (próximos 20 días)</h4>
           <div id="renewalsList"><p class="sub">Cargando...</p></div>
         </div>
 
@@ -8320,9 +8325,11 @@
   }
 
   // ---- Próximas renovaciones ----
+  // Dos niveles: aviso normal desde 20 días antes, y aviso urgente (todos los
+  // días, sin falta) cuando quedan 5 días o menos hasta el día 0 (el día que vence).
   async function loadRenewals(){
     const hoy = new Date(); hoy.setHours(0,0,0,0);
-    const limite = new Date(hoy); limite.setDate(limite.getDate() + 15);
+    const limite = new Date(hoy); limite.setDate(limite.getDate() + 20);
     const { data, error } = await sb.from('client_policies')
       .select('*, client:client_id(full_name)')
       .neq('status', 'cancelled')
@@ -8330,9 +8337,12 @@
       .lte('expiration_date', toISODateLocal(limite))
       .order('expiration_date', { ascending: true });
 
+    const urgentCard = document.getElementById('renewalsUrgentCard');
+    const urgentList = document.getElementById('renewalsUrgentList');
     const list = document.getElementById('renewalsList');
     if(error || !data || data.length === 0){
-      list.innerHTML = '<p class="sub">No hay renovaciones en los próximos 15 días.</p>';
+      urgentCard.style.display = 'none';
+      list.innerHTML = '<p class="sub">No hay renovaciones en los próximos 20 días.</p>';
       return;
     }
 
@@ -8346,20 +8356,43 @@
     const dismissedIds = new Set((dismissals || []).map(d => d.policy_id));
     const visible = data.filter(p => !dismissedIds.has(p.id));
 
-    if(visible.length === 0){
-      list.innerHTML = '<p class="sub">Quitaste todas las de hoy — vuelven a aparecer mañana si siguen pendientes.</p>';
-      return;
-    }
+    // Días que faltan para cada póliza (0 = vence hoy).
+    const withDays = visible.map(p => {
+      const venc = new Date(p.expiration_date + 'T00:00:00');
+      const diasFaltan = Math.round((venc - hoy) / (24 * 60 * 60 * 1000));
+      return { p, diasFaltan };
+    });
 
-    list.innerHTML = visible.map(p => `
-      <div style="padding:8px 0; border-bottom:1px solid #F0D28A; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+    const urgentes = withDays.filter(x => x.diasFaltan <= 5);
+    const normales = withDays.filter(x => x.diasFaltan > 5);
+
+    const renderItem = (p, diasFaltan, urgente) => `
+      <div style="padding:8px 0; border-bottom:1px solid ${urgente ? '#E39C9C' : '#F0D28A'}; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${p.client_id}')">
           <strong>${p.client ? p.client.full_name : 'Cliente'}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
           con ${p.company || '—'} — vence el <strong>${formatDateUS(p.expiration_date)}</strong>
+          <span style="font-weight:700; color:${urgente ? '#8a3030' : '#8a6116'};">
+            (${diasFaltan <= 0 ? '¡vence hoy!' : diasFaltan === 1 ? '¡falta 1 día!' : '¡faltan ' + diasFaltan + ' días!'})
+          </span>
         </div>
-        <button class="btn-ghost" style="width:auto; padding:6px 10px; flex-shrink:0;" onclick="dismissRenewal('${p.id}', event)">Quitar</button>
+        <button class="btn-ghost" style="width:auto; padding:6px 10px; flex-shrink:0;" onclick="dismissRenewal('${p.id}', event)">Quitar por hoy</button>
       </div>
-    `).join('');
+    `;
+
+    if(urgentes.length === 0){
+      urgentCard.style.display = 'none';
+    } else {
+      urgentCard.style.display = 'block';
+      urgentList.innerHTML = urgentes.map(x => renderItem(x.p, x.diasFaltan, true)).join('');
+    }
+
+    if(normales.length === 0){
+      list.innerHTML = urgentes.length > 0
+        ? '<p class="sub">Sin renovaciones adicionales entre 6 y 20 días — revisa la lista urgente de arriba.</p>'
+        : '<p class="sub">Quitaste todas las de hoy — vuelven a aparecer mañana si siguen pendientes.</p>';
+    } else {
+      list.innerHTML = normales.map(x => renderItem(x.p, x.diasFaltan, false)).join('');
+    }
   }
 
   async function dismissRenewal(policyId, evt){
