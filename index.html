@@ -177,6 +177,16 @@
   .profile-field .label{font-size:11.5px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.03em; font-weight:700; margin:0;}
   .profile-field .num{display:block; word-break:break-word; overflow-wrap:break-word; margin-top:7px; font-weight:600; color:var(--navy); line-height:1.4;}
 
+  /* Versión compacta de lo de arriba — mismo dato, recuadro más chico. Se usa
+     en "Perfil del cliente" / "Información comercial" / "Persona adicional",
+     donde antes cada cajita (nombre, dirección, teléfono...) salía tan grande
+     que esa sección sola ocupaba casi toda la pantalla. */
+  .dash-card-compact{padding:16px 18px; margin:14px 0;}
+  .dash-card-compact h4{font-size:14px; margin-bottom:2px;}
+  .profile-field-compact{padding:8px 12px; border-radius:8px;}
+  .profile-field-compact .label{font-size:10px;}
+  .profile-field-compact .num{margin-top:3px; font-size:13px; line-height:1.3;}
+
   /* Caja de Documentos con color propio para diferenciarla del resto */
   .dash-card-docs{background:#FEFBF0; border:1.5px solid #F0DCA0;}
   .dash-card-docs h4{color:#8a6116;}
@@ -390,9 +400,13 @@
       <p class="sub" style="margin-top:14px; font-size:11.5px;">Al firmar, se guarda tu nombre, la fecha y hora, y tu dirección IP como parte de este documento.</p>
     </div>
 
-    <div id="sign-already-done" style="display:none; text-align:center;">
-      <p style="color:#1a7f37; font-weight:600; font-size:18px;">✓ Este documento ya fue firmado.</p>
-      <p class="sub" id="sign-already-done-detail"></p>
+    <div id="sign-already-done" style="display:none; text-align:left;">
+      <p style="color:#1a7f37; font-weight:600; font-size:18px; text-align:center;">✓ Este documento ya fue firmado.</p>
+      <p class="sub" id="sign-already-done-detail" style="text-align:center;"></p>
+      <div id="sign-already-done-doc" style="border:1.5px solid var(--line); border-radius:12px; padding:20px; margin:16px 0; background:#fff;"></div>
+      <div style="text-align:center;">
+        <button type="button" class="btn-primary" style="width:auto; padding:10px 20px;" onclick="downloadSignedDocumentPDF()">⬇️ Descargar / Imprimir mi copia</button>
+      </div>
     </div>
 
     <div id="sign-error" style="display:none;">
@@ -843,29 +857,42 @@
           <div class="dash-stat"><div class="num" id="statPendientes">—</div><div class="label">Solicitudes pendientes</div></div>
         </div>
 
-        <div class="dash-card" id="dashPendingPolicyCard" style="display:none; margin-top:20px; background:#FFF8EA; border:1.5px solid #F0D28A;">
-          <h4 style="margin-top:0; color:#8a6116;">⚠ Pólizas pendientes de número (falta emitir recibo)</h4>
-          <div id="dashPendingPolicyList"></div>
-        </div>
+        <!-- Panel de alertas: en vez de barras una debajo de otra, salen como
+             cuadros lado a lado, agrupados por nivel — rojo = urgente (hay que
+             actuar ya), naranja = importante, amarillo = próximas renovaciones,
+             violeta = alertas de seguimiento que tú misma le pusiste a un cliente. -->
+        <div id="dashAlertsGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; margin-top:20px;">
 
-        <div class="dash-card" id="dashAlertsCard" style="display:none; margin-top:20px; background:#FDEAEA; border:1.5px solid #E39C9C;">
-          <h4 style="margin-top:0; color:#8a3030;">⚠ Clientes con documentos pendientes</h4>
-          <div id="dashAlertsList"></div>
-        </div>
+          <div class="dash-card" id="dashAlertsCard" style="display:none; margin:0; background:#FDEAEA; border:1.5px solid #E39C9C;">
+            <div style="display:inline-block; background:#C23B3B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔴 Urgente</div>
+            <h4 style="margin-top:0; color:#8a3030;">Clientes con documentos pendientes</h4>
+            <div id="dashAlertsList"></div>
+          </div>
 
-        <div class="dash-card" id="dashFollowupCard" style="display:none; margin-top:20px; background:#F1E9FB; border:1.5px solid #D6C2EF;">
-          <h4 style="margin-top:0; color:#6B3FA0;">🔔 Recordatorios de seguimiento</h4>
-          <div id="dashFollowupList"></div>
-        </div>
+          <div class="dash-card" id="dashPendingPolicyCard" style="display:none; margin:0; background:#FDEAEA; border:1.5px solid #E39C9C;">
+            <div style="display:inline-block; background:#C23B3B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔴 Urgente</div>
+            <h4 style="margin-top:0; color:#8a3030;">Pólizas pendientes de número (falta emitir recibo)</h4>
+            <div id="dashPendingPolicyList"></div>
+          </div>
 
-        <div class="dash-card" id="renewalsUrgentCard" style="display:none; margin-top:20px; background:#FDEAEA; border:1.5px solid #E39C9C;">
-          <h4 style="margin-top:0; color:#8a3030;">🚨 Renovaciones urgentes (5 días o menos)</h4>
-          <div id="renewalsUrgentList"></div>
-        </div>
+          <div class="dash-card" id="renewalsUrgentCard" style="display:none; margin:0; background:#FDF0E4; border:1.5px solid #F0B87F;">
+            <div style="display:inline-block; background:#C97A2E; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🟠 Importante</div>
+            <h4 style="margin-top:0; color:#9a5518;">Renovaciones en 5 días o menos</h4>
+            <div id="renewalsUrgentList"></div>
+          </div>
 
-        <div class="dash-card" id="renewalsCard" style="margin-top:20px; background:#FFF8EA; border:1.5px solid #F0D28A;">
-          <h4 style="margin-top:0; color:#8a6116;">📅 Próximas renovaciones (próximos 20 días)</h4>
-          <div id="renewalsList"><p class="sub">Cargando...</p></div>
+          <div class="dash-card" id="renewalsCard" style="margin:0; background:#FFF8EA; border:1.5px solid #F0D28A;">
+            <div style="display:inline-block; background:#B8860B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🟡 Próxima renovación</div>
+            <h4 style="margin-top:0; color:#8a6116;">Próximas renovaciones (próximos 20 días)</h4>
+            <div id="renewalsList"><p class="sub">Cargando...</p></div>
+          </div>
+
+          <div class="dash-card" id="dashFollowupCard" style="display:none; margin:0; background:#F1E9FB; border:1.5px solid #D6C2EF;">
+            <div style="display:inline-block; background:#6B3FA0; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🟣 Alerta</div>
+            <h4 style="margin-top:0; color:#6B3FA0;">Recordatorios de seguimiento</h4>
+            <div id="dashFollowupList"></div>
+          </div>
+
         </div>
 
         <div class="dash-card" id="leadsCard" style="margin-top:20px; background:#EAF1FB; border:1.5px solid #C7D9F3;">
@@ -1551,52 +1578,52 @@
           </div>
 
           <!-- Perfil (solo lectura) -->
-          <div class="dash-card" id="cd-viewCard">
+          <div class="dash-card dash-card-compact" id="cd-viewCard">
             <h4>Perfil del cliente</h4>
-            <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:22px; row-gap:26px;">
-              <div class="profile-field"><div class="label">Correo</div><div class="num" id="cd-view-correo">—</div></div>
-              <div class="profile-field"><div class="label">Correo alternativo</div><div class="num" id="cd-view-correo-alt">—</div></div>
-              <div class="profile-field"><div class="label">Teléfono</div><div class="num" id="cd-view-telefono">—</div></div>
-              <div class="profile-field"><div class="label">Teléfono secundario</div><div class="num" id="cd-view-telefono2">—</div></div>
-              <div class="profile-field"><div class="label">Licencia de conducir</div><div class="num" id="cd-view-licencia">—</div></div>
-              <div class="profile-field"><div class="label">Fecha de nacimiento</div><div class="num" id="cd-view-nacimiento">—</div></div>
-              <div class="profile-field"><div class="label">Sexo / Estado civil</div><div class="num" id="cd-view-sexocivil">—</div></div>
-              <div class="profile-field"><div class="label">Idioma preferido</div><div class="num" id="cd-view-idioma">—</div></div>
-              <div class="profile-field"><div class="label">Dirección residencial</div><div class="num" id="cd-view-direccion">—</div></div>
-              <div class="profile-field"><div class="label">Dirección postal</div><div class="num" id="cd-view-direccionpostal">—</div></div>
-              <div class="profile-field"><div class="label">Ciudad / Estado / ZIP</div><div class="num" id="cd-view-ciudad">—</div></div>
-              <div class="profile-field"><div class="label">Condado</div><div class="num" id="cd-view-condado">—</div></div>
-              <div class="profile-field"><div class="label">Contacto preferido</div><div class="num" id="cd-view-contacto">—</div></div>
-              <div class="profile-field"><div class="label">Fuente del lead</div><div class="num" id="cd-view-fuente">—</div></div>
-              <div class="profile-field"><div class="label">Referido por</div><div class="num" id="cd-view-referido">—</div></div>
+            <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; row-gap:10px;">
+              <div class="profile-field profile-field-compact"><div class="label">Correo</div><div class="num" id="cd-view-correo">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Correo alternativo</div><div class="num" id="cd-view-correo-alt">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Teléfono</div><div class="num" id="cd-view-telefono">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Teléfono secundario</div><div class="num" id="cd-view-telefono2">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Licencia de conducir</div><div class="num" id="cd-view-licencia">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Fecha de nacimiento</div><div class="num" id="cd-view-nacimiento">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Sexo / Estado civil</div><div class="num" id="cd-view-sexocivil">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Idioma preferido</div><div class="num" id="cd-view-idioma">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Dirección residencial</div><div class="num" id="cd-view-direccion">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Dirección postal</div><div class="num" id="cd-view-direccionpostal">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Ciudad / Estado / ZIP</div><div class="num" id="cd-view-ciudad">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Condado</div><div class="num" id="cd-view-condado">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Contacto preferido</div><div class="num" id="cd-view-contacto">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Fuente del lead</div><div class="num" id="cd-view-fuente">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Referido por</div><div class="num" id="cd-view-referido">—</div></div>
             </div>
           </div>
 
-          <div class="dash-card" id="cd-viewBusinessCard" style="display:none;">
+          <div class="dash-card dash-card-compact" id="cd-viewBusinessCard" style="display:none;">
             <h4>Información comercial</h4>
-            <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:22px; row-gap:26px;">
-              <div class="profile-field"><div class="label">Nombre legal</div><div class="num" id="cd-view-b-legal">—</div></div>
-              <div class="profile-field"><div class="label">DBA</div><div class="num" id="cd-view-b-dba">—</div></div>
-              <div class="profile-field"><div class="label">Tipo de entidad</div><div class="num" id="cd-view-b-entidad">—</div></div>
-              <div class="profile-field"><div class="label">EIN</div><div class="num" id="cd-view-b-ein">—</div></div>
-              <div class="profile-field"><div class="label">Fecha de inicio</div><div class="num" id="cd-view-b-inicio">—</div></div>
-              <div class="profile-field"><div class="label">Industria</div><div class="num" id="cd-view-b-industria">—</div></div>
-              <div class="profile-field"><div class="label">Dirección del negocio</div><div class="num" id="cd-view-b-direccion">—</div></div>
-              <div class="profile-field"><div class="label">Ingresos / Nómina anual</div><div class="num" id="cd-view-b-finanzas">—</div></div>
-              <div class="profile-field"><div class="label">Empleados</div><div class="num" id="cd-view-b-empleados">—</div></div>
-              <div class="profile-field"><div class="label">Propietarios</div><div class="num" id="cd-view-b-propietarios">—</div></div>
-              <div class="profile-field"><div class="label">Sitio web</div><div class="num" id="cd-view-b-web">—</div></div>
-              <div class="profile-field"><div class="label">Teléfono / Correo comercial</div><div class="num" id="cd-view-b-contacto">—</div></div>
+            <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; row-gap:10px;">
+              <div class="profile-field profile-field-compact"><div class="label">Nombre legal</div><div class="num" id="cd-view-b-legal">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">DBA</div><div class="num" id="cd-view-b-dba">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Tipo de entidad</div><div class="num" id="cd-view-b-entidad">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">EIN</div><div class="num" id="cd-view-b-ein">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Fecha de inicio</div><div class="num" id="cd-view-b-inicio">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Industria</div><div class="num" id="cd-view-b-industria">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Dirección del negocio</div><div class="num" id="cd-view-b-direccion">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Ingresos / Nómina anual</div><div class="num" id="cd-view-b-finanzas">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Empleados</div><div class="num" id="cd-view-b-empleados">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Propietarios</div><div class="num" id="cd-view-b-propietarios">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Sitio web</div><div class="num" id="cd-view-b-web">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Teléfono / Correo comercial</div><div class="num" id="cd-view-b-contacto">—</div></div>
             </div>
             <p class="sub" id="cd-view-b-operaciones" style="margin-top:10px;"></p>
           </div>
 
           <!-- Persona adicional -->
-          <div class="dash-card" id="cd-viewAdditionalCard" style="display:none;">
+          <div class="dash-card dash-card-compact" id="cd-viewAdditionalCard" style="display:none;">
             <h4>Persona adicional</h4>
-            <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:22px; row-gap:26px;">
-              <div class="profile-field"><div class="label">Nombre</div><div class="num" id="cd-view-add-nombre">—</div></div>
-              <div class="profile-field"><div class="label">Relación con el cliente</div><div class="num" id="cd-view-add-relacion">—</div></div>
+            <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; row-gap:10px;">
+              <div class="profile-field profile-field-compact"><div class="label">Nombre</div><div class="num" id="cd-view-add-nombre">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Relación con el cliente</div><div class="num" id="cd-view-add-relacion">—</div></div>
             </div>
           </div>
 
@@ -2517,6 +2544,19 @@
         <p class="sub">Dinero de la agencia (Checking) vs. dinero que corresponde a las aseguradoras (Agency Sweep), por transacción. Solo tú puedes verlo.</p>
 
         <div class="dash-card">
+          <h4 style="margin-top:0;">🔎 Buscar recibo por número</h4>
+          <p class="sub">Para control interno, o para conciliar con Stripe si hay que hacer un reembolso.</p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+            <div class="form-row" style="flex:1; min-width:220px; margin-bottom:0;">
+              <label>Número de recibo</label>
+              <input type="text" id="tr-buscar-recibo" placeholder="GMAX-2026-000123" onkeydown="if(event.key==='Enter'){ event.preventDefault(); searchReceiptByNumber(); }">
+            </div>
+            <button type="button" class="btn-primary" style="width:auto; padding:10px 20px;" onclick="searchReceiptByNumber()">Buscar</button>
+          </div>
+          <div id="tr-buscar-recibo-resultado" style="margin-top:12px;"></div>
+        </div>
+
+        <div class="dash-card">
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn-ghost tr-range-btn active" data-range="today" onclick="setTesoreriaRange('today')" style="width:auto; padding:8px 16px;">Hoy</button>
             <button class="btn-ghost tr-range-btn" data-range="5" onclick="setTesoreriaRange('5')" style="width:auto; padding:8px 16px;">Últimos 5 días</button>
@@ -3249,6 +3289,17 @@
       if(data.status === 'firmado'){
         document.getElementById('sign-already-done').style.display = 'block';
         document.getElementById('sign-already-done-detail').textContent = 'Firmado por ' + data.signer_name + ' el ' + new Date(data.signed_at).toLocaleString('es-US') + '.';
+        document.getElementById('sign-already-done-doc').innerHTML = `
+          <h3 style="margin-top:0;">${data.document_title || 'Documento'}</h3>
+          ${data.document_html || ''}
+          ${data.signature_image_data ? `
+            <div style="margin-top:20px; padding-top:14px; border-top:1px solid var(--line);">
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase;">Firma</div>
+              <img src="${data.signature_image_data}" alt="Firma" style="height:70px; margin-top:6px; border-bottom:1.5px solid #000;">
+              <div style="font-size:13px; margin-top:4px;">${data.signer_name || ''} — ${new Date(data.signed_at).toLocaleString('es-US')}</div>
+            </div>
+          ` : ''}
+        `;
         return;
       }
 
@@ -3340,7 +3391,10 @@
       const resp = await fetch(SUPABASE_URL + '/functions/v1/submit-signature', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ token, signerName: nombre, signatureImage })
+        body: JSON.stringify({
+          token, signerName: nombre, signatureImage,
+          pageUrl: window.location.origin + window.location.pathname
+        })
       });
       const data = await resp.json();
       if(!resp.ok || data.error){
@@ -3348,11 +3402,28 @@
         return;
       }
       document.getElementById('sign-content').style.display = 'none';
-      document.getElementById('sign-already-done').style.display = 'block';
-      document.getElementById('sign-already-done-detail').textContent = 'Gracias, ' + nombre + '. Tu firma quedó guardada correctamente.';
+      // Vuelve a pedir el documento — ya viene marcado como firmado, con el
+      // contenido completo y la firma, listo para ver/descargar.
+      await loadSignatureDocument(token);
     } catch(err){
       showMsg('sign-msg','error','Error de conexión: ' + err.message);
     }
+  }
+
+  function downloadSignedDocumentPDF(){
+    const content = document.getElementById('sign-already-done-doc').innerHTML;
+    const w = window.open('', '_blank');
+    w.document.write(`
+      <html><head><title>Documento firmado - GMAX All Insurance</title>
+      <style>
+        body{ font-family: Arial, sans-serif; color:#0D1424; padding:24px; max-width:640px; margin:0 auto; }
+        .badge{ background:#E4F6EC; color:#177A54; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:700; }
+        button{ display:none !important; }
+      </style></head>
+      <body>${content}</body></html>
+    `);
+    w.document.close();
+    setTimeout(() => { w.print(); }, 300);
   }
   // ===================== FIN FIRMA PÚBLICA =====================
 
@@ -7276,6 +7347,8 @@
     let stripePaymentIntentId = null;
     let stripeCheckoutSessionId = null;
     let paymentLinkUrl = null;
+    let cardBrand = null;
+    let cardLast4 = null;
     if(metodoPago === 'tarjeta'){
       if(totalACobrar <= 0){
         showMsg('newTransactionMsg','error','El monto a cobrar debe ser mayor a $0.');
@@ -7318,6 +7391,29 @@
           return;
         }
         stripePaymentIntentId = paymentIntent.id;
+
+        // Marca y últimos 4 dígitos de la tarjeta — para que salgan en el
+        // recibo. Si esto falla por lo que sea, no se detiene la venta (el
+        // pago ya se cobró); el recibo simplemente sale sin ese dato.
+        try {
+          const { data: { session: cardSession } } = await sb.auth.getSession();
+          const cardResp = await fetch(SUPABASE_URL + '/functions/v1/get-card-details', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer ' + cardSession.access_token,
+              'apikey': SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ paymentIntentId: stripePaymentIntentId })
+          });
+          const cardData = await cardResp.json();
+          if(cardResp.ok && !cardData.error){
+            cardBrand = cardData.brand || null;
+            cardLast4 = cardData.last4 || null;
+          }
+        } catch(cardErr){
+          console.error('No se pudo obtener la marca/últimos 4 de la tarjeta:', cardErr);
+        }
       } catch(err){
         showMsg('newTransactionMsg','error','Error de conexión con Stripe: ' + err.message);
         return;
@@ -7440,6 +7536,8 @@
       endorsement_subtype: tipo === 'endorsement' ? endorsoSubtipos.join(',') : null,
       payment_method: resumen.dataset.paymentMethod || 'tarjeta',
       stripe_payment_intent_id: stripePaymentIntentId,
+      card_brand: cardBrand,
+      card_last4: cardLast4,
       payment_link_email: metodoPago === 'link' ? (document.getElementById('tx-link-email').value || null) : null,
       stripe_checkout_session_id: stripeCheckoutSessionId,
       payment_link_url: paymentLinkUrl,
@@ -8182,6 +8280,24 @@
       policyNumber = pol ? pol.policy_number : '—';
     }
 
+    let agentName = '—';
+    if(t.created_by){
+      const { data: agentProfile } = await sb.from('profiles').select('full_name').eq('id', t.created_by).single();
+      agentName = agentProfile ? agentProfile.full_name : '—';
+    }
+
+    // Recibos con tarjeta requieren firma del cliente por ley (Texas — el
+    // service fee de la agencia tiene que llevar su consentimiento). Este
+    // recibo se queda "bloqueado" (sin poder descargar ni enviar directo)
+    // hasta que exista una firma guardada para esta transacción.
+    const { data: sigReq } = await sb.from('signature_requests')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const firmado = !!(sigReq && sigReq.status === 'firmado');
+
     const fecha = formatDateUS(t.receipt_issued_at ? t.receipt_issued_at.split('T')[0] : new Date().toISOString().split('T')[0]);
     const clienteNombre = document.getElementById('cd-nombre').textContent;
 
@@ -8197,16 +8313,45 @@
       notaDeposito = `<p class="sub" style="margin-top:10px;">Nota: el depósito de $${Number(t.deposit_amount).toFixed(2)} que pide la aseguradora se paga directo con ellos y no está incluido en este recibo.</p>`;
     }
 
+    const cardLine = (t.card_brand && t.card_last4)
+      ? `<div><div class="label" style="font-size:12px; color:var(--slate-light);">Tarjeta</div><div>${CARD_BRAND_LABELS[t.card_brand] || t.card_brand} terminada en ${t.card_last4}</div></div>`
+      : '';
+
+    // Panel de acción: mientras no esté firmado, la ÚNICA acción posible es
+    // pedirle la firma al cliente (copiar link o mandarlo por correo) — nada
+    // de descargar ni de mandar el recibo directo sin firmar. Ya firmado, se
+    // desbloquea la descarga y se ve quién firmó y cuándo.
+    const accionesHtml = firmado ? `
+      <div style="margin-top:14px; padding:14px 16px; background:#E9F7F0; border:1.5px solid #A9DFC4; border-radius:10px;">
+        <div style="font-weight:700; color:#177A54;">✓ Firmado por ${escapeHtml(sigReq.signer_name || '')} el ${formatDateTimeUS(sigReq.signed_at)}</div>
+        ${sigReq.signature_image_data ? `<img src="${sigReq.signature_image_data}" alt="Firma" style="height:60px; margin-top:8px; border-bottom:1.5px solid #A9DFC4;">` : ''}
+        <p class="sub" style="margin-top:8px; margin-bottom:0;">El cliente ya recibió su copia firmada por correo automáticamente.</p>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">⬇️ Descargar recibo</button>
+      </div>
+    ` : `
+      <div style="margin-top:14px; padding:14px 16px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:10px;">
+        <div style="font-weight:700; color:#8a6116;">✍️ Falta la firma del cliente</div>
+        <p class="sub" style="margin-top:4px; margin-bottom:0;">Por ley, este recibo no se puede descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono.</p>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <button type="button" class="btn-ghost" id="cd-receipt-copy-btn" style="width:auto; padding:10px 18px;" onclick="copySignatureLink('${transactionId}')">📋 Copiar link para enviar</button>
+        <button type="button" class="btn-ghost" id="cd-receipt-email-btn" style="width:auto; padding:10px 18px;" onclick="emailSignatureLink('${transactionId}')">✉️ Enviar por correo al cliente</button>
+      </div>
+      <div class="msg" id="cd-receipt-sign-msg" style="margin-top:8px;"></div>
+    `;
+
     document.getElementById('cd-receiptContent').innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
         <div style="display:flex; align-items:center; gap:12px;">
           <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:52px; width:auto;">
           <div>
             <h3 style="margin:0;">Recibo de pago</h3>
-            <p class="sub" style="margin-top:4px;">GMAX All Insurance</p>
+            <p class="sub" style="margin-top:4px;">GMAX All Insurance ${t.receipt_number ? '— #' + t.receipt_number : ''}</p>
           </div>
         </div>
-        <span class="badge active">Pagado</span>
+        <span class="badge ${firmado ? 'active' : 'pending'}">${firmado ? 'Firmado' : 'Pendiente de firma'}</span>
       </div>
 
       <!-- TOTAL: lo primero y más grande que ve el cliente -->
@@ -8223,15 +8368,29 @@
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">Número de póliza</div><div>${policyNumber || '—'}</div></div>
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">Tipo de transacción</div><div>${SERVICE_TYPE_LABELS[t.transaction_type] || t.transaction_type}</div></div>
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">Método de pago</div><div>${{tarjeta:'Tarjeta', link:'Link de pago', ach:'ACH / Cuenta bancaria'}[t.payment_method] || 'Tarjeta'}</div></div>
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Agente</div><div>${escapeHtml(agentName)}</div></div>
+        ${cardLine}
       </div>
 
-      <div style="margin-top:18px; font-size:12px; color:var(--slate-light); line-height:1.5;">
-        <strong>Terms and Conditions:</strong> By signing this document, I authorize GMAX All Insurance to process
-        this transaction and acknowledge that I have been informed of all applicable charges, including the
-        insurance premium (when applicable), Agency Service Fee, and Payment Processing Fee. I understand that
-        the Agency Service Fee and Payment Processing Fee are separate from the insurance premium and are
-        non-refundable once services have been rendered or the transaction has been processed, except where
-        required by law or approved by GMAX All Insurance under exceptional circumstances.
+      <div style="margin-top:18px; font-size:11.5px; color:var(--slate-light); line-height:1.6;">
+        <strong>AUTHORIZATION AND CONSENT TO CHARGES.</strong> By signing this document, I, the undersigned, acknowledge
+        and agree to the following: (1) I am purchasing and/or servicing an insurance policy, or requesting a
+        related service (which may include, without limitation, a new policy, an endorsement, an assisted
+        payment, or a reinstatement), through GMAX All Insurance ("the Agency"), a licensed insurance agency.
+        (2) The total amount charged, itemized above, may include: the insurance premium and/or deposit
+        collected on behalf of the insurance carrier, when applicable; an Agency Service Fee charged by the
+        Agency for the professional services rendered in connection with this specific transaction; and a
+        Payment Processing Fee to recover the cost of accepting card or electronic payment. (3) I understand
+        and agree that the Agency Service Fee and Payment Processing Fee are separate and distinct from the
+        insurance premium, are earned by the Agency upon performance of the requested service, and are
+        non-refundable once the service has been rendered, except as otherwise required by applicable Texas
+        law or approved by the Agency at its sole discretion. (4) I acknowledge that I was informed of all
+        charges reflected on this receipt before authorizing this transaction, and that my consent is
+        voluntary. (5) I authorize GMAX All Insurance to charge the payment method described above for the
+        total amount shown, and I agree that my electronic signature captured through this system is legally
+        binding and has the same effect as a handwritten signature, pursuant to the Texas Uniform Electronic
+        Transactions Act (Tex. Bus. & Com. Code Ch. 322) and the federal E-SIGN Act. (6) This authorization
+        applies only to the transaction described on this receipt and does not authorize any future charge.
       </div>
 
       <!-- Desglose y nota: debajo de los términos y condiciones -->
@@ -8241,61 +8400,82 @@
       </div>
       ${notaDeposito}
 
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-        <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">Descargar recibo</button>
-        <button type="button" class="btn-ghost" id="cd-receipt-email-btn" style="width:auto; padding:10px 18px;" onclick="sendReceiptByEmail('${transactionId}')">Enviar por correo</button>
-        <button type="button" class="btn-ghost" id="cd-receipt-sign-btn" style="width:auto; padding:10px 18px;" onclick="requestSignature('${transactionId}')">✍️ Enviar a firmar</button>
-      </div>
-      <div class="msg" id="cd-receipt-email-msg" style="margin-top:8px;"></div>
-      <div class="msg" id="cd-receipt-sign-msg" style="margin-top:8px;"></div>
-      <p class="sub" style="margin-top:8px;">"Enviar a firmar" genera un link único para mandarle al cliente — ahí va a poder ver este documento y firmarlo con el dedo o el mouse, sin necesitar cuenta.</p>
+      ${accionesHtml}
     `;
     document.getElementById('cd-receiptCard').style.display = 'block';
     document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
   }
 
-  async function requestSignature(transactionId){
-    const btn = document.getElementById('cd-receipt-sign-btn');
-    const msgEl = document.getElementById('cd-receipt-sign-msg');
-    btn.disabled = true;
-    showMsg('cd-receipt-sign-msg','success','Generando link de firma...');
+  // Marca de tarjeta tal como la devuelve Stripe → cómo se ve en el recibo.
+  const CARD_BRAND_LABELS = {
+    visa: 'Visa', mastercard: 'Mastercard', amex: 'American Express',
+    discover: 'Discover', diners: 'Diners Club', jcb: 'JCB', unionpay: 'UnionPay'
+  };
 
+  // Pide (o reutiliza, si ya había una pendiente) el link de firma para esta
+  // transacción — usado tanto por "Copiar link" como por "Enviar por correo".
+  async function ensureSignatureLink(transactionId, sendToEmail){
     const receiptHtml = document.getElementById('cd-receiptContent') ? document.getElementById('cd-receiptContent').innerHTML : document.getElementById('cd-receiptCard').innerHTML;
+    const { data: { session } } = await sb.auth.getSession();
+    const signLinkBase = window.location.origin + window.location.pathname;
+    const resp = await fetch(SUPABASE_URL + '/functions/v1/create-signature-request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + session.access_token,
+        'apikey': SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify({
+        transactionId,
+        clientId: currentClientId,
+        documentTitle: 'Recibo de pago — GMAX All Insurance',
+        documentHtml: receiptHtml,
+        agentName: currentProfile ? currentProfile.full_name : null,
+        sendToEmail: sendToEmail || undefined,
+        signLinkBase: sendToEmail ? signLinkBase : undefined
+      })
+    });
+    const data = await resp.json();
+    if(!resp.ok || data.error) throw new Error(data.error || 'No se pudo generar el link de firma.');
+    return { token: data.token, emailed: !!data.emailed, link: signLinkBase + '?firmar=' + data.token };
+  }
 
+  async function copySignatureLink(transactionId){
+    const btn = document.getElementById('cd-receipt-copy-btn');
+    if(btn) btn.disabled = true;
+    showMsg('cd-receipt-sign-msg','success','Generando link de firma...');
     try {
-      const { data: { session } } = await sb.auth.getSession();
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/create-signature-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + session.access_token,
-          'apikey': SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({
-          transactionId,
-          clientId: currentClientId,
-          documentTitle: 'Recibo de pago — GMAX All Insurance',
-          documentHtml: receiptHtml
-        })
-      });
-      const data = await resp.json();
-      btn.disabled = false;
-      if(!resp.ok || data.error){
-        showMsg('cd-receipt-sign-msg','error', data.error || 'No se pudo generar el link de firma.');
-        return;
-      }
-
-      const link = window.location.origin + window.location.pathname + '?firmar=' + data.token;
+      const { link } = await ensureSignatureLink(transactionId, null);
+      navigator.clipboard.writeText(link).catch(() => {});
+      const msgEl = document.getElementById('cd-receipt-sign-msg');
       msgEl.className = 'msg success';
       msgEl.innerHTML = `
-        ✓ Link de firma generado. Mándaselo al cliente:<br>
+        ✓ Link copiado — mándaselo al cliente por donde quieras (mensaje de texto, WhatsApp, etc.):<br>
         <input type="text" readonly value="${link}" onclick="this.select()" style="width:100%; margin-top:6px; padding:8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px;">
-        <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px; margin-top:6px; font-size:13px;" onclick="navigator.clipboard.writeText('${link}'); this.textContent='¡Copiado!';">Copiar link</button>
       `;
     } catch(err){
-      btn.disabled = false;
-      showMsg('cd-receipt-sign-msg','error','Error de conexión: ' + err.message);
+      showMsg('cd-receipt-sign-msg','error', err.message);
     }
+    if(btn) btn.disabled = false;
+  }
+
+  async function emailSignatureLink(transactionId){
+    const btn = document.getElementById('cd-receipt-email-btn');
+    const c = allClients.find(x => x.id === currentClientId);
+    const defaultEmail = c ? c.email : '';
+    const destino = prompt('¿A qué correo se lo enviamos para que firme?', defaultEmail || '');
+    if(!destino) return;
+
+    if(btn){ btn.disabled = true; btn.textContent = 'Enviando...'; }
+    showMsg('cd-receipt-sign-msg','success','Enviando el link de firma...');
+    try {
+      const { emailed } = await ensureSignatureLink(transactionId, destino);
+      showMsg('cd-receipt-sign-msg', emailed ? 'success' : 'error',
+        emailed ? ('✓ Se le mandó el link de firma a ' + destino + '.') : 'El link se generó pero el correo no se pudo enviar — usa "Copiar link" y mándaselo tú misma.');
+    } catch(err){
+      showMsg('cd-receipt-sign-msg','error', err.message);
+    }
+    if(btn){ btn.disabled = false; btn.textContent = '✉️ Enviar por correo al cliente'; }
   }
 
   function downloadReceiptPDF(){
@@ -8312,37 +8492,6 @@
     `);
     w.document.close();
     setTimeout(() => { w.print(); }, 300);
-  }
-
-  async function sendReceiptByEmail(transactionId){
-    const btn = document.getElementById('cd-receipt-email-btn');
-    const c = allClients.find(x => x.id === currentClientId);
-    const defaultEmail = c ? c.email : '';
-    const destino = prompt('¿A qué correo se lo enviamos?', defaultEmail || '');
-    if(!destino) return;
-
-    btn.disabled = true; btn.textContent = 'Enviando...';
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/send-receipt-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + session.access_token,
-          'apikey': SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({ transactionId, toEmail: destino })
-      });
-      const data = await resp.json();
-      if(!resp.ok || data.error){
-        showMsg('cd-receipt-email-msg','error', data.error || 'No se pudo enviar el correo.');
-      } else {
-        showMsg('cd-receipt-email-msg','success', 'Recibo enviado a ' + destino + '.');
-      }
-    } catch(err){
-      showMsg('cd-receipt-email-msg','error','Error de conexión: ' + err.message);
-    }
-    btn.disabled = false; btn.textContent = 'Enviar por correo';
   }
   // =================== FIN PENDIENTE DE PÓLIZA / RECIBO ===================
 
@@ -8600,11 +8749,11 @@
     const normales = withDays.filter(x => x.diasFaltan > 5);
 
     const renderItem = (p, diasFaltan, urgente) => `
-      <div style="padding:8px 0; border-bottom:1px solid ${urgente ? '#E39C9C' : '#F0D28A'}; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div style="padding:8px 0; border-bottom:1px solid ${urgente ? '#F0B87F' : '#F0D28A'}; display:flex; justify-content:space-between; align-items:center; gap:10px;">
         <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${p.client_id}')">
           <strong>${p.client ? p.client.full_name : 'Cliente'}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
           con ${p.company || '—'} — vence el <strong>${formatDateUS(p.expiration_date)}</strong>
-          <span style="font-weight:700; color:${urgente ? '#8a3030' : '#8a6116'};">
+          <span style="font-weight:700; color:${urgente ? '#9a5518' : '#8a6116'};">
             (${diasFaltan <= 0 ? '¡vence hoy!' : diasFaltan === 1 ? '¡falta 1 día!' : '¡faltan ' + diasFaltan + ' días!'})
           </span>
         </div>
@@ -9066,6 +9215,59 @@
   function isoToMMDDYYYYDisplay(isoDate){
     const [y,m,d] = isoDate.split('-');
     return `${m}/${d}/${y}`;
+  }
+
+  async function searchReceiptByNumber(){
+    const container = document.getElementById('tr-buscar-recibo-resultado');
+    const numero = document.getElementById('tr-buscar-recibo').value.trim();
+    if(!numero){
+      container.innerHTML = '<p class="sub" style="margin:0;">Escribe un número de recibo.</p>';
+      return;
+    }
+    container.innerHTML = '<p class="sub" style="margin:0;">Buscando...</p>';
+
+    const { data: results, error } = await sb.from('client_transactions')
+      .select('*, client:client_id(full_name)')
+      .ilike('receipt_number', `%${numero}%`)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if(error){
+      container.innerHTML = `<p class="sub" style="margin:0; color:#C23B3B;">Error buscando: ${error.message}</p>`;
+      return;
+    }
+    if(!results || results.length === 0){
+      container.innerHTML = '<p class="sub" style="margin:0;">No se encontró ningún recibo con ese número.</p>';
+      return;
+    }
+
+    const rows = await Promise.all(results.map(async t => {
+      const { data: sigReq } = await sb.from('signature_requests')
+        .select('status, signer_name, signed_at')
+        .eq('transaction_id', t.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const firmado = sigReq && sigReq.status === 'firmado';
+      const cardInfo = (t.card_brand && t.card_last4) ? `${CARD_BRAND_LABELS[t.card_brand] || t.card_brand} ****${t.card_last4}` : '—';
+      return `
+        <div style="padding:12px 0; border-bottom:1px solid var(--line);">
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+            <strong style="cursor:pointer;" onclick="goToClientFromUnderwriting('${t.client_id}')">#${t.receipt_number || '—'} — ${t.client ? t.client.full_name : 'Cliente'}</strong>
+            <span class="badge ${firmado ? 'active' : 'pending'}">${firmado ? 'Firmado' : 'Sin firmar'}</span>
+          </div>
+          <div class="sub" style="margin-top:4px;">
+            ${formatDateUS(t.created_at?.split('T')[0])} — ${SERVICE_TYPE_LABELS[t.transaction_type] || t.transaction_type} — $${Number(t.total_reference || 0).toFixed(2)}
+            — Tarjeta: ${cardInfo}
+          </div>
+          <div class="sub" style="margin-top:2px;">Stripe Payment Intent: ${t.stripe_payment_intent_id ? `<code>${t.stripe_payment_intent_id}</code>` : '—'}</div>
+          ${firmado ? `<div class="sub" style="margin-top:2px;">Firmado por ${escapeHtml(sigReq.signer_name || '')} el ${formatDateTimeUS(sigReq.signed_at)}</div>` : ''}
+          <button type="button" class="btn-ghost" style="width:auto; padding:5px 12px; margin-top:6px; font-size:12.5px;" onclick="goToClientFromUnderwriting('${t.client_id}')">Ver cliente y recibo →</button>
+        </div>
+      `;
+    }));
+
+    container.innerHTML = rows.join('');
   }
 
   async function loadTesoreria(){
