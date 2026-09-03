@@ -736,6 +736,8 @@
 
           <div class="form-row"><label>WhatsApp Business (con código de país, ej: 19561234567)</label><input type="tel" id="mp-whatsapp" placeholder="19561234567" autocomplete="off"></div>
 
+          <div class="form-row"><label>Correo que verán tus clientes en tu página</label><input type="email" id="mp-email" placeholder="tucorreo@ejemplo.com" autocomplete="off"><p class="sub" style="margin-top:4px;">Si lo dejas vacío, se usa el correo de tu cuenta.</p></div>
+
           <div class="form-row"><label>Link para agendar una cita/llamada (Calendly, Google Calendar, etc.)</label><input type="url" id="mp-calendly" placeholder="https://calendly.com/tu-usuario" autocomplete="off"></div>
 
           <div class="form-row">
@@ -1581,7 +1583,11 @@
           <div class="dash-card dash-card-compact" id="cd-viewCard">
             <h4>Perfil del cliente</h4>
             <div class="dash-stats" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; row-gap:10px;">
-              <div class="profile-field profile-field-compact"><div class="label">Correo</div><div class="num" id="cd-view-correo">—</div></div>
+              <div class="profile-field profile-field-compact">
+                <div class="label">Correo</div>
+                <div class="num" id="cd-view-correo">—</div>
+                <button type="button" class="btn-ghost" style="width:auto; padding:2px 8px; font-size:11px; margin-top:4px;" onclick="openClientEmailChange()">✏️ Cambiar correo</button>
+              </div>
               <div class="profile-field profile-field-compact"><div class="label">Correo alternativo</div><div class="num" id="cd-view-correo-alt">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Teléfono</div><div class="num" id="cd-view-telefono">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Teléfono secundario</div><div class="num" id="cd-view-telefono2">—</div></div>
@@ -1596,6 +1602,26 @@
               <div class="profile-field profile-field-compact"><div class="label">Contacto preferido</div><div class="num" id="cd-view-contacto">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Fuente del lead</div><div class="num" id="cd-view-fuente">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Referido por</div><div class="num" id="cd-view-referido">—</div></div>
+            </div>
+
+            <div id="cd-emailChangeCard" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+              <div style="font-weight:700; font-size:13.5px;">Cambiar correo electrónico del cliente</div>
+              <p class="sub" style="margin:4px 0 12px;">Por seguridad — para que los recibos y documentos firmados nunca le lleguen a un correo equivocado — te vamos a mandar un código de verificación al correo NUEVO antes de guardarlo.</p>
+
+              <div id="cd-emailChange-formStep">
+                <div class="form-row" style="max-width:320px;"><label>Correo nuevo</label><input type="email" id="cd-emailChange-nuevo" autocomplete="off"></div>
+                <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="requestClientEmailChange()">Enviar código al correo nuevo</button>
+                <button type="button" class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="closeClientEmailChange()">Cancelar</button>
+              </div>
+
+              <div id="cd-emailChange-codeStep" style="display:none; margin-top:14px;">
+                <p class="sub" style="margin-bottom:8px;">Te mandamos un código de 6 dígitos al correo nuevo. Escríbelo aquí para confirmar el cambio.</p>
+                <div class="form-row" style="max-width:220px;"><label>Código de verificación</label><input type="text" id="cd-emailChange-codigo" maxlength="6" inputmode="numeric"></div>
+                <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="confirmClientEmailChange()">Confirmar cambio</button>
+                <button type="button" class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="closeClientEmailChange()">Cancelar</button>
+              </div>
+
+              <div class="msg" id="cdEmailChangeMsg"></div>
             </div>
           </div>
 
@@ -2015,7 +2041,7 @@
                 <div class="form-row"><label>Apellido(s)</label><input type="text" id="ec-apellido" required></div>
               </div>
               <div class="form-row-2">
-                <div class="form-row"><label>Correo</label><input type="email" id="ec-correo"></div>
+                <div class="form-row"><label>Correo</label><input type="email" id="ec-correo" readonly style="background:var(--canvas); color:var(--slate-light);"><p class="sub" style="margin-top:4px;">Para cambiar el correo usa el botón "✏️ Cambiar correo" en el perfil del cliente (pide código de verificación).</p></div>
                 <div class="form-row"><label>Correo alternativo <span style="font-weight:400; color:var(--slate-light);">(opcional)</span></label><input type="email" id="ec-correo-alt"></div>
               </div>
               <div class="form-row-2">
@@ -3761,6 +3787,7 @@
     document.getElementById('mp-slug').value = page?.slug || slugifyText(currentProfile.full_name);
     document.getElementById('mp-bio').value = page?.bio || '';
     document.getElementById('mp-whatsapp').value = page?.whatsapp_number || '';
+    document.getElementById('mp-email').value = page?.public_email || currentProfile.email || '';
     document.getElementById('mp-calendly').value = page?.calendly_url || '';
 
     const fotoImg = document.getElementById('mp-fotoPreview');
@@ -3878,6 +3905,7 @@
       agent_id: currentProfile.id,
       slug,
       whatsapp_number: document.getElementById('mp-whatsapp').value.trim() || null,
+      public_email: document.getElementById('mp-email').value.trim() || null,
       calendly_url: document.getElementById('mp-calendly').value.trim() || null,
       bio: document.getElementById('mp-bio').value.trim() || null,
       color_palette: mpSelected.palette,
@@ -4546,14 +4574,19 @@
     const { data: clients, error } = await query;
     if(error){ console.error(error); allClients = []; }
     else {
-      // Los leads que llegan por el formulario público de la página web (source_public_form)
-      // solo los puede ver la administradora suprema y los administradores que ella designe —
-      // los agentes no los ven en ningún lado del CRM.
-      // Además, cada agente solo ve los clientes que tiene asignados a él mismo (assigned_agent_id) —
-      // nunca los clientes de otros agentes. Los admins/super_admin sí ven todo.
+      // Cada agente solo ve los clientes que tiene asignados a él mismo
+      // (assigned_agent_id) — nunca los clientes de otros agentes. Los
+      // admins/super_admin sí ven todo.
+      // Un lead que llegó por el formulario público SIN pasar por la página
+      // de un agente en específico (fuente genérica de la web) se queda sin
+      // asignar (assigned_agent_id vacío) hasta que un admin lo reparta — por
+      // eso no le sale a ningún agente todavía, sin necesidad de revisar
+      // source_public_form aquí: si ya tiene assigned_agent_id = este agente
+      // (por ejemplo, porque el cliente cotizó desde SU página personal), sí
+      // le tiene que salir, igual que cualquier otro cliente suyo.
       allClients = isAdminUser()
         ? (clients || [])
-        : (clients || []).filter(c => !c.source_public_form && c.assigned_agent_id === currentProfile.id);
+        : (clients || []).filter(c => c.assigned_agent_id === currentProfile.id);
     }
 
     // Traer las pólizas de todos los clientes para mostrar compañía + núm. de póliza en la lista
@@ -5030,9 +5063,12 @@
       return;
     }
 
-    // Los leads del formulario público solo los puede abrir la administradora
-    // suprema o un administrador designado — nunca un agente.
-    if(client.source_public_form && !isAdminUser()){
+    // Un lead del formulario público que todavía no está asignado a nadie
+    // (llegó por la fuente genérica de la web, no por la página de un agente)
+    // solo lo puede abrir la administradora suprema o un admin designado. Si
+    // ya está asignado a este mismo agente (por ejemplo, cotizó desde SU
+    // página personal), sí lo puede abrir normalmente.
+    if(client.source_public_form && client.assigned_agent_id !== currentProfile.id && !isAdminUser()){
       document.getElementById('clientDetailView').style.display = 'none';
       document.getElementById('clientsListView').style.display = 'block';
       currentClientId = null;
@@ -5300,6 +5336,7 @@
 
     document.getElementById('cd-view-correo').textContent = c.email || '—';
     document.getElementById('cd-view-correo-alt').textContent = c.email_alt || '—';
+    closeClientEmailChange();
     document.getElementById('cd-view-telefono').textContent = c.phone || '—';
     document.getElementById('cd-view-telefono2').textContent = c.secondary_phone || '—';
     document.getElementById('cd-view-licencia').textContent = c.drivers_license_number ? (c.drivers_license_number + (c.drivers_license_state ? ' (' + c.drivers_license_state + ')' : '')) : '—';
@@ -5409,6 +5446,107 @@
     document.getElementById('ec-b-correo').value = c.business_email || '';
     toggleBusinessFields('ec');
   }
+
+  // ===================== CAMBIO DE CORREO DEL CLIENTE (con verificación) =====================
+  // El correo del cliente es a donde le llegan los recibos y documentos
+  // firmados — por eso no se deja editar directo en el formulario (ec-correo
+  // quedó de solo lectura). Para cambiarlo hay que pasar por aquí: mandamos
+  // un código de 6 dígitos al correo NUEVO (no al viejo) y solo se guarda el
+  // cambio si ese código se confirma — así nos aseguramos de que el correo
+  // nuevo existe de verdad y de que nadie redirija los recibos por error.
+  function openClientEmailChange(){
+    const card = document.getElementById('cd-emailChangeCard');
+    card.style.display = 'block';
+    document.getElementById('cd-emailChange-nuevo').value = '';
+    document.getElementById('cd-emailChange-formStep').style.display = 'block';
+    document.getElementById('cd-emailChange-codeStep').style.display = 'none';
+    document.getElementById('cd-emailChange-codigo').value = '';
+    const msg = document.getElementById('cdEmailChangeMsg');
+    msg.className = 'msg'; msg.textContent = '';
+  }
+
+  function closeClientEmailChange(){
+    const card = document.getElementById('cd-emailChangeCard');
+    if(card) card.style.display = 'none';
+    const msg = document.getElementById('cdEmailChangeMsg');
+    if(msg){ msg.className = 'msg'; msg.textContent = ''; }
+  }
+
+  async function requestClientEmailChange(){
+    const msg = document.getElementById('cdEmailChangeMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    if(!currentClientId){ msg.className = 'msg error'; msg.textContent = 'No hay un cliente abierto.'; return; }
+
+    const nuevoCorreo = document.getElementById('cd-emailChange-nuevo').value.trim();
+    if(!nuevoCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoCorreo)){
+      msg.className = 'msg error'; msg.textContent = 'Escribe un correo válido.'; return;
+    }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){ msg.className = 'msg error'; msg.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión.'; return; }
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/request-client-email-change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ clientId: currentClientId, newEmail: nuevoCorreo })
+      });
+      const result = await resp.json();
+      if(!resp.ok || result.error){ msg.className = 'msg error'; msg.textContent = result.error || 'No se pudo enviar el código.'; return; }
+      msg.className = 'msg success';
+      msg.textContent = 'Te mandamos un código de verificación al correo nuevo.';
+      document.getElementById('cd-emailChange-formStep').style.display = 'none';
+      document.getElementById('cd-emailChange-codeStep').style.display = 'block';
+    } catch(err){
+      msg.className = 'msg error'; msg.textContent = 'No se pudo enviar el código: ' + err.message;
+    }
+  }
+
+  async function confirmClientEmailChange(){
+    const msg = document.getElementById('cdEmailChangeMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    if(!currentClientId){ msg.className = 'msg error'; msg.textContent = 'No hay un cliente abierto.'; return; }
+
+    const code = document.getElementById('cd-emailChange-codigo').value.trim();
+    if(!code){ msg.className = 'msg error'; msg.textContent = 'Escribe el código que mandamos al correo nuevo.'; return; }
+
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session){ msg.className = 'msg error'; msg.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión.'; return; }
+
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/confirm-client-email-change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + session.access_token,
+          'apikey': SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({ clientId: currentClientId, code })
+      });
+      const result = await resp.json();
+      if(!resp.ok || result.error){ msg.className = 'msg error'; msg.textContent = result.error || 'No se pudo confirmar el código.'; return; }
+
+      msg.className = 'msg success'; msg.textContent = 'Correo del cliente actualizado.';
+      document.getElementById('cd-emailChange-codeStep').style.display = 'none';
+      // Actualizamos solo lo que cambió en pantalla (no llamamos fillClientDetail
+      // completo aquí porque eso reinicia/cierra este mismo panel y se
+      // borraría el mensaje de éxito antes de que se alcance a leer).
+      const { data: refreshed } = await sb.from('clients').select('email').eq('id', currentClientId).single();
+      if(refreshed){
+        currentClientEmail = refreshed.email || '';
+        document.getElementById('cd-view-correo').textContent = refreshed.email || '—';
+        document.getElementById('cd-subtitulo').textContent = refreshed.email || document.getElementById('cd-view-telefono').textContent || 'Sin datos de contacto';
+        document.getElementById('ec-correo').value = refreshed.email || '';
+      }
+    } catch(err){
+      msg.className = 'msg error'; msg.textContent = 'No se pudo confirmar: ' + err.message;
+    }
+  }
+  // ===================== FIN CAMBIO DE CORREO DEL CLIENTE =====================
 
   function backToClientsList(){
     currentClientId = null;
