@@ -4570,7 +4570,7 @@
   let allClientPoliciesByClient = {};
 
   async function loadClients(){
-    let query = sb.from('clients').select('*, agente:assigned_agent_id(full_name)').order('created_at', { ascending: false });
+    let query = sb.from('clients').select('*, agente:assigned_agent_id(full_name, producer_code)').order('created_at', { ascending: false });
     const { data: clients, error } = await query;
     if(error){ console.error(error); allClients = []; }
     else {
@@ -4658,7 +4658,17 @@
     const filtered = filteredClientsList.slice(start, start + CLIENTS_PAGE_SIZE);
 
     tbody.innerHTML = filtered.map(c => {
-      const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${c.source_public_form ? ' <span class="badge blue" title="Este lead llegó por el formulario público de la página web">🌐 Web</span>' : ''}`;
+      // Si el lead vino del formulario público A TRAVÉS de la página de un
+      // agente en específico (assigned_agent_id ya viene puesto desde
+      // submit-public-quote), le agregamos el código del agente al badge —
+      // así, como administradora, se distingue de un lead genérico de la
+      // página web sin necesidad de abrir el cliente.
+      const webBadge = c.source_public_form
+        ? (c.agente?.producer_code
+            ? ` <span class="badge blue" title="Este lead llegó por el formulario público, a través de la página del agente ${c.agente.producer_code}">🌐 Web — Agente ${c.agente.producer_code}</span>`
+            : ` <span class="badge blue" title="Este lead llegó por el formulario público de la página web">🌐 Web</span>`)
+        : '';
+      const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${webBadge}`;
       const policies = allClientPoliciesByClient[c.id] || [];
 
       // Sin pólizas: una sola fila con guiones en compañía / póliza
