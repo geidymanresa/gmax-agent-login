@@ -740,6 +740,12 @@
 
           <div class="form-row"><label>Link para agendar una cita/llamada (Calendly, Google Calendar, etc.)</label><input type="url" id="mp-calendly" placeholder="https://calendly.com/tu-usuario" autocomplete="off"></div>
 
+          <div class="form-row" id="mp-healthsherpa-row" style="display:none;">
+            <label>Tu link de HealthSherpa</label>
+            <input type="url" id="mp-healthsherpa" placeholder="https://www.healthsherpa.com/?_agent_id=tu-usuario" autocomplete="off">
+            <p class="sub" style="margin-top:4px;">Cuando un cliente cotice "Seguro médico" desde tu página, lo vamos a mandar directo a este link. Si lo dejas vacío, se usa el link general de la agencia.</p>
+          </div>
+
           <div class="form-row">
             <label>Redes sociales</label>
             <div id="mp-socialRows"></div>
@@ -2794,6 +2800,19 @@
             <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:14px;" onclick="saveAgentType()">Guardar tipo de agente</button>
           </div>
 
+          <!-- Licencias del agente (líneas de autorización) -->
+          <div class="dash-card">
+            <h4>Licencias del agente</h4>
+            <p class="sub" style="margin-bottom:14px;">Marca las licencias que tiene este agente. Por ejemplo, solo un agente con Life and Health le va a salir la opción de poner su link de HealthSherpa en su página pública.</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <label style="display:flex; align-items:center; gap:8px; font-weight:400; cursor:pointer;"><input type="checkbox" id="ud-lic-pc"> Property and Casualty</label>
+              <label style="display:flex; align-items:center; gap:8px; font-weight:400; cursor:pointer;"><input type="checkbox" id="ud-lic-pl"> Personal Lines</label>
+              <label style="display:flex; align-items:center; gap:8px; font-weight:400; cursor:pointer;"><input type="checkbox" id="ud-lic-lh"> Life and Health</label>
+            </div>
+            <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:14px;" onclick="saveAgentLicenseLines()">Guardar licencias</button>
+            <div class="msg" id="udLicenseLinesMsg"></div>
+          </div>
+
           <!-- Carriers apuntados -->
           <div class="dash-card">
             <h4>Aseguradoras con las que está apuntado</h4>
@@ -3790,6 +3809,12 @@
     document.getElementById('mp-email').value = page?.public_email || currentProfile.email || '';
     document.getElementById('mp-calendly').value = page?.calendly_url || '';
 
+    // El link de HealthSherpa solo le sale a un agente con licencia Life and
+    // Health — lo decide la administradora en Usuarios → perfil del agente.
+    const tieneLifeHealth = Array.isArray(currentProfile.license_lines) && currentProfile.license_lines.includes('life_health');
+    document.getElementById('mp-healthsherpa-row').style.display = tieneLifeHealth ? 'block' : 'none';
+    document.getElementById('mp-healthsherpa').value = page?.healthsherpa_url || '';
+
     const fotoImg = document.getElementById('mp-fotoPreview');
     if(page?.photo_storage_path){
       const { data } = sb.storage.from('agent-page-photos').getPublicUrl(page.photo_storage_path);
@@ -3907,6 +3932,7 @@
       whatsapp_number: document.getElementById('mp-whatsapp').value.trim() || null,
       public_email: document.getElementById('mp-email').value.trim() || null,
       calendly_url: document.getElementById('mp-calendly').value.trim() || null,
+      healthsherpa_url: document.getElementById('mp-healthsherpa').value.trim() || null,
       bio: document.getElementById('mp-bio').value.trim() || null,
       color_palette: mpSelected.palette,
       typography: mpSelected.typography,
@@ -9851,6 +9877,11 @@
     document.getElementById('ud-tipo-agente').value = u.agent_type || '';
     onAgentTypeChange();
 
+    const licenseLines = Array.isArray(u.license_lines) ? u.license_lines : [];
+    document.getElementById('ud-lic-pc').checked = licenseLines.includes('property_casualty');
+    document.getElementById('ud-lic-pl').checked = licenseLines.includes('personal_lines');
+    document.getElementById('ud-lic-lh').checked = licenseLines.includes('life_health');
+
     await Promise.all([
       loadAgentCarriers(userId),
       loadAgentDocuments(userId),
@@ -10016,6 +10047,21 @@
     if(error){ showMsg('udMsg','error','No se pudo guardar: ' + error.message); return; }
     showMsg('udMsg','success','Tipo de agente guardado.');
     await loadUsers();
+  }
+
+  async function saveAgentLicenseLines(){
+    if(!currentUserDetailId) return;
+    const msg = document.getElementById('udLicenseLinesMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    const lines = [];
+    if(document.getElementById('ud-lic-pc').checked) lines.push('property_casualty');
+    if(document.getElementById('ud-lic-pl').checked) lines.push('personal_lines');
+    if(document.getElementById('ud-lic-lh').checked) lines.push('life_health');
+    const { error } = await sb.from('profiles').update({ license_lines: lines }).eq('id', currentUserDetailId);
+    if(error){ msg.className = 'msg error'; msg.textContent = 'No se pudo guardar: ' + error.message; return; }
+    const u = allUsers.find(x => x.id === currentUserDetailId);
+    if(u) u.license_lines = lines;
+    msg.className = 'msg success'; msg.textContent = 'Licencias guardadas.';
   }
 
   // ---- Carriers apuntados ----
