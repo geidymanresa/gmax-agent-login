@@ -638,6 +638,7 @@
           <button class="mc-tab-btn" data-mctab="documentos" onclick="switchMiCuentaTab('documentos')">Mis documentos</button>
           <button class="mc-tab-btn" data-mctab="banco" onclick="switchMiCuentaTab('banco')">Información bancaria</button>
           <button class="mc-tab-btn" data-mctab="pagina" onclick="switchMiCuentaTab('pagina')">Mi página</button>
+          <button class="mc-tab-btn" data-mctab="licencias" onclick="switchMiCuentaTab('licencias')">Mis licencias</button>
         </div>
         <div class="msg" id="miCuentaMsg"></div>
 
@@ -805,24 +806,40 @@
 
           <div class="msg" id="mpPaginaMsg"></div>
           <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:6px;" onclick="saveMiPagina()">Guardar mi página</button>
+        </div>
 
-          <div style="margin-top:32px; padding-top:24px; border-top:1px solid var(--line);">
-            <h4 style="margin-top:0;">Mis licencias</h4>
-            <p class="sub" style="margin-bottom:14px;">Sube el PDF de cada licencia que tengas. Van a salir públicas en tu página para que tus clientes puedan verificarte.</p>
-            <form id="mp-licenseForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
-              <div class="form-row" style="min-width:140px; margin:0;"><label>Estado</label><input type="text" id="mp-lic-estado" placeholder="ej: TX" maxlength="2" required></div>
-              <div class="form-row" style="min-width:160px; margin:0;"><label>Número de licencia</label><input type="text" id="mp-lic-numero" required></div>
-              <div class="form-row" style="min-width:160px; margin:0;"><label>Vence</label><input type="date" id="mp-lic-vence"></div>
-              <div class="form-row" style="min-width:130px; margin:0;">
-                <label>&nbsp;</label>
-                <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:13px; padding-top:8px;"><input type="checkbox" id="mp-lic-residente" style="width:auto;" checked> Residente</label>
+        <div id="mc-tab-licencias" class="mc-tab-content dash-card" style="display:none;">
+          <h4 style="margin-top:0;">Mis licencias</h4>
+          <p class="sub" style="margin-bottom:14px;">Sube el PDF de cada licencia que tengas. Si publicaste tu página de agente, o activaste la casilla de abajo, van a salir públicas para que tus clientes puedan verificarte.</p>
+
+          <div class="dash-card" style="background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin-bottom:18px;">
+            <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px;">
+              <input type="checkbox" id="lic-mostrarPublico" style="width:auto;" onchange="saveShowLicensesPublicly()"> Mostrar mis licencias en mi página pública (sin necesidad de tener una "Mi página" de agente)
+            </label>
+            <div class="msg" id="licVisibilidadMsg" style="margin-top:6px;"></div>
+            <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
+              <label style="font-size:11.5px; color:var(--slate-light); text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Tu ID de agente</label>
+              <p class="sub" style="margin:4px 0 8px;">Solo hace falta si alguien te pide este código para conectar una página pública tuya que no sea la de "Mi página" (por ejemplo tu página individual aparte).</p>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="lic-miId" readonly style="flex:1; min-width:240px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; color:var(--slate);">
+                <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="copyMiAgentId()">Copiar</button>
               </div>
-              <div class="form-row" style="min-width:200px; margin:0;"><label>PDF de la licencia</label><input type="file" id="mp-lic-archivo" accept="application/pdf" required></div>
-              <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Agregar licencia</button>
-            </form>
-            <div class="msg" id="mpLicMsg"></div>
-            <div id="mp-licensesList"></div>
+            </div>
           </div>
+
+          <form id="mp-licenseForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+            <div class="form-row" style="min-width:140px; margin:0;"><label>Estado</label><input type="text" id="mp-lic-estado" placeholder="ej: TX" maxlength="2" required></div>
+            <div class="form-row" style="min-width:160px; margin:0;"><label>Número de licencia</label><input type="text" id="mp-lic-numero" required></div>
+            <div class="form-row" style="min-width:160px; margin:0;"><label>Vence</label><input type="date" id="mp-lic-vence"></div>
+            <div class="form-row" style="min-width:130px; margin:0;">
+              <label>&nbsp;</label>
+              <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:13px; padding-top:8px;"><input type="checkbox" id="mp-lic-residente" style="width:auto;" checked> Residente</label>
+            </div>
+            <div class="form-row" style="min-width:200px; margin:0;"><label>PDF de la licencia</label><input type="file" id="mp-lic-archivo" accept="application/pdf" required></div>
+            <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Agregar licencia</button>
+          </form>
+          <div class="msg" id="mpLicMsg"></div>
+          <div id="mp-licensesList"></div>
         </div>
       </div>
     </div>
@@ -3649,6 +3666,7 @@
     if(tab === 'documentos' && currentProfile) loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
     if(tab === 'banco' && currentProfile) loadMiCuentaBanco();
     if(tab === 'pagina' && currentProfile) loadMiPagina();
+    if(tab === 'licencias' && currentProfile) loadMisLicencias();
   }
 
   async function saveMiCuentaInfo(){
@@ -3788,10 +3806,9 @@
     const msg = document.getElementById('mpPaginaMsg');
     msg.className = 'msg'; msg.textContent = '';
 
-    const [{ data: page }, { data: links }, { data: licenses }] = await Promise.all([
+    const [{ data: page }, { data: links }] = await Promise.all([
       sb.from('agent_pages').select('*').eq('agent_id', currentProfile.id).maybeSingle(),
-      sb.from('agent_social_links').select('*').eq('agent_id', currentProfile.id).order('sort_order', { ascending: true }),
-      sb.from('agent_licenses').select('*').eq('agent_id', currentProfile.id).order('is_primary', { ascending: false })
+      sb.from('agent_social_links').select('*').eq('agent_id', currentProfile.id).order('sort_order', { ascending: true })
     ]);
 
     mpAgentPageRow = page || null;
@@ -3826,9 +3843,45 @@
 
     applyMiPaginaStyleSelection();
     renderMpSocialRows();
-    renderMpLicensesList(licenses || []);
     updateMiPaginaLinkPreview();
   }
+
+  // ===================== MIS LICENCIAS (tab aparte, para cualquier usuario) =====================
+  async function loadMisLicencias(){
+    if(!currentProfile) return;
+    document.getElementById('lic-miId').value = currentProfile.id;
+    document.getElementById('lic-mostrarPublico').checked = !!currentProfile.show_licenses_publicly;
+
+    const { data: licenses, error } = await sb.from('agent_licenses').select('*').eq('agent_id', currentProfile.id).order('is_primary', { ascending: false });
+    if(error) console.error('agent_licenses:', error.message);
+    renderMpLicensesList(licenses || []);
+  }
+
+  function copyMiAgentId(){
+    const input = document.getElementById('lic-miId');
+    input.select();
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(input.value).then(() => {
+        showMsg('licVisibilidadMsg', 'success', 'ID copiado.');
+      }).catch(() => {});
+    } else {
+      document.execCommand('copy');
+    }
+  }
+
+  async function saveShowLicensesPublicly(){
+    if(!currentProfile) return;
+    const checked = document.getElementById('lic-mostrarPublico').checked;
+    const { error } = await sb.from('profiles').update({ show_licenses_publicly: checked }).eq('id', currentProfile.id);
+    if(error){
+      showMsg('licVisibilidadMsg', 'error', 'No se pudo guardar: ' + error.message);
+      document.getElementById('lic-mostrarPublico').checked = !checked;
+      return;
+    }
+    currentProfile.show_licenses_publicly = checked;
+    showMsg('licVisibilidadMsg', 'success', checked ? 'Tus licencias ya son públicas.' : 'Tus licencias ya no se muestran públicamente.');
+  }
+  // ===================== FIN MIS LICENCIAS =====================
 
   function updateMiPaginaLinkPreview(){
     const slug = document.getElementById('mp-slug').value.trim() || slugifyText(currentProfile?.full_name);
@@ -4016,7 +4069,7 @@
     showMsg('mpLicMsg', 'success', 'Licencia agregada.');
     document.getElementById('mp-licenseForm').reset();
     document.getElementById('mp-lic-residente').checked = true;
-    await loadMiPagina();
+    await loadMisLicencias();
   });
 
   async function deleteMpLicense(id, storagePath){
@@ -4024,7 +4077,7 @@
     if(storagePath) await sb.storage.from('agent-licenses').remove([storagePath]);
     const { error } = await sb.from('agent_licenses').delete().eq('id', id);
     if(error){ showMsg('mpLicMsg', 'error', 'No se pudo eliminar: ' + error.message); return; }
-    await loadMiPagina();
+    await loadMisLicencias();
   }
   // ===================== FIN MI PÁGINA =====================
 
