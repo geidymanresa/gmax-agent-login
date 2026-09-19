@@ -830,7 +830,7 @@
           <form id="mp-licenseForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
             <div class="form-row" style="min-width:140px; margin:0;"><label>Estado</label><input type="text" id="mp-lic-estado" placeholder="ej: TX" maxlength="2" required></div>
             <div class="form-row" style="min-width:160px; margin:0;"><label>Número de licencia</label><input type="text" id="mp-lic-numero" required></div>
-            <div class="form-row" style="min-width:160px; margin:0;"><label>Vence</label><input type="date" id="mp-lic-vence"></div>
+            <div class="form-row" style="min-width:160px; margin:0;"><label>Vence</label><input type="text" id="mp-lic-vence" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
             <div class="form-row" style="min-width:130px; margin:0;">
               <label>&nbsp;</label>
               <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:13px; padding-top:8px;"><input type="checkbox" id="mp-lic-residente" style="width:auto;" checked> Residente</label>
@@ -4044,7 +4044,7 @@
     if(!currentProfile) return;
     const estado = document.getElementById('mp-lic-estado').value.trim().toUpperCase();
     const numero = document.getElementById('mp-lic-numero').value.trim();
-    const vence = document.getElementById('mp-lic-vence').value || null;
+    const vence = mmddyyyyToISO(document.getElementById('mp-lic-vence').value);
     const residente = document.getElementById('mp-lic-residente').checked;
     const file = document.getElementById('mp-lic-archivo').files[0];
     if(!estado || !numero || !file){ showMsg('mpLicMsg', 'error', 'Completa estado, número de licencia y sube el PDF.'); return; }
