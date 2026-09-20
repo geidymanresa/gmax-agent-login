@@ -595,6 +595,7 @@
       <div class="dash-user" id="dashUserBlock">
         <div id="dashUserName" style="font-weight:700; font-size:15px; color:#fff;">—</div>
         <div id="dashUserRole" class="dash-user-role">—</div>
+        <div id="dashUserCodigo" style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:2px;"></div>
         <div style="display:flex; gap:16px; margin-top:10px; flex-wrap:wrap;">
           <a href="javascript:void(0)" onclick="openMiCuenta()" style="color:var(--gold); font-size:12.5px; font-weight:700; text-decoration:none;">Mi cuenta</a>
           <a href="javascript:void(0)" onclick="logout()" style="color:rgba(255,255,255,0.65); font-size:12.5px; font-weight:600; text-decoration:none;">Cerrar sesión</a>
@@ -646,10 +647,17 @@
           <h4 style="margin-top:0;">Mi información</h4>
           <div class="form-row"><label>Nombre completo</label><input type="text" id="mc-nombre"></div>
           <div class="form-row"><label>Correo electrónico</label><input type="text" id="mc-correo" disabled style="background:var(--canvas);"></div>
-          <p class="sub" style="margin-top:-10px;">Para cambiar tu correo, contacta a la administradora.</p>
           <div class="form-row"><label>Teléfono</label><input type="tel" id="mc-telefono"></div>
           <div class="form-row"><label>Dirección</label><input type="text" id="mc-direccion"></div>
           <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:10px;" onclick="saveMiCuentaInfo()">Guardar cambios</button>
+
+          <div class="dash-card" style="background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin-top:22px;">
+            <div style="font-weight:700; font-size:13.5px;">Cambiar correo electrónico</div>
+            <p class="sub" style="margin:4px 0 12px;">Escribe tu correo nuevo y te mandamos un enlace de confirmación ahí. El cambio solo se hace efectivo cuando lo confirmas desde ese correo — así nos aseguramos de que el correo nuevo es de verdad tuyo.</p>
+            <div class="form-row" style="margin-bottom:0;"><label>Correo nuevo</label><input type="email" id="mc-correo-nuevo" placeholder="tunuevo@correo.com" autocomplete="off"></div>
+            <div class="msg" id="mcCorreoMsg" style="margin-top:8px;"></div>
+            <button class="btn-ghost" style="width:auto; padding:8px 16px; margin-top:6px;" onclick="requestMiCorreoChange()">Enviar enlace de confirmación</button>
+          </div>
         </div>
 
         <div id="mc-tab-documentos" class="mc-tab-content dash-card" style="display:none;">
@@ -674,7 +682,6 @@
             <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Subir</button>
           </form>
           <div class="msg" id="mcDocMsg"></div>
-          <div id="mc-documentos-list"></div>
         </div>
 
         <div id="mc-tab-banco" class="mc-tab-content dash-card" style="display:none;">
@@ -873,7 +880,7 @@
 
       <!-- TAB: INICIO -->
       <section class="dash-tab" id="tab-inicio">
-        <h2>Bienvenida, <span id="welcomeName2">—</span></h2>
+        <h2>Bienvenida, <span id="welcomeName2">—</span> <span id="welcomeCodigo" style="font-size:15px; font-weight:600; color:var(--slate-light);"></span></h2>
         <p class="sub">Resumen general de GMAX Agent.</p>
 
         <div class="dash-stats">
@@ -887,6 +894,12 @@
              actuar ya), naranja = importante, amarillo = próximas renovaciones,
              violeta = alertas de seguimiento que tú misma le pusiste a un cliente. -->
         <div id="dashAlertsGrid" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(340px, 1fr)); gap:16px; margin-top:20px;">
+
+          <div class="dash-card" id="dashAgentAlertsCard" style="display:none; margin:0; background:#FDEAEA; border:1.5px solid #E39C9C;">
+            <div style="display:inline-block; background:#C23B3B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔴 Urgente</div>
+            <h4 style="margin-top:0; color:#8a3030;">Tareas pendientes de la administradora</h4>
+            <div id="dashAgentAlertsList"></div>
+          </div>
 
           <div class="dash-card" id="dashAlertsCard" style="display:none; margin:0; background:#FDEAEA; border:1.5px solid #E39C9C;">
             <div style="display:inline-block; background:#C23B3B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔴 Urgente</div>
@@ -2890,15 +2903,23 @@
           <!-- Alertas -->
           <div class="dash-card">
             <h4>Alertas para este agente</h4>
-            <p class="sub" style="margin-bottom:14px;">Le aparecerá en su dashboard hasta que la resuelvas o suba el documento pedido.</p>
-            <form id="ud-alertForm" style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; align-items:flex-end;">
-              <div class="form-row" style="flex:1; min-width:220px; margin:0;">
+            <p class="sub" style="margin-bottom:14px;">Le aparece en su dashboard como tarea urgente hasta que la resuelvas (o hasta que suba el documento pedido, si marcas esa opción).</p>
+            <form id="ud-alertForm">
+              <div class="form-row">
                 <label>Mensaje</label>
                 <input type="text" id="ud-alerta-texto" placeholder="Ej: Sube tu nuevo seguro de E&O, el actual venció." required>
               </div>
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; font-weight:600; margin:2px 0 12px; cursor:pointer;">
+                <input type="checkbox" id="ud-alerta-requiereDoc" style="width:auto;" onchange="document.getElementById('ud-alerta-docLabel-row').style.display = this.checked ? 'block' : 'none';">
+                Esto es una petición de documento o foto (le sale un casillero para subirlo directo desde la alerta)
+              </label>
+              <div class="form-row" id="ud-alerta-docLabel-row" style="display:none;">
+                <label>¿Qué necesitas que suba?</label>
+                <input type="text" id="ud-alerta-docLabel" placeholder="Ej: Licencia activa, foto de tu ID, captura de la póliza...">
+              </div>
               <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Crear alerta</button>
             </form>
-            <div id="ud-alertas-list"></div>
+            <div id="ud-alertas-list" style="margin-top:16px;"></div>
           </div>
         </div>
 
@@ -3663,7 +3684,9 @@
     document.querySelectorAll('.mc-tab-content').forEach(el => el.style.display = 'none');
     document.getElementById('mc-tab-' + tab).style.display = 'block';
     document.querySelectorAll('.mc-tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.mctab === tab));
-    if(tab === 'documentos' && currentProfile) loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
+    // Ya no cargamos la lista de documentos aquí — el agente solo ve la
+    // confirmación de que subió el archivo, no el listado (eso lo ve la
+    // administradora desde el perfil del agente en Usuarios).
     if(tab === 'banco' && currentProfile) loadMiCuentaBanco();
     if(tab === 'pagina' && currentProfile) loadMiPagina();
     if(tab === 'licencias' && currentProfile) loadMisLicencias();
@@ -3688,6 +3711,35 @@
     if(welcomeEl) welcomeEl.textContent = nombre;
     msg.className = 'msg success';
     msg.textContent = 'Guardado correctamente.';
+  }
+
+  // Cambio de correo de la CUENTA del agente/admin (con el que inicia sesión
+  // — distinto al "correo público" de Mi página). Usamos el cambio de correo
+  // nativo de Supabase Auth: manda un enlace de confirmación al correo
+  // NUEVO (y, según la configuración del proyecto, también pide confirmar
+  // desde el correo actual) y solo cuando se confirma se actualiza de
+  // verdad auth.users.email. Un trigger en la base de datos
+  // (migracion_cambio_correo_agente.sql) copia ese cambio a profiles.email
+  // automáticamente, que es de donde lee tanto esta misma pantalla como la
+  // vista de Usuarios de la administradora — no hace falta hacer nada más
+  // aquí para que se vea actualizado en ambos lados.
+  async function requestMiCorreoChange(){
+    const msg = document.getElementById('mcCorreoMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    const nuevoCorreo = document.getElementById('mc-correo-nuevo').value.trim();
+    if(!nuevoCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoCorreo)){
+      msg.className = 'msg error'; msg.textContent = 'Escribe un correo válido.'; return;
+    }
+    if(currentProfile && nuevoCorreo.toLowerCase() === (currentProfile.email || '').toLowerCase()){
+      msg.className = 'msg error'; msg.textContent = 'Ese ya es tu correo actual.'; return;
+    }
+    const { error } = await sb.auth.updateUser({ email: nuevoCorreo });
+    if(error){
+      msg.className = 'msg error'; msg.textContent = 'No se pudo enviar: ' + error.message; return;
+    }
+    msg.className = 'msg success';
+    msg.textContent = 'Listo — te mandamos un enlace de confirmación a ' + nuevoCorreo + '. Ábrelo desde ese correo para completar el cambio (es posible que también te pida confirmar desde tu correo actual).';
+    document.getElementById('mc-correo-nuevo').value = '';
   }
 
   // ===================== INFORMACIÓN BANCARIA (con verificación por correo) =====================
@@ -4015,8 +4067,12 @@
       })));
     }
 
-    showMsg('mpPaginaMsg', 'success', 'Tu página se guardó correctamente.');
+    // Ojo: loadMiPagina() borra el contenido de mpPaginaMsg apenas arranca
+    // (para limpiar mensajes viejos al abrir la pestaña) — por eso el
+    // mensaje de éxito tiene que ponerse DESPUÉS de que loadMiPagina()
+    // termine, nunca antes, o se borra solo sin que la persona lo alcance a ver.
     await loadMiPagina();
+    showMsg('mpPaginaMsg', 'success', '✔ Tu página se guardó correctamente.');
   }
 
   function renderMpLicensesList(licenses){
@@ -4158,6 +4214,14 @@
     document.getElementById('dashUserName').textContent = profile ? profile.full_name : session.user.email;
     document.getElementById('dashUserRole').textContent = profile ? profile.role : '';
     document.getElementById('welcomeName2').textContent = profile ? profile.full_name : '';
+    // Código de agente (producer_code) — mismo campo que usa la administradora
+    // en Usuarios para buscar/identificar a cada agente. Se muestra al lado
+    // del nombre, tanto en el menú lateral como en el saludo del dashboard.
+    const codigoTxt = profile && profile.producer_code ? ('Código: ' + profile.producer_code) : '';
+    const dashCodigoEl = document.getElementById('dashUserCodigo');
+    if(dashCodigoEl) dashCodigoEl.textContent = codigoTxt;
+    const welcomeCodigoEl = document.getElementById('welcomeCodigo');
+    if(welcomeCodigoEl) welcomeCodigoEl.textContent = codigoTxt ? ('(' + codigoTxt + ')') : '';
     document.getElementById('btnSeguridad').style.display = (profile && (profile.role === 'admin' || profile.role === 'super_admin')) ? 'inline-block' : 'none';
 
     async function safeLoad(fn, label){
@@ -4174,6 +4238,7 @@
     await safeLoad(loadTesoreria, 'Tesorería');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
     await safeLoad(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
+    await safeLoad(loadDashboardAgentAlerts, 'Tareas de la administradora');
     await safeLoad(loadDashboardAlerts, 'Alertas del dashboard');
     await safeLoad(loadDashboardFollowups, 'Recordatorios de seguimiento');
     await safeLoad(loadRenewals, 'Próximas renovaciones');
@@ -8879,6 +8944,84 @@
     `).join('');
   }
 
+  // ---- Tareas/alertas que la administradora le deja a ESTE agente ----
+  // (agent_alerts — antes no se mostraban en ningún lado del dashboard del
+  // agente, solo existían en la vista de la administradora; ver
+  // migracion_alertas_agente_documentos.sql para el arreglo de permisos.)
+  //
+  // Estas son alertas de "emergencia": el agente NO las puede cerrar por su
+  // cuenta, ni siquiera subiendo el documento pedido — solo desaparecen
+  // cuando la administradora las revisa y les da el visto bueno desde el
+  // perfil del agente en Usuarios. Si ya subió el documento, se le avisa
+  // aquí mismo que quedó recibido y está esperando esa revisión.
+  async function loadDashboardAgentAlerts(){
+    if(!currentProfile) return;
+    const { data: alerts, error } = await sb.from('agent_alerts')
+      .select('*')
+      .eq('agent_id', currentProfile.id)
+      .eq('resolved', false)
+      .order('created_at', { ascending: false });
+
+    const card = document.getElementById('dashAgentAlertsCard');
+    const list = document.getElementById('dashAgentAlertsList');
+    if(!card || !list) return;
+    if(error || !alerts || alerts.length === 0){
+      card.style.display = 'none';
+      return;
+    }
+    card.style.display = 'block';
+    list.innerHTML = alerts.map(a => `
+      <div style="padding:10px 0; border-bottom:1px solid #F3C6C6;">
+        <p style="margin:0 0 6px;">${escapeHtml(a.message)}</p>
+        ${a.requires_document ? (
+          a.response_storage_path
+            ? `<div style="background:#fff; border:1px solid #F3C6C6; border-radius:10px; padding:10px 12px; margin-top:6px; font-size:13px; color:#8a3030;">✔ Ya subiste el documento — está esperando revisión de la administradora.</div>`
+            : `<div style="background:#fff; border:1px solid #F3C6C6; border-radius:10px; padding:10px 12px; margin-top:6px;">
+                <label style="font-size:12.5px; font-weight:700; color:#8a3030;">📎 Necesitamos: ${escapeHtml(a.document_label || 'un documento')}</label>
+                <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+                  <input type="file" id="dash-alert-file-${a.id}" style="flex:1; min-width:180px;">
+                  <button class="btn-primary" style="width:auto; padding:8px 14px;" onclick="uploadAgentAlertResponse('${a.id}')">Subir</button>
+                </div>
+                <div class="msg" id="dash-alert-msg-${a.id}" style="margin-top:6px;"></div>
+              </div>`
+        ) : ''}
+      </div>
+    `).join('');
+  }
+
+  async function uploadAgentAlertResponse(alertId){
+    const fileInput = document.getElementById('dash-alert-file-' + alertId);
+    const msg = document.getElementById('dash-alert-msg-' + alertId);
+    if(!fileInput || !fileInput.files || !fileInput.files[0]){
+      if(msg){ msg.className = 'msg error'; msg.textContent = 'Elige un archivo primero.'; }
+      return;
+    }
+    const file = fileInput.files[0];
+    const path = `${currentProfile.id}/${alertId}/${Date.now()}_${file.name}`;
+    if(msg){ msg.className = 'msg'; msg.textContent = 'Subiendo...'; }
+    const { error: upErr } = await sb.storage.from('agent-alert-responses').upload(path, file, { upsert: true });
+    if(upErr){
+      if(msg){ msg.className = 'msg error'; msg.textContent = 'No se pudo subir: ' + upErr.message; }
+      return;
+    }
+    // No se marca resolved aquí a propósito — el agente puede subir el
+    // documento, pero solo la administradora cierra la alerta después de
+    // revisarlo (con "Dar el visto bueno" en el perfil del agente).
+    const { error } = await sb.from('agent_alerts').update({
+      response_storage_path: path,
+      response_file_name: file.name,
+      responded_at: new Date().toISOString()
+    }).eq('id', alertId);
+    if(error){
+      if(msg){ msg.className = 'msg error'; msg.textContent = 'Se subió el archivo, pero no se pudo actualizar la alerta: ' + error.message; }
+      return;
+    }
+    // No hace falta un mensaje aparte aquí — al recargar, la tarjeta misma
+    // cambia a "Ya subiste el documento — esperando revisión", que ya es la
+    // confirmación.
+    await loadDashboardAgentAlerts();
+  }
+
   async function loadDashboardAlerts(){
     await sb.rpc('cancel_overdue_requirement_policies');
     const { data: reqs, error } = await sb.from('client_requirements')
@@ -8918,6 +9061,20 @@
       activos = activos.filter(a => a.client.assigned_agent_id === currentProfile.id);
     }
 
+    // "Quitar por hoy": igual que las renovaciones — se puede sacar del
+    // dashboard sin desactivar la alerta de verdad; vuelve a aparecer sola
+    // pasadas 24h (o al día siguiente), o antes si alguien la vuelve a activar.
+    const { data: { session } } = await sb.auth.getSession();
+    if(session){
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data: dismissals } = await sb.from('client_alert_dismissals')
+        .select('client_alert_id')
+        .eq('user_id', session.user.id)
+        .gte('dismissed_at', cutoff);
+      const dismissedIds = new Set((dismissals || []).map(d => d.client_alert_id));
+      activos = activos.filter(a => !dismissedIds.has(a.id));
+    }
+
     activos.sort((a, b) => (a.client.full_name || '').localeCompare(b.client.full_name || ''));
 
     if(error || activos.length === 0){
@@ -8926,11 +9083,26 @@
     }
     card.style.display = 'block';
     list.innerHTML = activos.map(a => `
-      <div style="padding:8px 0; border-bottom:1px solid #E1D6F2; cursor:pointer;" onclick="goToClientFromUnderwriting('${a.client_id}')">
-        <strong>${a.client ? a.client.full_name : 'Cliente'}</strong> — ${describeAlertSchedule(a)}
-        <div class="sub" style="margin-top:2px;">${escapeHtml(a.note)}</div>
+      <div style="padding:8px 0; border-bottom:1px solid #E1D6F2; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+        <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${a.client_id}')">
+          <strong>${a.client ? a.client.full_name : 'Cliente'}</strong> — ${describeAlertSchedule(a)}
+          <div class="sub" style="margin-top:2px;">${escapeHtml(a.note)}</div>
+        </div>
+        <button class="btn-ghost" style="width:auto; padding:6px 10px; flex-shrink:0;" onclick="dismissFollowup('${a.id}', event)">Quitar por hoy</button>
       </div>
     `).join('');
+  }
+
+  async function dismissFollowup(clientAlertId, evt){
+    if(evt) evt.stopPropagation();
+    const { data: { session } } = await sb.auth.getSession();
+    if(!session) return;
+    await sb.from('client_alert_dismissals').upsert({
+      client_alert_id: clientAlertId,
+      user_id: session.user.id,
+      dismissed_at: new Date().toISOString()
+    }, { onConflict: 'client_alert_id,user_id' });
+    await loadDashboardFollowups();
   }
 
   // ---- Próximas renovaciones ----
@@ -10257,9 +10429,11 @@
     });
     if(dbError){ showMsg('mcDocMsg','error','El archivo se subió pero no se pudo registrar: ' + dbError.message); return; }
 
-    showMsg('mcDocMsg','success','Documento subido.');
+    // El agente ya no ve la lista de lo que ha subido — solo la confirmación
+    // de que se subió. La administradora sí ve el listado completo, desde el
+    // perfil del agente en Usuarios (ud-documentos-list / loadAgentDocuments).
+    showMsg('mcDocMsg','success','✔ Documento subido exitosamente.');
     document.getElementById('mc-uploadDocForm').reset();
-    await loadAgentDocumentsInto(currentProfile.id, 'mc-documentos-list', 'mcDocMsg');
   });
 
   async function deleteAgentDocument(id, storagePath, agentId, containerId, msgId){
@@ -10306,6 +10480,10 @@
   });
 
   // ---- Alertas ----
+  // Antes esta tabla tenía una política de RLS que solo dejaba verla a
+  // administradores — ni siquiera el propio agente dueño de la alerta podía
+  // leerla, por eso nunca le aparecían en su dashboard aunque la
+  // administradora sí las creaba bien (ver migracion_alertas_agente_documentos.sql).
   async function loadAgentAlerts(agentId){
     const { data: alerts } = await sb.from('agent_alerts').select('*').eq('agent_id', agentId).order('created_at', { ascending: false });
     const container = document.getElementById('ud-alertas-list');
@@ -10313,15 +10491,19 @@
       container.innerHTML = '<p class="sub">No hay alertas para este agente.</p>';
       return;
     }
-    container.innerHTML = alerts.map(a => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line);">
+    container.innerHTML = alerts.map(a => {
+      const estado = a.resolved ? 'Resuelta' : (a.response_storage_path ? 'Documento recibido' : 'Pendiente');
+      const estadoClass = a.resolved ? 'active' : (a.response_storage_path ? 'pending' : 'gray');
+      return `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--line); gap:10px; flex-wrap:wrap;">
         <div>
-          <p style="margin:0;">${escapeHtml(a.message)}</p>
-          <div style="font-size:12px; color:var(--slate-light);">${formatDateTimeUS(a.created_at)} — <span class="badge ${a.resolved ? 'active' : 'gray'}">${a.resolved ? 'Resuelta' : 'Pendiente'}</span></div>
+          <p style="margin:0;">${escapeHtml(a.message)}${a.requires_document ? ` <span class="badge" style="background:#FDEAEA; color:#8a3030;">📎 Pide: ${escapeHtml(a.document_label || 'documento')}</span>` : ''}</p>
+          <div style="font-size:12px; color:var(--slate-light);">${formatDateTimeUS(a.created_at)} — <span class="badge ${estadoClass}">${estado}</span>${a.response_storage_path ? ` — <a href="javascript:void(0)" onclick="viewAgentAlertResponse('${a.response_storage_path}')">Ver lo que subió ↗</a>` : ''}</div>
         </div>
-        ${!a.resolved ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="resolveAgentAlert('${a.id}')">Marcar resuelta</button>` : ''}
+        ${!a.resolved ? `<button class="btn-primary" style="width:auto; padding:6px 12px;" onclick="approveAgentAlert('${a.id}')">Dar el visto bueno</button>` : ''}
       </div>
-    `).join('');
+    `;
+    }).join('');
   }
 
   document.getElementById('ud-alertForm').addEventListener('submit', async function(e){
@@ -10329,21 +10511,39 @@
     if(!currentUserDetailId) return;
     const text = document.getElementById('ud-alerta-texto').value.trim();
     if(!text) return;
+    const requiresDoc = document.getElementById('ud-alerta-requiereDoc').checked;
+    const docLabel = document.getElementById('ud-alerta-docLabel').value.trim();
+    if(requiresDoc && !docLabel){ alert('Escribe qué documento o foto necesitas que suba.'); return; }
     const { data: { session } } = await sb.auth.getSession();
     const { error } = await sb.from('agent_alerts').insert({
       agent_id: currentUserDetailId,
       message: text,
-      created_by: session.user.id
+      created_by: session.user.id,
+      requires_document: requiresDoc,
+      document_label: requiresDoc ? docLabel : null
     });
     if(error){ alert('No se pudo crear la alerta: ' + error.message); return; }
     document.getElementById('ud-alerta-texto').value = '';
+    document.getElementById('ud-alerta-requiereDoc').checked = false;
+    document.getElementById('ud-alerta-docLabel').value = '';
+    document.getElementById('ud-alerta-docLabel-row').style.display = 'none';
     await loadAgentAlerts(currentUserDetailId);
   });
 
-  async function resolveAgentAlert(id){
+  async function approveAgentAlert(id){
+    if(!confirm('¿Dar el visto bueno a esta alerta? Se cierra y desaparece del dashboard del agente.')) return;
     const { error } = await sb.from('agent_alerts').update({ resolved: true, resolved_at: new Date().toISOString() }).eq('id', id);
     if(error){ alert('No se pudo actualizar: ' + error.message); return; }
     await loadAgentAlerts(currentUserDetailId);
+  }
+
+  // El bucket de respuestas es privado (puede haber documentos personales),
+  // así que para que la administradora vea lo que subió el agente hace
+  // falta una URL firmada de un minuto, no un link público directo.
+  async function viewAgentAlertResponse(path){
+    const { data, error } = await sb.storage.from('agent-alert-responses').createSignedUrl(path, 60);
+    if(error || !data){ alert('No se pudo abrir el archivo: ' + (error ? error.message : '')); return; }
+    window.open(data.signedUrl, '_blank');
   }
   // =================== FIN USUARIOS + PERFIL DE AGENTE ===================
 
