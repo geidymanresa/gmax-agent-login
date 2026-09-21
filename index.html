@@ -605,7 +605,7 @@
       <nav class="dash-nav">
         <button class="dash-nav-btn active" data-tab="inicio" onclick="switchTab('inicio')">Inicio</button>
         <button class="dash-nav-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
-        <button class="dash-nav-btn" data-tab="aseguradoras" onclick="switchTab('aseguradoras')">🏢 Aseguradoras</button>
+        <button class="dash-nav-btn" data-tab="aseguradoras" id="navAseguradoras" onclick="switchTab('aseguradoras')">🏢 Aseguradoras</button>
         <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
         <button class="dash-nav-btn" data-tab="companias" id="navCompanias" onclick="switchTab('companias')" style="display:none;">Compañías</button>
         <button class="dash-nav-btn" data-tab="servicefees" id="navServiceFees" onclick="switchTab('servicefees')" style="display:none;">Service Fees</button>
@@ -658,6 +658,22 @@
             <div class="form-row" style="margin-bottom:0;"><label>Correo nuevo</label><input type="email" id="mc-correo-nuevo" placeholder="tunuevo@correo.com" autocomplete="off"></div>
             <div class="msg" id="mcCorreoMsg" style="margin-top:8px;"></div>
             <button class="btn-ghost" style="width:auto; padding:8px 16px; margin-top:6px;" onclick="requestMiCorreoChange()">Enviar enlace de confirmación</button>
+          </div>
+
+          <!-- Contrato de comisión: % actual, y el progreso hacia la meta de
+               $60,000 en primas dentro de los primeros 3 meses que sube el
+               contrato a 75%. El cambio de % lo hace la administradora a mano
+               (no es automático — hace falta firmar el contrato nuevo). -->
+          <div class="dash-card" id="mc-contratoCard" style="background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin-top:18px; display:none;">
+            <div style="font-weight:700; font-size:13.5px;">💼 Mi contrato de comisión</div>
+            <p class="sub" style="margin:6px 0 12px;">Actualmente estás en un contrato de <strong id="mc-contrato-pct">70%</strong> de comisión sobre todas tus ventas.</p>
+            <div id="mc-contrato-metaWrap">
+              <p class="sub" style="margin:0 0 8px;">Meta para subir a 75%: <strong>$60,000</strong> en primas (depósito + mensualidades de tus pólizas activas) dentro de tus primeros 3 meses.</p>
+              <div style="background:#E3E7F0; border-radius:20px; height:12px; overflow:hidden;">
+                <div id="mc-contrato-bar" style="height:100%; width:0%; background:var(--blue); border-radius:20px; transition:width 0.4s ease, background 0.3s ease;"></div>
+              </div>
+              <p id="mc-contrato-status" style="margin:8px 0 0; font-size:13px; font-weight:600;"></p>
+            </div>
           </div>
         </div>
 
@@ -884,27 +900,42 @@
         <h2>Bienvenida, <span id="welcomeName2">—</span> <span id="welcomeCodigo" style="font-size:15px; font-weight:600; color:var(--slate-light);"></span></h2>
         <p class="sub">Resumen general de GMAX Agent.</p>
 
-        <div class="dash-stats">
-          <div class="dash-stat"><div class="num" id="statAgentes">—</div><div class="label">Agentes activos</div></div>
-          <div class="dash-stat"><div class="num" id="statAdmins">—</div><div class="label">Administradores</div></div>
-          <div class="dash-stat"><div class="num" id="statPendientes">—</div><div class="label">Solicitudes pendientes</div></div>
+        <!-- Control de agentes (solo para la administradora principal): quién
+             no cumplió la meta de pólizas el mes pasado, y quién acaba de
+             llegar a los $60,000 en primas para subir su contrato a 75%. -->
+        <div class="dash-card" id="controlAgentesCard" style="display:none; margin-bottom:20px; background:#F7F9FC; border:1.5px solid var(--line);">
+          <h4 style="margin-top:0;">📋 Control de agentes</h4>
+          <div id="controlAgentesList"></div>
         </div>
 
-        <!-- Meta de producción mensual: cuenta las pólizas nuevas (sin E&O) que
-             este agente ha vendido este mes calendario (día 1 al último día),
-             comparado contra su meta (5 por defecto, o la que le haya puesto la
-             administradora), y se pone verde cuando la cumple. -->
-        <div class="dash-card" id="metaProduccionCard" style="margin-top:20px; background:#F7F9FC; border:1.5px solid var(--line); transition:background 0.3s ease, border-color 0.3s ease;">
-          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <h4 style="margin:0;">🎯 Meta de producción mensual</h4>
-            <div style="font-size:15px; font-weight:800;"><span id="metaProduccionCount">0</span> / <span id="metaProduccionTarget">5</span> pólizas</div>
+        <!-- Meta de producción mensual: círculo chiquito y esquineado (no un
+             cuadro grande) para que el agente lo tenga en cuenta sin que le
+             ocupe espacio del dashboard. Cuenta las pólizas nuevas (sin E&O)
+             vendidas este mes calendario (día 1 al último día) contra su meta
+             (5 por defecto, o la que le haya puesto la administradora); el
+             aro se pone verde cuando la cumple. Clic para ver el detalle. -->
+        <div id="metaProduccionCard" onclick="toggleMetaProduccionDetalle()" style="position:fixed; bottom:22px; right:22px; z-index:500; width:64px; height:64px; cursor:pointer;" title="Meta de producción mensual">
+          <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg); filter:drop-shadow(0 3px 10px rgba(20,30,60,0.18));">
+            <circle cx="32" cy="32" r="27" fill="#fff" stroke="#E3E7F0" stroke-width="6"></circle>
+            <circle id="metaProduccionRing" cx="32" cy="32" r="27" fill="none" stroke="var(--blue)" stroke-width="6" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="169.6" style="transition:stroke-dashoffset 0.5s ease, stroke 0.3s ease;"></circle>
+          </svg>
+          <div style="position:absolute; top:0; left:0; width:64px; height:64px; display:flex; align-items:center; justify-content:center; pointer-events:none;">
+            <div id="metaProduccionCount" style="font-size:14px; font-weight:800; color:var(--ink);">0/5</div>
           </div>
-          <p class="sub" style="margin:6px 0 10px;">Pólizas nuevas vendidas este mes (no cuenta E&amp;O). El conteo empieza el día 1 y termina el último día de cada mes.</p>
-          <div style="background:#E3E7F0; border-radius:20px; height:12px; overflow:hidden;">
-            <div id="metaProduccionBar" style="height:100%; width:0%; background:var(--blue); border-radius:20px; transition:width 0.4s ease, background 0.3s ease;"></div>
-          </div>
-          <p id="metaProduccionStatus" style="margin:10px 0 0; font-size:13.5px; font-weight:700;"></p>
-          <p id="metaProduccionPrize" style="margin:6px 0 0; font-size:13.5px; color:var(--gold-deep); display:none;"></p>
+        </div>
+        <div id="metaProduccionDetalle" style="display:none; position:fixed; bottom:94px; right:22px; z-index:500; background:#fff; border-radius:14px; box-shadow:0 10px 30px rgba(20,30,60,0.2); padding:16px 18px; width:250px;">
+          <h4 style="margin:0 0 6px; font-size:14px;">🎯 Meta de producción mensual</h4>
+          <p class="sub" style="margin:0 0 8px;">Pólizas nuevas vendidas este mes (no cuenta E&amp;O).</p>
+          <p id="metaProduccionStatus" style="margin:0; font-size:13px; font-weight:700;"></p>
+          <p id="metaProduccionPrize" style="margin:6px 0 0; font-size:13px; color:var(--gold-deep); display:none;"></p>
+        </div>
+
+        <!-- Retos y objetivos opcionales, creados por la administradora para
+             TODOS los agentes (no obligatorios como la meta de 5 pólizas). Solo
+             se muestra si hay al menos un reto vigente ahora mismo. -->
+        <div class="dash-card" id="misRetosCard" style="display:none; margin-top:20px; background:#FFF9EC; border:1.5px solid #F0D28A;">
+          <h4 style="margin-top:0; color:#8a6116;">🏆 Retos activos</h4>
+          <div id="misRetosList"></div>
         </div>
 
         <!-- Panel de alertas: en vez de barras una debajo de otra, salen como
@@ -2787,6 +2818,40 @@
             </form>
           </div>
 
+          <!-- Retos y objetivos para agentes (opcionales, no obligatorios como
+               la meta de 5 pólizas). Van dirigidos a TODOS los agentes por
+               igual — no a un agente en particular. -->
+          <div class="dash-card" id="challengesCard" style="margin-top:20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div>
+                <h4 style="margin:0;">🏆 Retos y objetivos para agentes</h4>
+                <p class="sub" style="margin:4px 0 0;">Opcionales, para todos los agentes, con premio y fecha límite. Se cuentan automático según lo que vayan vendiendo.</p>
+              </div>
+              <button class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="toggleAddChallenge()">+ Agregar reto</button>
+            </div>
+
+            <div id="addChallengeCard" style="display:none; margin-top:16px; background:var(--canvas); border-radius:10px; padding:16px;">
+              <div class="form-row"><label>Título del reto</label><input type="text" id="ch-titulo" placeholder="Ej: Reto de pólizas de auto"></div>
+              <div class="form-row"><label>Descripción (opcional)</label><textarea id="ch-descripcion" rows="2" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea></div>
+              <div class="form-row-2">
+                <div class="form-row">
+                  <label>Producto</label>
+                  <select id="ch-producto"><option value="">Cualquier producto</option></select>
+                </div>
+                <div class="form-row"><label>Meta (cantidad de pólizas)</label><input type="number" id="ch-meta" min="1" value="10"></div>
+              </div>
+              <div class="form-row"><label>Premio</label><input type="text" id="ch-premio" placeholder="Ej: Bono de $200"></div>
+              <div class="form-row-2">
+                <div class="form-row"><label>Desde</label><input type="text" id="ch-desde" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this);"></div>
+                <div class="form-row"><label>Hasta</label><input type="text" id="ch-hasta" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this);"></div>
+              </div>
+              <div class="msg" id="addChallengeMsg"></div>
+              <button class="btn-primary" style="width:auto; padding:10px 20px;" onclick="submitChallenge()">Crear reto</button>
+            </div>
+
+            <div id="challengesList" style="margin-top:14px;">Cargando...</div>
+          </div>
+
           <div class="form-row" style="max-width:420px; margin-top:18px;">
             <input type="text" id="userSearchInput" placeholder="Buscar por nombre, correo o código de agente..." oninput="renderUsersList()">
           </div>
@@ -2839,24 +2904,6 @@
             <div id="ud-prod-clientesList">Cargando...</div>
           </div>
 
-          <!-- Tipo de agente -->
-          <div class="dash-card">
-            <h4>Tipo de agente</h4>
-            <p class="sub" style="margin-bottom:14px;">Define a qué aseguradoras tiene acceso este agente al vender pólizas.</p>
-            <div class="form-row">
-              <select id="ud-tipo-agente" onchange="onAgentTypeChange()">
-                <option value="">— Sin definir —</option>
-                <option value="personal_lines">Personal Lines (acceso limitado a ciertas aseguradoras)</option>
-                <option value="property_casualty">Property &amp; Casualty (acceso completo a todas)</option>
-              </select>
-            </div>
-            <div id="ud-restringidas-wrap" style="display:none; margin-top:10px;">
-              <p class="sub" style="margin-bottom:8px;">Marca las aseguradoras que SÍ puede vender:</p>
-              <div id="ud-restringidas-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-            </div>
-            <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:14px;" onclick="saveAgentType()">Guardar tipo de agente</button>
-          </div>
-
           <!-- Licencias del agente (líneas de autorización) -->
           <div class="dash-card">
             <h4>Licencias del agente</h4>
@@ -2893,6 +2940,21 @@
             </div>
             <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:6px;" onclick="saveAgentGoal()">Guardar meta</button>
             <div class="msg" id="udMetaMsg"></div>
+          </div>
+
+          <!-- Comisión y contrato: % actual + progreso hacia los $60,000 en
+               primas dentro de sus primeros 3 meses (desde que se creó su
+               cuenta) que sube el contrato de 70% a 75%. El cambio de % es
+               SIEMPRE manual — hace falta firmar el contrato nuevo primero. -->
+          <div class="dash-card">
+            <h4>💼 Comisión y contrato</h4>
+            <p class="sub" style="margin-bottom:10px;" id="ud-comision-progreso">Cargando...</p>
+            <div class="form-row" style="max-width:200px;">
+              <label>% de comisión actual</label>
+              <input type="number" id="ud-comision-pct" min="0" max="100" step="1" value="70">
+            </div>
+            <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:6px;" onclick="saveAgentCommission()">Guardar comisión</button>
+            <div class="msg" id="udComisionMsg"></div>
           </div>
 
           <!-- Información bancaria (lo que el agente registró, con verificación por correo) -->
@@ -3715,9 +3777,150 @@
     document.getElementById('miCuentaMsg').className = 'msg';
     document.getElementById('miCuentaMsg').textContent = '';
     switchMiCuentaTab('info');
+    loadMiContrato();
     document.getElementById('miCuentaOverlay').style.display = 'block';
     document.body.style.overflow = 'hidden';
     window.scrollTo(0, 0);
+  }
+
+  // Suma la "prima" (depósito + mensualidades × término) de las pólizas
+  // activas de un agente, dentro de un rango de fechas opcional — misma
+  // fórmula que se usa al crear la póliza (ver guardarNuevaPolizaTotalPremium
+  // / marcar cliente como activo). Se usa tanto para el propio agente en "Mi
+  // cuenta" como para la administradora en el perfil del agente y el panel
+  // de control.
+  async function sumAgentPremium(agentId, desdeISO, hastaISO){
+    let query = sb.from('client_policies')
+      .select('total_premium, status, created_by, created_at')
+      .eq('created_by', agentId)
+      .neq('status', 'cancelled');
+    if(desdeISO) query = query.gte('created_at', desdeISO);
+    if(hastaISO) query = query.lte('created_at', hastaISO);
+    const { data, error } = await query;
+    if(error) return 0;
+    return (data || []).reduce((sum, p) => sum + (Number(p.total_premium) || 0), 0);
+  }
+
+  async function loadMiContrato(){
+    const card = document.getElementById('mc-contratoCard');
+    if(!card || !currentProfile) return;
+    card.style.display = 'block';
+    const pct = Math.round((currentProfile.commission_rate != null ? currentProfile.commission_rate : 0.70) * 100);
+    document.getElementById('mc-contrato-pct').textContent = pct + '%';
+
+    if(pct >= 75){
+      document.getElementById('mc-contrato-metaWrap').style.display = 'none';
+      return;
+    }
+    document.getElementById('mc-contrato-metaWrap').style.display = 'block';
+
+    const hireDate = (currentProfile.created_at || '').slice(0, 10);
+    const windowEnd = addMonthsISO(hireDate, 3);
+    const today = toISODateLocal(new Date());
+    const total = await sumAgentPremium(currentProfile.id, hireDate, windowEnd);
+    const pctBar = Math.min(100, Math.round((total / 60000) * 100));
+    const bar = document.getElementById('mc-contrato-bar');
+    const met = total >= 60000;
+    if(bar){ bar.style.width = pctBar + '%'; bar.style.background = met ? '#1E9E5A' : 'var(--blue)'; }
+    const statusEl = document.getElementById('mc-contrato-status');
+    if(statusEl){
+      if(met){
+        statusEl.textContent = `¡Llegaste a $${total.toLocaleString('en-US', {maximumFractionDigits:0})}! 🎉 Ya cumpliste la meta — la administradora te va a contactar para el contrato nuevo.`;
+        statusEl.style.color = '#177A54';
+      } else if(today > windowEnd){
+        statusEl.textContent = `Se cerró la ventana de tus primeros 3 meses con $${total.toLocaleString('en-US', {maximumFractionDigits:0})} en primas.`;
+        statusEl.style.color = 'inherit';
+      } else {
+        statusEl.textContent = `Llevas $${total.toLocaleString('en-US', {maximumFractionDigits:0})} de $60,000 — tienes hasta ${formatDateUS(windowEnd)}.`;
+        statusEl.style.color = 'inherit';
+      }
+    }
+  }
+
+  // Suma meses a una fecha ISO (YYYY-MM-DD) sin líos de zona horaria.
+  function addMonthsISO(iso, months){
+    if(!iso) return iso;
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1 + months, d);
+    return toISODateLocal(dt);
+  }
+
+  // ---- Control de agentes (dashboard de la administradora principal) ----
+  async function loadControlAgentes(){
+    const card = document.getElementById('controlAgentesCard');
+    if(!card) return;
+    if(!isSuperAdminUser()){ card.style.display = 'none'; return; }
+
+    const { data: agentProfiles } = await sb.from('profiles').select('id, full_name, producer_code, role, commission_rate, created_at').eq('role', 'agent');
+    const agentes = agentProfiles || [];
+    if(agentes.length === 0){ card.style.display = 'none'; return; }
+
+    const { data: goals } = await sb.from('agent_goals').select('*');
+    const goalsByAgent = {};
+    (goals || []).forEach(g => { goalsByAgent[g.agent_id] = g; });
+
+    const { data: allPolicies } = await sb.from('client_policies').select('id, insurance_type, status, created_by, created_at, total_premium');
+    const policies = allPolicies || [];
+
+    // Mes calendario pasado completo: del día 1 al último día del mes anterior.
+    const now = new Date();
+    const startOfThisMonthISO = toISODateLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+    const startOfLastMonthISO = toISODateLocal(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+    const today = toISODateLocal(now);
+
+    const incumplieron = [];
+    const cumplieronComision = [];
+
+    agentes.forEach(a => {
+      const target = (goalsByAgent[a.id] && goalsByAgent[a.id].target_count) ? goalsByAgent[a.id].target_count : 5;
+      const countLastMonth = policies.filter(p =>
+        p.created_by === a.id &&
+        p.insurance_type !== 'professional_liability' &&
+        (p.created_at || '').slice(0, 10) >= startOfLastMonthISO &&
+        (p.created_at || '').slice(0, 10) < startOfThisMonthISO
+      ).length;
+      // Solo lo marcamos si ya llevaba al menos un mes completo trabajando
+      // cuando terminó el mes pasado (para no marcar como "incumplió" a
+      // alguien que apenas empezó a mitad del mes pasado).
+      const hireISO = (a.created_at || '').slice(0, 10);
+      if(countLastMonth < target && hireISO < startOfLastMonthISO){
+        incumplieron.push({ ...a, countLastMonth, target });
+      }
+
+      const pct = Math.round((a.commission_rate != null ? a.commission_rate : 0.70) * 100);
+      if(pct < 75){
+        const windowEnd = addMonthsISO(hireISO, 3);
+        const total = policies.filter(p =>
+          p.created_by === a.id &&
+          p.status !== 'cancelled' &&
+          (p.created_at || '').slice(0, 10) >= hireISO &&
+          (p.created_at || '').slice(0, 10) <= windowEnd
+        ).reduce((sum, p) => sum + (Number(p.total_premium) || 0), 0);
+        if(total >= 60000){
+          cumplieronComision.push({ ...a, total });
+        }
+      }
+    });
+
+    if(incumplieron.length === 0 && cumplieronComision.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+
+    let html = '';
+    if(cumplieronComision.length > 0){
+      html += '<h5 style="margin:0 0 8px; color:#177A54;">🎉 Llegaron a $60,000 en primas (listos para subir a 75%)</h5>';
+      html += cumplieronComision.map(a => `
+        <p class="sub" style="margin:0 0 6px;"><strong>${a.full_name}</strong> (${a.producer_code || 'sin código'}) — $${a.total.toLocaleString('en-US', { maximumFractionDigits: 0 })} en primas.
+        <a href="#" onclick="event.preventDefault(); switchTab('usuarios'); openUserProfile('${a.id}');">Ver perfil →</a></p>
+      `).join('');
+    }
+    if(incumplieron.length > 0){
+      html += '<h5 style="margin:14px 0 8px; color:#8a3030;">⚠️ No cumplieron la meta de pólizas el mes pasado</h5>';
+      html += incumplieron.map(a => `
+        <p class="sub" style="margin:0 0 6px;"><strong>${a.full_name}</strong> (${a.producer_code || 'sin código'}) — ${a.countLastMonth} de ${a.target} pólizas.
+        <a href="#" onclick="event.preventDefault(); switchTab('usuarios'); openUserProfile('${a.id}');">Ver perfil →</a></p>
+      `).join('');
+    }
+    document.getElementById('controlAgentesList').innerHTML = html;
   }
 
   function closeMiCuenta(){
@@ -4268,6 +4471,11 @@
     const welcomeCodigoEl = document.getElementById('welcomeCodigo');
     if(welcomeCodigoEl) welcomeCodigoEl.textContent = codigoTxt ? ('(' + codigoTxt + ')') : '';
     document.getElementById('btnSeguridad').style.display = (profile && (profile.role === 'admin' || profile.role === 'super_admin')) ? 'inline-block' : 'none';
+    // "Aseguradoras" es solo para el propio agente vea con cuáles está activo
+    // — a la administradora no le sirve de nada aquí, ella ya lo maneja desde
+    // Usuarios → perfil de cada agente.
+    const navAseg = document.getElementById('navAseguradoras');
+    if(navAseg) navAseg.style.display = (profile && (profile.role === 'admin' || profile.role === 'super_admin')) ? 'none' : 'inline-block';
 
     async function safeLoad(fn, label){
       try { await fn(); }
@@ -4281,6 +4489,8 @@
     await safeLoad(loadClients, 'Clientes');
     await safeLoad(loadMyCarriers, 'Aseguradoras');
     await safeLoad(loadMetaProduccion, 'Meta de producción');
+    await safeLoad(loadMisRetos, 'Retos activos');
+    await safeLoad(loadControlAgentes, 'Control de agentes');
     await safeLoad(loadServiceFees, 'Service Fees');
     await safeLoad(loadTesoreria, 'Tesorería');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
@@ -5925,13 +6135,19 @@
         const selectedOption = selectEl.options[selectEl.selectedIndex];
         companyNameSnapshot = selectedOption ? selectedOption.textContent : null;
       }
+      // Aquí no hay depósito por separado (se registró la venta ya hecha,
+      // sin pasar por el flujo de "Nueva transacción") — la prima para la
+      // meta de comisión se calcula solo con la mensualidad × el término.
+      const ecPagoMensual = parseFloat(pago) || 0;
+      const ecTerminoMeses = parseInt(termino, 10) || 0;
       const { error: polError } = await sb.from('client_policies').insert({
         client_id: currentClientId,
         company_id: (companySelect && companySelect !== '__otra__') ? companySelect : null,
         company: companyNameSnapshot,
         policy_number: numero,
-        monthly_payment: parseFloat(pago),
-        term_months: parseInt(termino, 10),
+        monthly_payment: ecPagoMensual,
+        term_months: ecTerminoMeses,
+        total_premium: ecPagoMensual * ecTerminoMeses,
         effective_date: efectivaISO,
         created_by: session.user.id
       });
@@ -7820,6 +8036,20 @@
       }
       companyName = company ? company.name : null;
 
+      // "Prima" de la póliza para efectos de la meta de comisión ($60,000 en
+      // primas en los primeros 3 meses) — según indicó la administradora, es
+      // el depósito/pago en full más las mensualidades a lo largo del
+      // término de la póliza. Si se cancela la póliza, esto deja de contar
+      // solo con filtrar status != 'cancelled' donde se usa, sin tener que
+      // tocar este número.
+      const txTermMonths = parseInt(document.getElementById('tx-termino').value, 10) || 0;
+      const txModalidadPago = document.querySelector('input[name="tx-modalidad-pago"]:checked')?.value;
+      const txCargoVal = parseFloat(document.getElementById('tx-cargo').value) || 0;
+      const txPagoMensualVal = parseFloat(document.getElementById('tx-pago-mensual').value) || 0;
+      const totalPremiumCalc = txModalidadPago === 'mensual'
+        ? (txCargoVal + txPagoMensualVal * txTermMonths)
+        : txCargoVal;
+
       const { data: newPolicy, error: polError } = await sb.from('client_policies').insert({
         client_id: currentClientId,
         insurance_type: product,
@@ -7827,7 +8057,9 @@
         company: companyName,
         policy_number: null,
         effective_date: efectivaISO,
-        term_months: parseInt(document.getElementById('tx-termino').value, 10),
+        term_months: txTermMonths,
+        monthly_payment: txModalidadPago === 'mensual' ? txPagoMensualVal : null,
+        total_premium: totalPremiumCalc,
         notes: document.getElementById('tx-notas').value || null,
         created_by: session.user.id
       }).select().single();
@@ -10107,11 +10339,135 @@
 
     const { data: users } = await sb.from('profiles').select('*').order('created_at', { ascending: false });
     allUsers = users || [];
-    const agentes = allUsers.filter(u => u.role === 'agent').length;
-    const admins = allUsers.filter(u => u.role === 'admin' || u.role === 'super_admin').length;
-    document.getElementById('statAgentes').textContent = agentes;
-    document.getElementById('statAdmins').textContent = admins;
     renderUsersList();
+    await loadChallenges();
+  }
+
+  // ===================== RETOS Y OBJETIVOS (opcionales, para todos) =====================
+  let allChallenges = [];
+
+  function toggleAddChallenge(){
+    const card = document.getElementById('addChallengeCard');
+    if(!card) return;
+    card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    if(card.style.display === 'block') populateChallengeProductDropdown();
+  }
+
+  function populateChallengeProductDropdown(){
+    const sel = document.getElementById('ch-producto');
+    if(!sel || sel.options.length > 1) return;
+    Object.entries(INSURANCE_TYPE_LABELS).forEach(([key, label]) => {
+      const opt = document.createElement('option');
+      opt.value = key; opt.textContent = label;
+      sel.appendChild(opt);
+    });
+  }
+
+  async function submitChallenge(){
+    const msg = document.getElementById('addChallengeMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    const titulo = document.getElementById('ch-titulo').value.trim();
+    const meta = parseInt(document.getElementById('ch-meta').value, 10);
+    const premio = document.getElementById('ch-premio').value.trim();
+    const desdeISO = mmddyyyyToISO(document.getElementById('ch-desde').value);
+    const hastaISO = mmddyyyyToISO(document.getElementById('ch-hasta').value);
+    if(!titulo || !meta || meta < 1 || !premio || !desdeISO || !hastaISO){
+      msg.className = 'msg error'; msg.textContent = 'Completa título, meta, premio, y las fechas de inicio y fin.';
+      return;
+    }
+    const { data: { session } } = await sb.auth.getSession();
+    const { error } = await sb.from('agency_challenges').insert({
+      title: titulo,
+      description: document.getElementById('ch-descripcion').value.trim() || null,
+      insurance_type: document.getElementById('ch-producto').value || null,
+      target_count: meta,
+      prize_description: premio,
+      start_date: desdeISO,
+      end_date: hastaISO,
+      active: true,
+      created_by: session.user.id
+    });
+    if(error){ msg.className = 'msg error'; msg.textContent = 'No se pudo crear: ' + error.message; return; }
+    msg.className = 'msg success'; msg.textContent = 'Reto creado.';
+    document.getElementById('ch-titulo').value = '';
+    document.getElementById('ch-descripcion').value = '';
+    document.getElementById('ch-meta').value = 10;
+    document.getElementById('ch-premio').value = '';
+    document.getElementById('ch-desde').value = '';
+    document.getElementById('ch-hasta').value = '';
+    await loadChallenges();
+  }
+
+  async function loadChallenges(){
+    const list = document.getElementById('challengesList');
+    if(!list) return;
+    const { data, error } = await sb.from('agency_challenges').select('*').order('created_at', { ascending: false });
+    allChallenges = error ? [] : (data || []);
+    if(allChallenges.length === 0){
+      list.innerHTML = '<p class="sub">Todavía no has creado ningún reto.</p>';
+      return;
+    }
+    const today = toISODateLocal(new Date());
+    list.innerHTML = allChallenges.map(c => {
+      const vigente = c.active && today >= c.start_date && today <= c.end_date;
+      const productLabel = c.insurance_type ? (INSURANCE_TYPE_LABELS[c.insurance_type] || c.insurance_type) : 'Cualquier producto';
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); flex-wrap:wrap;">
+          <div>
+            <strong>${c.title}</strong> ${vigente ? '<span class="badge active">Vigente</span>' : '<span class="badge gray">No vigente</span>'}<br>
+            <span class="sub">${productLabel} · Meta: ${c.target_count} pólizas · Premio: ${c.prize_description} · ${formatDateUS(c.start_date)} a ${formatDateUS(c.end_date)}</span>
+          </div>
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#c0392b; border-color:#c0392b;" onclick="deleteChallenge('${c.id}')">Eliminar</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function deleteChallenge(id){
+    if(!confirm('¿Eliminar este reto? Ya no le va a salir a los agentes.')) return;
+    const { error } = await sb.from('agency_challenges').delete().eq('id', id);
+    if(error){ alert('No se pudo eliminar: ' + error.message); return; }
+    await loadChallenges();
+  }
+
+  // Vista del propio agente: retos vigentes ahora mismo, con su progreso
+  // calculado automáticamente según lo que ha vendido.
+  async function loadMisRetos(){
+    const card = document.getElementById('misRetosCard');
+    const list = document.getElementById('misRetosList');
+    if(!card || !list || !currentProfile) return;
+
+    const today = toISODateLocal(new Date());
+    const { data, error } = await sb.from('agency_challenges')
+      .select('*')
+      .eq('active', true)
+      .lte('start_date', today)
+      .gte('end_date', today);
+
+    const vigentes = error ? [] : (data || []);
+    if(vigentes.length === 0){ card.style.display = 'none'; return; }
+
+    const { data: policies } = await sb.from('client_policies')
+      .select('id, insurance_type, status, created_by, created_at')
+      .eq('created_by', currentProfile.id)
+      .neq('status', 'cancelled');
+
+    list.innerHTML = vigentes.map(c => {
+      const count = (policies || []).filter(p => {
+        if(c.insurance_type && p.insurance_type !== c.insurance_type) return false;
+        const createdISO = (p.created_at || '').slice(0, 10);
+        return createdISO >= c.start_date && createdISO <= c.end_date;
+      }).length;
+      const met = count >= c.target_count;
+      const productLabel = c.insurance_type ? (INSURANCE_TYPE_LABELS[c.insurance_type] || c.insurance_type) : 'cualquier producto';
+      return `
+        <div style="padding:10px 0; border-bottom:1px solid #F0D28A;">
+          <strong>${c.title}</strong> ${met ? '<span class="badge active">¡Cumplido! 🎉</span>' : ''}<br>
+          <span class="sub">${productLabel} · ${count} / ${c.target_count} · 🏆 ${c.prize_description} · vence ${formatDateUS(c.end_date)}</span>
+        </div>
+      `;
+    }).join('');
+    card.style.display = 'block';
   }
 
   function renderUsersList(){
@@ -10169,9 +10525,6 @@
     deleteBtn.style.display = showManageBtns ? 'inline-block' : 'none';
     toggleBtn.textContent = active ? 'Remover acceso' : 'Reactivar';
 
-    document.getElementById('ud-tipo-agente').value = u.agent_type || '';
-    onAgentTypeChange();
-
     const licenseLines = Array.isArray(u.license_lines) ? u.license_lines : [];
     document.getElementById('ud-lic-pc').checked = licenseLines.includes('property_casualty');
     document.getElementById('ud-lic-pl').checked = licenseLines.includes('personal_lines');
@@ -10180,6 +10533,7 @@
     await Promise.all([
       loadAgentCarriers(userId),
       loadAgentGoal(userId),
+      loadAgentCommission(userId),
       loadAgentDocuments(userId),
       loadAgentNotes(userId),
       loadAgentAlerts(userId),
@@ -10310,41 +10664,6 @@
     });
   }
 
-  // ---- Tipo de agente y restricción de aseguradoras ----
-  function onAgentTypeChange(){
-    const tipo = document.getElementById('ud-tipo-agente').value;
-    const wrap = document.getElementById('ud-restringidas-wrap');
-    wrap.style.display = tipo === 'personal_lines' ? 'block' : 'none';
-    if(tipo === 'personal_lines'){
-      const u = allUsers.find(x => x.id === currentUserDetailId);
-      const restricted = (u && u.restricted_company_ids) || [];
-      const list = document.getElementById('ud-restringidas-list');
-      if(allCompanies.length === 0){
-        list.innerHTML = '<p class="sub">No hay aseguradoras registradas todavía en Compañías.</p>';
-        return;
-      }
-      list.innerHTML = allCompanies.map(co => `
-        <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
-          <input type="checkbox" value="${co.id}" class="ud-restringida-cb" ${restricted.includes(co.id) ? 'checked' : ''}>
-          ${co.name}
-        </label>
-      `).join('');
-    }
-  }
-
-  async function saveAgentType(){
-    if(!currentUserDetailId) return;
-    const tipo = document.getElementById('ud-tipo-agente').value || null;
-    let restricted = [];
-    if(tipo === 'personal_lines'){
-      restricted = [...document.querySelectorAll('.ud-restringida-cb:checked')].map(el => el.value);
-    }
-    const { error } = await sb.from('profiles').update({ agent_type: tipo, restricted_company_ids: restricted }).eq('id', currentUserDetailId);
-    if(error){ showMsg('udMsg','error','No se pudo guardar: ' + error.message); return; }
-    showMsg('udMsg','success','Tipo de agente guardado.');
-    await loadUsers();
-  }
-
   async function saveAgentLicenseLines(){
     if(!currentUserDetailId) return;
     const msg = document.getElementById('udLicenseLinesMsg');
@@ -10423,6 +10742,48 @@
     showMsg('udMetaMsg','success','Meta de producción guardada.');
   }
 
+  // ---- Comisión y contrato (vista de la administradora) ----
+  async function loadAgentCommission(agentId){
+    const pctInput = document.getElementById('ud-comision-pct');
+    const progresoEl = document.getElementById('ud-comision-progreso');
+    if(!pctInput || !progresoEl) return;
+    const u = allUsers.find(x => x.id === agentId);
+    const pct = Math.round((u && u.commission_rate != null ? u.commission_rate : 0.70) * 100);
+    pctInput.value = pct;
+
+    if(pct >= 75){
+      progresoEl.textContent = 'Este agente ya está en un contrato de 75% o más.';
+      return;
+    }
+    const hireDate = (u && u.created_at ? u.created_at : new Date().toISOString()).slice(0, 10);
+    const windowEnd = addMonthsISO(hireDate, 3);
+    const today = toISODateLocal(new Date());
+    const total = await sumAgentPremium(agentId, hireDate, windowEnd);
+    const totalTxt = '$' + total.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    if(total >= 60000){
+      progresoEl.innerHTML = `<strong style="color:#177A54;">✅ Ya llegó a ${totalTxt} en primas</strong> dentro de sus primeros 3 meses (desde ${formatDateUS(hireDate)}) — cumplió la meta para subir a 75%.`;
+    } else if(today > windowEnd){
+      progresoEl.textContent = `Se le cerró la ventana de los primeros 3 meses (desde ${formatDateUS(hireDate)} hasta ${formatDateUS(windowEnd)}) con ${totalTxt} en primas — no llegó a $60,000.`;
+    } else {
+      progresoEl.textContent = `Lleva ${totalTxt} de $60,000 en primas, dentro de sus primeros 3 meses (hasta ${formatDateUS(windowEnd)}).`;
+    }
+  }
+
+  async function saveAgentCommission(){
+    if(!currentUserDetailId) return;
+    const pct = parseInt(document.getElementById('ud-comision-pct').value, 10);
+    if(isNaN(pct) || pct < 0 || pct > 100){
+      showMsg('udComisionMsg','error','Escribe un porcentaje válido (0 a 100).');
+      return;
+    }
+    const { error } = await sb.from('profiles').update({ commission_rate: pct / 100 }).eq('id', currentUserDetailId);
+    if(error){ showMsg('udComisionMsg','error','No se pudo guardar: ' + error.message); return; }
+    const u = allUsers.find(x => x.id === currentUserDetailId);
+    if(u) u.commission_rate = pct / 100;
+    showMsg('udComisionMsg','success','Comisión actualizada a ' + pct + '%. Recuerda avisarle al agente y tener el contrato firmado.');
+    await loadAgentCommission(currentUserDetailId);
+  }
+
   // ---- Aseguradoras (vista del propio agente: con cuáles está activo) ----
   async function loadMyCarriers(){
     const container = document.getElementById('myCarriersList');
@@ -10478,12 +10839,13 @@
     const met = count >= target;
     const pct = target > 0 ? Math.min(100, Math.round((count / target) * 100)) : 0;
 
-    document.getElementById('metaProduccionCount').textContent = count;
-    document.getElementById('metaProduccionTarget').textContent = target;
-    const bar = document.getElementById('metaProduccionBar');
-    if(bar){ bar.style.width = pct + '%'; bar.style.background = met ? '#1E9E5A' : 'var(--blue)'; }
-    card.style.background = met ? '#E8F7EE' : '#F7F9FC';
-    card.style.borderColor = met ? '#8FD6AB' : 'var(--line)';
+    document.getElementById('metaProduccionCount').textContent = count + '/' + target;
+    const ring = document.getElementById('metaProduccionRing');
+    if(ring){
+      const circumference = 169.6; // 2 * PI * r(27), precalculado
+      ring.style.strokeDashoffset = String(circumference * (1 - pct / 100));
+      ring.style.stroke = met ? '#1E9E5A' : 'var(--blue)';
+    }
     const statusEl = document.getElementById('metaProduccionStatus');
     if(statusEl){
       statusEl.textContent = met
@@ -10497,6 +10859,19 @@
       else { prizeEl.style.display = 'none'; }
     }
   }
+
+  function toggleMetaProduccionDetalle(){
+    const detalle = document.getElementById('metaProduccionDetalle');
+    if(!detalle) return;
+    detalle.style.display = detalle.style.display === 'none' ? 'block' : 'none';
+  }
+  document.addEventListener('click', function(e){
+    const detalle = document.getElementById('metaProduccionDetalle');
+    const circulo = document.getElementById('metaProduccionCard');
+    if(!detalle || detalle.style.display === 'none') return;
+    if(detalle.contains(e.target) || (circulo && circulo.contains(e.target))) return;
+    detalle.style.display = 'none';
+  });
 
   // ---- Licencia y E&O (llenados por el agente) ----
   async function loadAgentLicenseEo(agentId){
@@ -10726,8 +11101,6 @@
     if(!isSuperAdminUser()) return;
 
     const { data: apps } = await sb.from('agent_applications').select('*').order('created_at', { ascending: false });
-    const pendientes = (apps || []).filter(a => a.status === 'pending').length;
-    document.getElementById('statPendientes').textContent = pendientes;
 
     const tbody = document.getElementById('appsTableBody');
     if(!apps || apps.length === 0){
