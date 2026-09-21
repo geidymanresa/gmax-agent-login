@@ -640,13 +640,13 @@
           <button class="mc-tab-btn" data-mctab="documentos" onclick="switchMiCuentaTab('documentos')">Mis documentos</button>
           <button class="mc-tab-btn" data-mctab="banco" onclick="switchMiCuentaTab('banco')">Información bancaria</button>
           <button class="mc-tab-btn" data-mctab="pagina" onclick="switchMiCuentaTab('pagina')">Mi página</button>
-          <button class="mc-tab-btn" data-mctab="licencias" onclick="switchMiCuentaTab('licencias')">Mis licencias</button>
         </div>
         <div class="msg" id="miCuentaMsg"></div>
 
         <div id="mc-tab-info" class="mc-tab-content dash-card">
           <h4 style="margin-top:0;">Mi información</h4>
-          <div class="form-row"><label>Nombre completo</label><input type="text" id="mc-nombre"></div>
+          <div class="form-row"><label>Nombre completo</label><input type="text" id="mc-nombre" disabled style="background:var(--canvas);"></div>
+          <p class="sub" style="margin:-10px 0 12px;">Si necesitas corregir tu nombre, pídeselo a la administradora — ella lo puede cambiar desde Usuarios.</p>
           <div class="form-row"><label>Correo electrónico</label><input type="text" id="mc-correo" disabled style="background:var(--canvas);"></div>
           <div class="form-row"><label>Teléfono</label><input type="tel" id="mc-telefono"></div>
           <div class="form-row"><label>Dirección</label><input type="text" id="mc-direccion"></div>
@@ -832,39 +832,6 @@
           <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:6px;" onclick="saveMiPagina()">Guardar mi página</button>
         </div>
 
-        <div id="mc-tab-licencias" class="mc-tab-content dash-card" style="display:none;">
-          <h4 style="margin-top:0;">Mis licencias</h4>
-          <p class="sub" style="margin-bottom:14px;">Sube el PDF de cada licencia que tengas. Si publicaste tu página de agente, o activaste la casilla de abajo, van a salir públicas para que tus clientes puedan verificarte.</p>
-
-          <div class="dash-card" style="background:var(--canvas); box-shadow:none; border:1.5px solid var(--line); margin-bottom:18px;">
-            <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px;">
-              <input type="checkbox" id="lic-mostrarPublico" style="width:auto;" onchange="saveShowLicensesPublicly()"> Mostrar mis licencias en mi página pública (sin necesidad de tener una "Mi página" de agente)
-            </label>
-            <div class="msg" id="licVisibilidadMsg" style="margin-top:6px;"></div>
-            <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--line);">
-              <label style="font-size:11.5px; color:var(--slate-light); text-transform:uppercase; font-weight:700; letter-spacing:.03em;">Tu ID de agente</label>
-              <p class="sub" style="margin:4px 0 8px;">Solo hace falta si alguien te pide este código para conectar una página pública tuya que no sea la de "Mi página" (por ejemplo tu página individual aparte).</p>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <input type="text" id="lic-miId" readonly style="flex:1; min-width:240px; background:#fff; border:1px solid var(--line); border-radius:8px; padding:9px 12px; font-size:13px; color:var(--slate);">
-                <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="copyMiAgentId()">Copiar</button>
-              </div>
-            </div>
-          </div>
-
-          <form id="mp-licenseForm" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
-            <div class="form-row" style="min-width:140px; margin:0;"><label>Estado</label><input type="text" id="mp-lic-estado" placeholder="ej: TX" maxlength="2" required></div>
-            <div class="form-row" style="min-width:160px; margin:0;"><label>Número de licencia</label><input type="text" id="mp-lic-numero" required></div>
-            <div class="form-row" style="min-width:160px; margin:0;"><label>Vence</label><input type="text" id="mp-lic-vence" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
-            <div class="form-row" style="min-width:130px; margin:0;">
-              <label>&nbsp;</label>
-              <label style="display:flex; align-items:center; gap:6px; font-weight:400; font-size:13px; padding-top:8px;"><input type="checkbox" id="mp-lic-residente" style="width:auto;" checked> Residente</label>
-            </div>
-            <div class="form-row" style="min-width:200px; margin:0;"><label>PDF de la licencia</label><input type="file" id="mp-lic-archivo" accept="application/pdf" required></div>
-            <button type="submit" class="btn-primary" style="width:auto; padding:10px 20px;">Agregar licencia</button>
-          </form>
-          <div class="msg" id="mpLicMsg"></div>
-          <div id="mp-licensesList"></div>
-        </div>
       </div>
     </div>
 
@@ -1341,8 +1308,8 @@
 
           <div class="dash-table-wrap">
             <table class="dash-table" id="clientsTable">
-              <thead><tr><th>Nombre</th><th>Teléfono</th><th>Compañía</th><th>Núm. de póliza</th></tr></thead>
-              <tbody id="clientsTableBody"><tr><td colspan="4">Cargando...</td></tr></tbody>
+              <thead><tr><th>Nombre</th><th>Teléfono</th><th>Producto</th><th>Compañía</th><th>Núm. de póliza</th><th>Última transacción</th></tr></thead>
+              <tbody id="clientsTableBody"><tr><td colspan="6">Cargando...</td></tr></tbody>
             </table>
           </div>
           <div id="clientsPager" style="display:flex; align-items:center; margin-top:12px; flex-wrap:wrap;"></div>
@@ -2871,7 +2838,7 @@
           <div class="dash-card">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
               <div>
-                <h2 id="ud-nombre" style="margin-bottom:4px;">—</h2>
+                <h2 style="margin-bottom:4px;"><span id="ud-nombre">—</span> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; vertical-align:middle;" onclick="renameAgent()" title="El agente ya no puede cambiar su propio nombre — solo tú, desde aquí.">✏️ Editar</button></h2>
                 <p class="sub" id="ud-correo" style="margin:0;">—</p>
                 <p class="sub" style="margin:4px 0 0;">Código de agente: <strong id="ud-codigo">—</strong> · Rol: <span id="ud-rol">—</span> · <span id="ud-estado-badge"></span></p>
               </div>
@@ -3937,26 +3904,22 @@
     // administradora desde el perfil del agente en Usuarios).
     if(tab === 'banco' && currentProfile) loadMiCuentaBanco();
     if(tab === 'pagina' && currentProfile) loadMiPagina();
-    if(tab === 'licencias' && currentProfile) loadMisLicencias();
   }
 
   async function saveMiCuentaInfo(){
     const msg = document.getElementById('miCuentaMsg');
     msg.className = 'msg'; msg.textContent = '';
-    const nombre = document.getElementById('mc-nombre').value.trim();
+    // El nombre ya NO es editable por el propio agente/admin — el campo
+    // queda deshabilitado y solo de referencia; para corregirlo hace falta
+    // que la administradora lo cambie desde Usuarios.
     const telefono = document.getElementById('mc-telefono').value.trim();
     const direccion = document.getElementById('mc-direccion').value.trim();
-    if(!nombre){ msg.className = 'msg error'; msg.textContent = 'El nombre no puede quedar vacío.'; return; }
 
-    const { error } = await sb.from('profiles').update({ full_name: nombre, phone: telefono, address: direccion }).eq('id', currentProfile.id);
+    const { error } = await sb.from('profiles').update({ phone: telefono, address: direccion }).eq('id', currentProfile.id);
     if(error){ msg.className = 'msg error'; msg.textContent = 'No se pudo guardar: ' + error.message; return; }
 
-    currentProfile.full_name = nombre;
     currentProfile.phone = telefono;
     currentProfile.address = direccion;
-    document.getElementById('dashUserName').textContent = nombre;
-    const welcomeEl = document.getElementById('welcomeName2');
-    if(welcomeEl) welcomeEl.textContent = nombre;
     msg.className = 'msg success';
     msg.textContent = 'Guardado correctamente.';
   }
@@ -4146,43 +4109,6 @@
     updateMiPaginaLinkPreview();
   }
 
-  // ===================== MIS LICENCIAS (tab aparte, para cualquier usuario) =====================
-  async function loadMisLicencias(){
-    if(!currentProfile) return;
-    document.getElementById('lic-miId').value = currentProfile.id;
-    document.getElementById('lic-mostrarPublico').checked = !!currentProfile.show_licenses_publicly;
-
-    const { data: licenses, error } = await sb.from('agent_licenses').select('*').eq('agent_id', currentProfile.id).order('is_primary', { ascending: false });
-    if(error) console.error('agent_licenses:', error.message);
-    renderMpLicensesList(licenses || []);
-  }
-
-  function copyMiAgentId(){
-    const input = document.getElementById('lic-miId');
-    input.select();
-    if(navigator.clipboard && navigator.clipboard.writeText){
-      navigator.clipboard.writeText(input.value).then(() => {
-        showMsg('licVisibilidadMsg', 'success', 'ID copiado.');
-      }).catch(() => {});
-    } else {
-      document.execCommand('copy');
-    }
-  }
-
-  async function saveShowLicensesPublicly(){
-    if(!currentProfile) return;
-    const checked = document.getElementById('lic-mostrarPublico').checked;
-    const { error } = await sb.from('profiles').update({ show_licenses_publicly: checked }).eq('id', currentProfile.id);
-    if(error){
-      showMsg('licVisibilidadMsg', 'error', 'No se pudo guardar: ' + error.message);
-      document.getElementById('lic-mostrarPublico').checked = !checked;
-      return;
-    }
-    currentProfile.show_licenses_publicly = checked;
-    showMsg('licVisibilidadMsg', 'success', checked ? 'Tus licencias ya son públicas.' : 'Tus licencias ya no se muestran públicamente.');
-  }
-  // ===================== FIN MIS LICENCIAS =====================
-
   function updateMiPaginaLinkPreview(){
     const slug = document.getElementById('mp-slug').value.trim() || slugifyText(currentProfile?.full_name);
     const link = PUBLIC_AGENT_PAGE_BASE + '?a=' + encodeURIComponent(slug);
@@ -4323,66 +4249,6 @@
     showMsg('mpPaginaMsg', 'success', '✔ Tu página se guardó correctamente.');
   }
 
-  function renderMpLicensesList(licenses){
-    const container = document.getElementById('mp-licensesList');
-    if(!licenses || licenses.length === 0){
-      container.innerHTML = '<p class="sub" style="margin:0;">Aún no has agregado ninguna licencia.</p>';
-      return;
-    }
-    container.innerHTML = licenses.map(l => {
-      const url = l.storage_path ? sb.storage.from('agent-licenses').getPublicUrl(l.storage_path).data.publicUrl : null;
-      return `
-        <div class="mp-license-row">
-          <div>
-            <strong>${l.state || ''}</strong> — #${l.license_number || ''} ${l.expiration_date ? '— vence ' + formatDateUS(l.expiration_date) : ''} ${l.is_resident === false ? '(no residente)' : ''}
-            ${url ? `<div><a href="${url}" target="_blank" rel="noopener">Ver PDF</a></div>` : ''}
-          </div>
-          <button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="deleteMpLicense('${l.id}','${l.storage_path || ''}')">Eliminar</button>
-        </div>
-      `;
-    }).join('');
-  }
-
-  document.getElementById('mp-licenseForm').addEventListener('submit', async function(e){
-    e.preventDefault();
-    if(!currentProfile) return;
-    const estado = document.getElementById('mp-lic-estado').value.trim().toUpperCase();
-    const numero = document.getElementById('mp-lic-numero').value.trim();
-    const vence = mmddyyyyToISO(document.getElementById('mp-lic-vence').value);
-    const residente = document.getElementById('mp-lic-residente').checked;
-    const file = document.getElementById('mp-lic-archivo').files[0];
-    if(!estado || !numero || !file){ showMsg('mpLicMsg', 'error', 'Completa estado, número de licencia y sube el PDF.'); return; }
-
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `${currentProfile.id}/${Date.now()}_${safeName}`;
-    const { error: uploadError } = await sb.storage.from('agent-licenses').upload(path, file);
-    if(uploadError){ showMsg('mpLicMsg', 'error', 'No se pudo subir el PDF: ' + uploadError.message); return; }
-
-    const { error: dbError } = await sb.from('agent_licenses').insert({
-      agent_id: currentProfile.id,
-      state: estado,
-      license_number: numero,
-      expiration_date: vence,
-      is_resident: residente,
-      is_primary: false,
-      storage_path: path,
-      file_name: file.name
-    });
-    if(dbError){ showMsg('mpLicMsg', 'error', 'La licencia no se pudo guardar: ' + dbError.message); return; }
-
-    showMsg('mpLicMsg', 'success', 'Licencia agregada.');
-    document.getElementById('mp-licenseForm').reset();
-    document.getElementById('mp-lic-residente').checked = true;
-    await loadMisLicencias();
-  });
-
-  async function deleteMpLicense(id, storagePath){
-    if(!confirm('¿Eliminar esta licencia?')) return;
-    if(storagePath) await sb.storage.from('agent-licenses').remove([storagePath]);
-    const { error } = await sb.from('agent_licenses').delete().eq('id', id);
-    if(error){ showMsg('mpLicMsg', 'error', 'No se pudo eliminar: ' + error.message); return; }
-    await loadMisLicencias();
-  }
   // ===================== FIN MI PÁGINA =====================
 
   async function startMfaEnroll(){
@@ -4999,8 +4865,23 @@
         allClientPoliciesByClient[p.client_id].push(p);
       });
     }
+
+    // Fecha de la última transacción por cliente, para que en la lista de
+    // Clientes se vea sin tener que entrar a cada uno.
+    const { data: txs, error: txError } = await sb.from('client_transactions')
+      .select('client_id, created_at')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
+    allLastTransactionByClient = {};
+    if(!txError && txs){
+      txs.forEach(t => {
+        if(!allLastTransactionByClient[t.client_id]) allLastTransactionByClient[t.client_id] = t.created_at;
+      });
+    }
+
     renderClientsList();
   }
+  let allLastTransactionByClient = {};
 
   let currentClientStatusFilter = '';
 
@@ -5047,7 +4928,7 @@
     const pager = document.getElementById('clientsPager');
     if(!tbody) return;
     if(filteredClientsList.length === 0){
-      tbody.innerHTML = '<tr><td colspan="4">No se encontraron clientes.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="6">No se encontraron clientes.</td></tr>';
       if(pager) pager.innerHTML = '';
       return;
     }
@@ -5083,8 +4964,10 @@
         : '';
       const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${webBadge}${agentBadge}`;
       const policies = allClientPoliciesByClient[c.id] || [];
+      const lastTxDate = allLastTransactionByClient[c.id];
+      const lastTxCell = lastTxDate ? formatDateUS(lastTxDate.slice(0, 10)) : '—';
 
-      // Sin pólizas: una sola fila con guiones en compañía / póliza
+      // Sin pólizas: una sola fila con guiones en producto / compañía / póliza
       if(policies.length === 0){
         return `
           <tr style="cursor:pointer;" onclick="openClient('${c.id}')">
@@ -5092,27 +4975,35 @@
             <td>${c.phone || '—'}</td>
             <td>—</td>
             <td>—</td>
+            <td>—</td>
+            <td>${lastTxCell}</td>
           </tr>
         `;
       }
 
-      // Con una o varias pólizas: el nombre y el teléfono ocupan una sola celda alta (rowspan),
-      // y cada póliza / compañía sale en su propia fila, sin repetir el nombre.
+      // Con una o varias pólizas: el nombre, teléfono y última transacción
+      // ocupan una sola celda alta (rowspan), y cada póliza / producto /
+      // compañía sale en su propia fila, sin repetir el nombre.
       return policies.map((p, idx) => {
         const co = allCompanies.find(x => x.id === p.company_id);
         const companyName = co ? co.name : (p.company || '—');
         const companyCell = co && co.login_url
           ? `<a href="${co.login_url}" target="_blank" rel="noopener" onclick="event.stopPropagation();">${companyName} →</a>`
           : companyName;
+        const productLabel = INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '—';
         const cancelledNote = p.status === 'cancelled' ? ' <span style="color:var(--slate-light); font-size:12px;">(cancelada)</span>' : '';
         const firstRow = idx === 0 ? `
             <td rowspan="${policies.length}" style="cursor:pointer;" onclick="openClient('${c.id}')">${nameCell}</td>
             <td rowspan="${policies.length}" style="cursor:pointer;" onclick="openClient('${c.id}')">${c.phone || '—'}</td>` : '';
+        const lastTxRow = idx === 0 ? `
+            <td rowspan="${policies.length}" style="cursor:pointer;" onclick="openClient('${c.id}')">${lastTxCell}</td>` : '';
         return `
           <tr>
             ${firstRow}
+            <td>${productLabel}${cancelledNote}</td>
             <td>${companyCell}</td>
-            <td>${p.policy_number || '—'}${cancelledNote}</td>
+            <td>${p.policy_number || '—'}</td>
+            ${lastTxRow}
           </tr>
         `;
       }).join('');
@@ -9522,9 +9413,12 @@
             : ` <span class="badge" style="background:#F5E9E9; color:#7A3030;" title="Sin agente asignado">👤 Sin agente asignado</span>`)
         : '';
       return `
-      <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center;">
+      <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${agentLine}</div>
-        <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto; padding:6px 10px; color:#8a3030; border-color:#E3B8B8;" onclick="markLeadNoContactar('${c.id}', event)">🚫 No contactar</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
+        </div>
       </div>
     `;}).join('');
 
@@ -9540,6 +9434,21 @@
   function changeLeadsPage(delta){
     leadsCurrentPage += delta;
     renderLeadsPage();
+  }
+
+  // Acción rápida desde la lista de leads del dashboard — marcarlo como "No
+  // contactar" sin tener que abrir el cliente completo. Pide motivo porque
+  // el resto del sistema ya lo exige para este estado (CLOSE_STATES).
+  async function markLeadNoContactar(clientId, evt){
+    if(evt) evt.stopPropagation();
+    const motivo = prompt('¿Por qué se marca como "No contactar"? (requerido)');
+    if(motivo === null) return;
+    const trimmed = motivo.trim();
+    if(!trimmed){ alert('Escribe un motivo para poder marcarlo como "No contactar".'); return; }
+    const { error } = await sb.from('clients').update({ client_status: 'no_contactar', close_reason: trimmed }).eq('id', clientId);
+    if(error){ alert('No se pudo actualizar: ' + error.message); return; }
+    await loadLeads();
+    try { await loadClients(); } catch(err){ console.error(err); }
   }
 
   // ---- Libro de negocio ----
@@ -10603,6 +10512,23 @@
       </div>
       <p class="sub" style="margin-top:12px; margin-bottom:0;">Última actualización: ${formatDateTimeUS(data.updated_at)}</p>
     `;
+  }
+
+  // El nombre del agente ya no lo puede cambiar él mismo desde "Mi cuenta" —
+  // ahora solo la administradora lo puede corregir, desde aquí.
+  async function renameAgent(){
+    if(!currentUserDetailId) return;
+    const u = allUsers.find(x => x.id === currentUserDetailId);
+    if(!u) return;
+    const nuevoNombre = prompt('Nombre completo:', u.full_name || '');
+    if(nuevoNombre === null) return;
+    const trimmed = nuevoNombre.trim();
+    if(!trimmed){ showMsg('udMsg','error','El nombre no puede quedar vacío.'); return; }
+    const { error } = await sb.from('profiles').update({ full_name: trimmed }).eq('id', currentUserDetailId);
+    if(error){ showMsg('udMsg','error','No se pudo guardar: ' + error.message); return; }
+    u.full_name = trimmed;
+    document.getElementById('ud-nombre').textContent = trimmed;
+    showMsg('udMsg','success','Nombre actualizado.');
   }
 
   async function toggleUserStatusFromProfile(){
