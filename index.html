@@ -605,6 +605,7 @@
       <nav class="dash-nav">
         <button class="dash-nav-btn active" data-tab="inicio" onclick="switchTab('inicio')">Inicio</button>
         <button class="dash-nav-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
+        <button class="dash-nav-btn" data-tab="aseguradoras" onclick="switchTab('aseguradoras')">🏢 Aseguradoras</button>
         <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
         <button class="dash-nav-btn" data-tab="companias" id="navCompanias" onclick="switchTab('companias')" style="display:none;">Compañías</button>
         <button class="dash-nav-btn" data-tab="servicefees" id="navServiceFees" onclick="switchTab('servicefees')" style="display:none;">Service Fees</button>
@@ -887,6 +888,23 @@
           <div class="dash-stat"><div class="num" id="statAgentes">—</div><div class="label">Agentes activos</div></div>
           <div class="dash-stat"><div class="num" id="statAdmins">—</div><div class="label">Administradores</div></div>
           <div class="dash-stat"><div class="num" id="statPendientes">—</div><div class="label">Solicitudes pendientes</div></div>
+        </div>
+
+        <!-- Meta de producción mensual: cuenta las pólizas nuevas (sin E&O) que
+             este agente ha vendido este mes calendario (día 1 al último día),
+             comparado contra su meta (5 por defecto, o la que le haya puesto la
+             administradora), y se pone verde cuando la cumple. -->
+        <div class="dash-card" id="metaProduccionCard" style="margin-top:20px; background:#F7F9FC; border:1.5px solid var(--line); transition:background 0.3s ease, border-color 0.3s ease;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <h4 style="margin:0;">🎯 Meta de producción mensual</h4>
+            <div style="font-size:15px; font-weight:800;"><span id="metaProduccionCount">0</span> / <span id="metaProduccionTarget">5</span> pólizas</div>
+          </div>
+          <p class="sub" style="margin:6px 0 10px;">Pólizas nuevas vendidas este mes (no cuenta E&amp;O). El conteo empieza el día 1 y termina el último día de cada mes.</p>
+          <div style="background:#E3E7F0; border-radius:20px; height:12px; overflow:hidden;">
+            <div id="metaProduccionBar" style="height:100%; width:0%; background:var(--blue); border-radius:20px; transition:width 0.4s ease, background 0.3s ease;"></div>
+          </div>
+          <p id="metaProduccionStatus" style="margin:10px 0 0; font-size:13.5px; font-weight:700;"></p>
+          <p id="metaProduccionPrize" style="margin:6px 0 0; font-size:13.5px; color:var(--gold-deep); display:none;"></p>
         </div>
 
         <!-- Panel de alertas: en vez de barras una debajo de otra, salen como
@@ -2346,6 +2364,15 @@
         </div>
       </section>
 
+      <!-- TAB: ASEGURADORAS (con las que el agente está activo/apuntado) -->
+      <section class="dash-tab" id="tab-aseguradoras" style="display:none;">
+        <h2>Aseguradoras</h2>
+        <p class="sub">Las aseguradoras con las que estás activo(a) y tu código con cada una. Haz clic en el nombre de la compañía para ir directo a su portal de login.</p>
+        <div class="dash-card">
+          <div id="myCarriersList"><p class="sub">Cargando...</p></div>
+        </div>
+      </section>
+
       <!-- TAB: COMPAÑÍAS -->
       <section class="dash-tab" id="tab-companias" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
@@ -2848,6 +2875,24 @@
             <h4>Aseguradoras con las que está apuntado</h4>
             <p class="sub" style="margin-bottom:14px;">Marca con cuáles carriers ya se gestionó la apuntación de este agente, y opcionalmente su código con esa aseguradora.</p>
             <div id="ud-carriers-list">Cargando...</div>
+          </div>
+
+          <!-- Meta de producción mensual -->
+          <div class="dash-card">
+            <h4>🎯 Meta de producción mensual</h4>
+            <p class="sub" style="margin-bottom:14px;">Cuántas pólizas nuevas (sin contar E&amp;O) debe vender este agente cada mes, y el premio si la cumple. Si no la defines, se usa la meta por defecto de 5 pólizas.</p>
+            <div class="form-row-2">
+              <div class="form-row">
+                <label>Meta (pólizas al mes)</label>
+                <input type="number" id="ud-meta-target" min="1" value="5">
+              </div>
+              <div class="form-row">
+                <label>Premio (opcional)</label>
+                <input type="text" id="ud-meta-premio" placeholder="Ej: $100 de bono">
+              </div>
+            </div>
+            <button class="btn-primary" style="width:auto; padding:10px 20px; margin-top:6px;" onclick="saveAgentGoal()">Guardar meta</button>
+            <div class="msg" id="udMetaMsg"></div>
           </div>
 
           <!-- Información bancaria (lo que el agente registró, con verificación por correo) -->
@@ -4234,6 +4279,8 @@
     await safeLoad(loadCompanies, 'Compañías');
     await safeLoad(loadProducts, 'Productos');
     await safeLoad(loadClients, 'Clientes');
+    await safeLoad(loadMyCarriers, 'Aseguradoras');
+    await safeLoad(loadMetaProduccion, 'Meta de producción');
     await safeLoad(loadServiceFees, 'Service Fees');
     await safeLoad(loadTesoreria, 'Tesorería');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
@@ -4801,6 +4848,8 @@
     const start = (clientsCurrentPage - 1) * CLIENTS_PAGE_SIZE;
     const filtered = filteredClientsList.slice(start, start + CLIENTS_PAGE_SIZE);
 
+    const showAgentAttribution = isAdminUser();
+
     tbody.innerHTML = filtered.map(c => {
       // Si el lead vino del formulario público A TRAVÉS de la página de un
       // agente en específico (assigned_agent_id ya viene puesto desde
@@ -4812,7 +4861,17 @@
             ? ` <span class="badge blue" title="Este lead llegó por el formulario público, a través de la página del agente ${c.agente.producer_code}">🌐 Web — Agente ${c.agente.producer_code}</span>`
             : ` <span class="badge blue" title="Este lead llegó por el formulario público de la página web">🌐 Web</span>`)
         : '';
-      const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${webBadge}`;
+      // A la administradora SIEMPRE le tiene que salir de quién es cada
+      // cliente — nombre y código del agente al que pertenece — no solo
+      // cuando llegó por el formulario público. A los agentes no se les
+      // muestra esto en sus propios clientes (es redundante, siempre son
+      // los suyos).
+      const agentBadge = (showAgentAttribution && !c.source_public_form)
+        ? (c.agente
+            ? ` <span class="badge" style="background:#EDEFF5; color:#3A3F55;" title="Agente asignado">👤 ${c.agente.full_name}${c.agente.producer_code ? ' — ' + c.agente.producer_code : ''}</span>`
+            : ` <span class="badge" style="background:#F5E9E9; color:#7A3030;" title="Sin agente asignado">👤 Sin agente asignado</span>`)
+        : '';
+      const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${webBadge}${agentBadge}`;
       const policies = allClientPoliciesByClient[c.id] || [];
 
       // Sin pólizas: una sola fila con guiones en compañía / póliza
@@ -9194,8 +9253,11 @@
   const LEADS_PAGE_SIZE = 10;
 
   async function loadLeads(){
+    // Igual que en Clientes: a la administradora siempre le tiene que salir
+    // de quién es cada lead — nombre y código del agente al que pertenece
+    // (o "sin agente" si todavía nadie lo tiene asignado).
     const { data, error } = await sb.from('clients')
-      .select('*')
+      .select('*, agente:assigned_agent_id(full_name, producer_code)')
       .in('client_status', LEAD_STATUSES)
       .order('created_at', { ascending: false });
 
@@ -9219,12 +9281,20 @@
     const start = (leadsCurrentPage - 1) * LEADS_PAGE_SIZE;
     const pageItems = allLeadsData.slice(start, start + LEADS_PAGE_SIZE);
 
-    list.innerHTML = pageItems.map(c => `
+    const showAgentAttribution = isAdminUser();
+
+    list.innerHTML = pageItems.map(c => {
+      const agentLine = showAgentAttribution
+        ? (c.agente
+            ? ` <span class="badge" style="background:#EDEFF5; color:#3A3F55;" title="Agente asignado">👤 ${c.agente.full_name}${c.agente.producer_code ? ' — ' + c.agente.producer_code : ''}</span>`
+            : ` <span class="badge" style="background:#F5E9E9; color:#7A3030;" title="Sin agente asignado">👤 Sin agente asignado</span>`)
+        : '';
+      return `
       <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center;">
-        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span></div>
+        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${agentLine}</div>
         <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
       </div>
-    `).join('');
+    `;}).join('');
 
     if(pager){
       pager.innerHTML = `
@@ -10109,6 +10179,7 @@
 
     await Promise.all([
       loadAgentCarriers(userId),
+      loadAgentGoal(userId),
       loadAgentDocuments(userId),
       loadAgentNotes(userId),
       loadAgentAlerts(userId),
@@ -10324,6 +10395,107 @@
     const { error } = await sb.from('agent_carriers').upsert(rows, { onConflict: 'agent_id,company_id' });
     if(error){ showMsg('udMsg','error','No se pudieron guardar los carriers: ' + error.message); return; }
     showMsg('udMsg','success','Carriers actualizados.');
+  }
+
+  // ---- Meta de producción mensual (objetivo de pólizas + premio, por agente) ----
+  async function loadAgentGoal(agentId){
+    const targetInput = document.getElementById('ud-meta-target');
+    const premioInput = document.getElementById('ud-meta-premio');
+    if(!targetInput || !premioInput) return;
+    const { data: goal } = await sb.from('agent_goals').select('*').eq('agent_id', agentId).maybeSingle();
+    targetInput.value = goal && goal.target_count ? goal.target_count : 5;
+    premioInput.value = goal && goal.prize_description ? goal.prize_description : '';
+  }
+
+  async function saveAgentGoal(){
+    if(!currentUserDetailId) return;
+    const target = parseInt(document.getElementById('ud-meta-target').value, 10) || 5;
+    const premio = document.getElementById('ud-meta-premio').value.trim() || null;
+    const { data: { session } } = await sb.auth.getSession();
+    const { error } = await sb.from('agent_goals').upsert({
+      agent_id: currentUserDetailId,
+      target_count: target,
+      prize_description: premio,
+      updated_at: new Date().toISOString(),
+      updated_by: session.user.id
+    }, { onConflict: 'agent_id' });
+    if(error){ showMsg('udMetaMsg','error','No se pudo guardar la meta: ' + error.message); return; }
+    showMsg('udMetaMsg','success','Meta de producción guardada.');
+  }
+
+  // ---- Aseguradoras (vista del propio agente: con cuáles está activo) ----
+  async function loadMyCarriers(){
+    const container = document.getElementById('myCarriersList');
+    if(!container || !currentProfile) return;
+    const { data: rows, error } = await sb.from('agent_carriers')
+      .select('*, company:company_id(name, login_url)')
+      .eq('agent_id', currentProfile.id)
+      .eq('appointed', true);
+    if(error){
+      container.innerHTML = '<p class="sub">No se pudo cargar la información de aseguradoras.</p>';
+      return;
+    }
+    const active = (rows || []).filter(r => r.company);
+    if(active.length === 0){
+      container.innerHTML = '<p class="sub">Todavía no tienes aseguradoras activas registradas. Si crees que esto es un error, contacta a la administradora.</p>';
+      return;
+    }
+    container.innerHTML = active.map(r => `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-bottom:1px solid var(--line); flex-wrap:wrap;">
+        <div>
+          ${r.company.login_url
+            ? `<a href="${r.company.login_url}" target="_blank" rel="noopener" style="font-weight:700;">${r.company.name} →</a>`
+            : `<span style="font-weight:700;">${r.company.name}</span>`}
+        </div>
+        <div class="sub">${r.agent_code ? ('Tu código: ' + r.agent_code) : 'Sin código registrado'}</div>
+      </div>
+    `).join('');
+  }
+
+  // ---- Meta de producción mensual (vista del propio agente) ----
+  async function loadMetaProduccion(){
+    const card = document.getElementById('metaProduccionCard');
+    if(!card || !currentProfile) return;
+
+    const { data: goal } = await sb.from('agent_goals').select('*').eq('agent_id', currentProfile.id).maybeSingle();
+    const target = (goal && goal.target_count) ? goal.target_count : 5;
+    const prize = goal ? goal.prize_description : null;
+
+    // Mes calendario actual: del día 1 al último día del mes.
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+    const { data: policies, error } = await sb.from('client_policies')
+      .select('id, insurance_type, created_by, created_at')
+      .eq('created_by', currentProfile.id)
+      .gte('created_at', startOfMonth.toISOString())
+      .lt('created_at', startOfNextMonth.toISOString());
+
+    // Todas las pólizas cuentan para la meta, con excepción de las de E&O
+    // (professional_liability) — así lo pidió la administradora.
+    const count = error ? 0 : (policies || []).filter(p => p.insurance_type !== 'professional_liability').length;
+    const met = count >= target;
+    const pct = target > 0 ? Math.min(100, Math.round((count / target) * 100)) : 0;
+
+    document.getElementById('metaProduccionCount').textContent = count;
+    document.getElementById('metaProduccionTarget').textContent = target;
+    const bar = document.getElementById('metaProduccionBar');
+    if(bar){ bar.style.width = pct + '%'; bar.style.background = met ? '#1E9E5A' : 'var(--blue)'; }
+    card.style.background = met ? '#E8F7EE' : '#F7F9FC';
+    card.style.borderColor = met ? '#8FD6AB' : 'var(--line)';
+    const statusEl = document.getElementById('metaProduccionStatus');
+    if(statusEl){
+      statusEl.textContent = met
+        ? '¡Meta cumplida este mes! 🎉'
+        : `Faltan ${target - count} póliza${(target - count) === 1 ? '' : 's'} para cumplir la meta este mes.`;
+      statusEl.style.color = met ? '#177A54' : 'inherit';
+    }
+    const prizeEl = document.getElementById('metaProduccionPrize');
+    if(prizeEl){
+      if(prize){ prizeEl.textContent = '🏆 Premio: ' + prize; prizeEl.style.display = 'block'; }
+      else { prizeEl.style.display = 'none'; }
+    }
   }
 
   // ---- Licencia y E&O (llenados por el agente) ----
