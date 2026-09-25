@@ -7605,6 +7605,21 @@
     let nuevaQtyVehiculos = 1;
     let nuevaQtyConductores = 1;
     if(tipo === 'nueva_poliza'){
+      // Producto, compañía, fecha efectiva y término son obligatorios para
+      // poder generar la póliza — y por eso se validan AQUÍ, antes de tocar
+      // Stripe. Antes esto solo se revisaba más abajo, después de haber
+      // cobrado la tarjeta, así que si faltaba alguno de estos campos el
+      // cliente igual quedaba cobrado pero la transacción no se guardaba (sin
+      // recibo, sin póliza) — eso es justo lo que no puede volver a pasar.
+      const nuevaPolizaProductoObligatorio = document.getElementById('tx-producto').value;
+      const nuevaPolizaCompaniaObligatoria = document.getElementById('tx-compania').value;
+      const nuevaPolizaEfectivaObligatoria = mmddyyyyToISO(document.getElementById('tx-efectiva').value);
+      const nuevaPolizaTerminoObligatorio = document.getElementById('tx-termino').value;
+      if(!nuevaPolizaProductoObligatorio || !nuevaPolizaCompaniaObligatoria || !nuevaPolizaEfectivaObligatoria || !nuevaPolizaTerminoObligatorio){
+        showMsg('newTransactionMsg','error','Antes de continuar, completa Producto, Compañía, Fecha efectiva (MM/DD/AAAA) y Término de la póliza — sin esto no se puede procesar el pago.');
+        return;
+      }
+
       nuevaPolizaProduct = document.getElementById('tx-producto').value;
       if(productQualifiesForVehiclePhotos(nuevaPolizaProduct)){
         nuevaCoberturasChecked = getCheckedCoverages('tx-nueva');
@@ -11113,6 +11128,14 @@
     const el = document.getElementById(id);
     el.className = 'msg ' + type;
     el.textContent = text;
+    // El aviso de "Nueva transacción" queda arriba de un formulario largo —
+    // sin este scroll, un error (sobre todo uno que evita que se cobre la
+    // tarjeta) podía quedar fuera de la vista si ya se había bajado hasta el
+    // botón de pagar, y parecía que "no salía nada". Con esto, el aviso se
+    // trae a la vista automáticamente apenas aparece.
+    if(id === 'newTransactionMsg' && type === 'error' && text){
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
   }
 
   // Todas las fechas del sistema se muestran en formato de EE. UU.: MM/DD/AAAA
