@@ -1325,9 +1325,13 @@
 
           <!-- Recibo / formularios emitidos -->
           <div class="dash-card" id="cd-receiptCard" style="display:none; border:2px solid var(--navy);">
+            <!-- Mientras el cliente no ha firmado, esto es lo ÚNICO que ve la
+                 agente/el agente: nada del contenido del documento, solo la
+                 opción de mandárselo a firmar. -->
+            <div id="cd-sendPanel" style="display:none;"></div>
             <div id="cd-receiptContent"></div>
             <div style="display:flex; gap:10px; margin-top:14px;">
-              <button type="button" class="btn-primary" id="cd-receiptPrintBtn" style="width:auto; padding:10px 18px;" onclick="window.print()">🖨 Imprimir / Guardar como PDF</button>
+              <button type="button" class="btn-primary" id="cd-receiptPrintBtn" style="width:auto; padding:10px 18px; display:none;" onclick="window.print()">🖨 Imprimir / Guardar como PDF</button>
               <button type="button" class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="document.getElementById('cd-receiptCard').style.display='none'">Cerrar</button>
             </div>
           </div>
@@ -1456,14 +1460,14 @@
                   </div>
                 </div>
 
-                <!-- Cambio de vehículos: agregó o quitó -->
+                <!-- Cambio de vehículos: agregó y/o quitó (se pueden marcar ambos a la vez) -->
                 <div class="form-row" id="tx-vehiculoAccionRow" style="display:none;">
-                  <label>¿Agregó o quitó vehículos? <span style="color:#C23B3B;">*obligatorio</span></label>
-                  <select id="tx-vehiculoAccion" onchange="onVehiculoAccionChange()">
-                    <option value="">—</option>
-                    <option value="agrego">Agregó vehículo(s)</option>
-                    <option value="quito">Quitó vehículo(s)</option>
-                  </select>
+                  <label>¿Qué se hizo con los vehículos? <span style="color:#C23B3B;">*obligatorio</span></label>
+                  <p class="sub" style="margin:2px 0 10px;">Se puede agregar y quitar vehículos en el mismo endorsement — marca todo lo que aplique.</p>
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" id="tx-endoso-vehiculo-agrego" onchange="onVehiculoAccionChange()"> Agregó vehículo(s)</label>
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" id="tx-endoso-vehiculo-quita" onchange="onVehiculoAccionChange()"> Quitó vehículo(s)</label>
+                  </div>
                 </div>
                 <div class="form-row" id="tx-coberturaEndosoBlock" style="display:none;">
                   <label>¿Cuántos vehículos se agregaron?</label>
@@ -1472,14 +1476,14 @@
                   <div id="tx-vehiculosMiniForms"></div>
                 </div>
 
-                <!-- Cambio de conductores: agregó o quitó -->
+                <!-- Cambio de conductores: agregó y/o quitó (se pueden marcar ambos a la vez) -->
                 <div class="form-row" id="tx-conductorAccionRow" style="display:none;">
-                  <label>¿Agregó o quitó conductores? <span style="color:#C23B3B;">*obligatorio</span></label>
-                  <select id="tx-conductorAccion" onchange="onConductorAccionChange()">
-                    <option value="">—</option>
-                    <option value="agrego">Agregó conductor(es)</option>
-                    <option value="quito">Quitó conductor(es)</option>
-                  </select>
+                  <label>¿Qué se hizo con los conductores? <span style="color:#C23B3B;">*obligatorio</span></label>
+                  <p class="sub" style="margin:2px 0 10px;">Se puede agregar y quitar conductores en el mismo endorsement — marca todo lo que aplique.</p>
+                  <div style="display:flex; flex-direction:column; gap:10px;">
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" id="tx-endoso-conductor-agrego" onchange="onConductorAccionChange()"> Agregó conductor(es)</label>
+                    <label style="display:flex; align-items:center; gap:8px; font-weight:500; cursor:pointer;"><input type="checkbox" id="tx-endoso-conductor-quita" onchange="onConductorAccionChange()"> Quitó conductor(es)</label>
+                  </div>
                 </div>
                 <div class="form-row" id="tx-conductorQtyRow" style="display:none;">
                   <label>¿Cuántos conductores se agregaron?</label>
@@ -7256,13 +7260,14 @@
     const conductor = document.getElementById('tx-endoso-cb-conductor').checked;
     const cobertura = document.getElementById('tx-endoso-cb-cobertura').checked;
     const informacion = document.getElementById('tx-endoso-cb-informacion').checked;
-    const vehiculoAccion = document.getElementById('tx-vehiculoAccion').value;
-    const conductorAccion = document.getElementById('tx-conductorAccion').value;
+    const vehiculoQuita = document.getElementById('tx-endoso-vehiculo-quita').checked;
+    const conductorQuita = document.getElementById('tx-endoso-conductor-quita').checked;
 
     // "Agregó" ya tiene su propio formulario por vehículo/conductor arriba —
-    // el cuadro de detalle solo hace falta cuando la acción es "quitó".
-    document.getElementById('tx-endorsoDetalleVehiculoBlock').style.display = (vehiculo && vehiculoAccion === 'quito') ? 'block' : 'none';
-    document.getElementById('tx-endorsoDetalleConductorBlock').style.display = (conductor && conductorAccion === 'quito') ? 'block' : 'none';
+    // el cuadro de detalle (VIN/nombre removido) solo hace falta cuando se
+    // marcó "quitó". Los dos se pueden marcar a la vez en el mismo endorso.
+    document.getElementById('tx-endorsoDetalleVehiculoBlock').style.display = (vehiculo && vehiculoQuita) ? 'block' : 'none';
+    document.getElementById('tx-endorsoDetalleConductorBlock').style.display = (conductor && conductorQuita) ? 'block' : 'none';
     document.getElementById('tx-endorsoDetalleCoberturaBlock').style.display = cobertura ? 'block' : 'none';
     document.getElementById('tx-endorsoDetalleInformacionBlock').style.display = informacion ? 'block' : 'none';
   }
@@ -7273,31 +7278,35 @@
     document.getElementById('tx-vehiculoAccionRow').style.display = vehiculo ? 'block' : 'none';
     document.getElementById('tx-conductorAccionRow').style.display = conductor ? 'block' : 'none';
     if(!vehiculo){
-      document.getElementById('tx-vehiculoAccion').value = '';
+      document.getElementById('tx-endoso-vehiculo-agrego').checked = false;
+      document.getElementById('tx-endoso-vehiculo-quita').checked = false;
       document.getElementById('tx-coberturaEndosoBlock').style.display = 'none';
     }
     if(!conductor){
-      document.getElementById('tx-conductorAccion').value = '';
+      document.getElementById('tx-endoso-conductor-agrego').checked = false;
+      document.getElementById('tx-endoso-conductor-quita').checked = false;
       document.getElementById('tx-conductorQtyRow').style.display = 'none';
     }
-    updateEndorsoDetallesBlock();
-    recalcTransaction();
+    onVehiculoAccionChange();
+    onConductorAccionChange();
   }
 
   function onVehiculoAccionChange(){
-    const accion = document.getElementById('tx-vehiculoAccion').value;
-    const show = accion === 'agrego';
-    document.getElementById('tx-coberturaEndosoBlock').style.display = show ? 'block' : 'none';
-    if(show) renderVehicleMiniForms();
+    // Agregó y quitó ya no son excluyentes — se pueden marcar los dos a la
+    // vez (por ejemplo: quitó un vehículo y agregó otro en el mismo endorso).
+    const agrego = document.getElementById('tx-endoso-vehiculo-agrego').checked;
+    document.getElementById('tx-coberturaEndosoBlock').style.display = agrego ? 'block' : 'none';
+    if(agrego) renderVehicleMiniForms();
     updateEndorsoDetallesBlock();
     recalcTransaction();
   }
 
   function onConductorAccionChange(){
-    const accion = document.getElementById('tx-conductorAccion').value;
-    const show = accion === 'agrego';
-    document.getElementById('tx-conductorQtyRow').style.display = show ? 'block' : 'none';
-    if(show) renderDriverMiniForms();
+    // Agregó y quitó ya no son excluyentes — se pueden marcar los dos a la
+    // vez (por ejemplo: quitó un conductor y agregó otro en el mismo endorso).
+    const agrego = document.getElementById('tx-endoso-conductor-agrego').checked;
+    document.getElementById('tx-conductorQtyRow').style.display = agrego ? 'block' : 'none';
+    if(agrego) renderDriverMiniForms();
     updateEndorsoDetallesBlock();
     recalcTransaction();
   }
@@ -7357,6 +7366,10 @@
       document.getElementById('tx-endoso-cb-conductor').checked = false;
       document.getElementById('tx-endoso-cb-cobertura').checked = false;
       document.getElementById('tx-endoso-cb-informacion').checked = false;
+      document.getElementById('tx-endoso-vehiculo-agrego').checked = false;
+      document.getElementById('tx-endoso-vehiculo-quita').checked = false;
+      document.getElementById('tx-endoso-conductor-agrego').checked = false;
+      document.getElementById('tx-endoso-conductor-quita').checked = false;
       document.getElementById('tx-vehiculoAccionRow').style.display = 'none';
       document.getElementById('tx-conductorAccionRow').style.display = 'none';
       document.getElementById('tx-coberturaEndosoBlock').style.display = 'none';
@@ -7651,9 +7664,11 @@
       }
     }
 
-    let vehiculoAccion = '';
+    let vehiculoAgrego = false;
+    let vehiculoQuita = false;
     let endosoVehiculos = [];
-    let conductorAccion = '';
+    let conductorAgrego = false;
+    let conductorQuita = false;
     let endosoConductores = [];
     let endorsoSubtipos = [];
     let detalleVehiculo = '';
@@ -7673,12 +7688,14 @@
 
       if(vehiculoOn){
         endorsoSubtipos.push('cambio_vehiculo');
-        vehiculoAccion = document.getElementById('tx-vehiculoAccion').value;
-        if(!vehiculoAccion){
-          showMsg('newTransactionMsg','error','Indica si se agregó o quitó vehículo(s).');
+        // Agregó y quitó ya no son excluyentes — se puede marcar ambos en el mismo endorso.
+        vehiculoAgrego = document.getElementById('tx-endoso-vehiculo-agrego').checked;
+        vehiculoQuita = document.getElementById('tx-endoso-vehiculo-quita').checked;
+        if(!vehiculoAgrego && !vehiculoQuita){
+          showMsg('newTransactionMsg','error','Indica si se agregó y/o quitó vehículo(s).');
           return;
         }
-        if(vehiculoAccion === 'agrego'){
+        if(vehiculoAgrego){
           endosoVehiculos = collectVehicleMiniForms();
           for(const v of endosoVehiculos){
             if(!v.vin){
@@ -7690,7 +7707,8 @@
               return;
             }
           }
-        } else if(vehiculoAccion === 'quito'){
+        }
+        if(vehiculoQuita){
           detalleVehiculo = document.getElementById('tx-endoso-detalle-vehiculo').value.trim();
           if(!detalleVehiculo){
             showMsg('newTransactionMsg','error','Completa el/los VIN de los vehículos removidos.');
@@ -7701,12 +7719,14 @@
 
       if(conductorOn){
         endorsoSubtipos.push('cambio_conductor');
-        conductorAccion = document.getElementById('tx-conductorAccion').value;
-        if(!conductorAccion){
-          showMsg('newTransactionMsg','error','Indica si se agregó o quitó conductor(es).');
+        // Agregó y quitó ya no son excluyentes — se puede marcar ambos en el mismo endorso.
+        conductorAgrego = document.getElementById('tx-endoso-conductor-agrego').checked;
+        conductorQuita = document.getElementById('tx-endoso-conductor-quita').checked;
+        if(!conductorAgrego && !conductorQuita){
+          showMsg('newTransactionMsg','error','Indica si se agregó y/o quitó conductor(es).');
           return;
         }
-        if(conductorAccion === 'agrego'){
+        if(conductorAgrego){
           endosoConductores = collectDriverMiniForms();
           for(const d of endosoConductores){
             if(!d.first_name || !d.last_name || !d.date_of_birth || !d.license_number){
@@ -7730,7 +7750,8 @@
               return;
             }
           }
-        } else if(conductorAccion === 'quito'){
+        }
+        if(conductorQuita){
           detalleConductor = document.getElementById('tx-endoso-detalle-conductor').value.trim();
           if(!detalleConductor){
             showMsg('newTransactionMsg','error','Completa el/los conductores removidos.');
@@ -8008,10 +8029,26 @@
 
     // Combinar todos los tipos de endorso marcados y sus detalles en un solo texto,
     // separado por secciones, para no tener que cambiar la estructura de la base de datos.
+    // Incluye tanto lo removido (texto libre) como lo agregado (datos estructurados de
+    // endosoVehiculos/endosoConductores) — antes solo se guardaba lo removido.
     let combinedEndorsoDetails = null;
     if(tipo === 'endorsement'){
       const secciones = [];
+      if(vehiculoAgrego && endosoVehiculos.length > 0){
+        const lineasVeh = endosoVehiculos.map((v, i) => {
+          const covLabels = (v.coverages || []).map(k => (COVERAGE_OPTIONS.find(c => c.key === k) || {}).label || k).join(', ');
+          return `  ${i + 1}. VIN: ${v.vin || '—'} — Coberturas: ${covLabels || '—'}`;
+        }).join('\n');
+        secciones.push('Vehículo(s) agregado(s):\n' + lineasVeh);
+      }
       if(detalleVehiculo) secciones.push('VIN(s) de vehículos removidos:\n' + detalleVehiculo);
+      if(conductorAgrego && endosoConductores.length > 0){
+        const lineasDrv = endosoConductores.map((d, i) => {
+          const nombre = buildFullName(d.first_name, d.middle_name, d.last_name);
+          return `  ${i + 1}. ${nombre} — Nac.: ${d.date_of_birth || '—'} — ID: ${d.license_number || '—'}${d.license_state ? ' (' + d.license_state + ')' : ''}${d.id_country ? ' (' + d.id_country + ')' : ''}`;
+        }).join('\n');
+        secciones.push('Conductor(es) agregado(s):\n' + lineasDrv);
+      }
       if(detalleConductor) secciones.push('Conductor(es) removido(s):\n' + detalleConductor);
       if(detalleCobertura) secciones.push('Cambio de cobertura:\n' + detalleCobertura);
       if(detalleInformacion) secciones.push('Cambio en información de la póliza:\n' + detalleInformacion);
@@ -8091,7 +8128,7 @@
       // Obligatorio en TODO endorsement, sin importar el subtipo: el documento real
       // del endorso descargado del portal de la aseguradora.
       newRequirements.push(['Documento del Endorsement', ['Subir el documento de endorsement descargado de la aseguradora']]);
-      if(vehiculoAccion === 'agrego' && endosoVehiculos.length > 0){
+      if(vehiculoAgrego && endosoVehiculos.length > 0){
         // Crear el vehículo de verdad en el expediente del cliente
         for(const v of endosoVehiculos){
           await sb.from('client_vehicles').insert({
@@ -8108,7 +8145,7 @@
           newRequirements.push(['Fotos del vehículo agregado', buildVehiclePhotosChecklistForVins(vinsQueNecesitanFotos)]);
         }
       }
-      if(conductorAccion === 'agrego' && endosoConductores.length > 0){
+      if(conductorAgrego && endosoConductores.length > 0){
         // Crear el conductor de verdad en el expediente del cliente
         const nombresCompletos = [];
         for(const d of endosoConductores){
@@ -8172,6 +8209,9 @@
     } else if(tipo === 'reinstalacion'){
       const relatedPolicy = currentClientPolicies.find(p => p.id === policyId);
       await saveReinstatementFormAsDocument(insertedTx.id, relatedPolicy ? (relatedPolicy.policy_number || 's/n') : 's/n');
+    } else if(tipo === 'endorsement'){
+      const relatedPolicy = currentClientPolicies.find(p => p.id === policyId);
+      await saveEndorsementFormAsDocument(insertedTx.id, relatedPolicy ? (relatedPolicy.policy_number || 's/n') : 's/n');
     } else if(tipo !== 'nueva_poliza' && metodoPago !== 'link'){
       const relatedPolicy = currentClientPolicies.find(p => p.id === policyId);
       await saveReceiptAsDocument(insertedTx.id, relatedPolicy ? (relatedPolicy.policy_number || 's/n') : 's/n');
@@ -8199,7 +8239,11 @@
     // - Cualquier otro tipo con pago de verdad (no link, no $0): muestra el recibo directo.
     if(tipo === 'nueva_poliza' && metodoPago !== 'link'){
       openPaymentSuccessOverlay(insertedTx.id, policyId);
-    } else if(tipo !== 'cancelacion' && tipo !== 'reinstalacion' && metodoPago !== 'link' && metodoPago !== 'ninguno'){
+    } else if(tipo === 'cancelacion'){
+      await showCancellationForm(insertedTx.id);
+    } else if(tipo === 'endorsement' && metodoPago !== 'link' && metodoPago !== 'ninguno'){
+      await showEndorsementForm(insertedTx.id);
+    } else if(tipo !== 'cancelacion' && tipo !== 'reinstalacion' && tipo !== 'endorsement' && metodoPago !== 'link' && metodoPago !== 'ninguno'){
       await showReceipt(insertedTx.id);
     }
     } finally {
@@ -8401,9 +8445,12 @@
 
   async function saveEndorsementFormAsDocument(transactionId, policyNumber){
     const { data: { session } } = await sb.auth.getSession();
+    const { data: t } = await sb.from('client_transactions').select('created_at,total_reference').eq('id', transactionId).single();
+    const fechaLabel = t ? formatDateUS(t.created_at?.split('T')[0]) : '';
+    const totalLabel = t ? Number(t.total_reference || 0).toFixed(2) : '0.00';
     await sb.from('client_documents').insert({
       client_id: currentClientId,
-      file_name: `Formulario de Endorsement - #${policyNumber}`,
+      file_name: `Recibo de Endorsement${fechaLabel ? ' - ' + fechaLabel : ''} - $${totalLabel} - #${policyNumber}`,
       storage_path: null,
       category: 'Formulario de Endorsement',
       receipt_transaction_id: transactionId,
@@ -8449,7 +8496,7 @@
     const CANCEL_TYPE_LABELS = { flat: 'Flat Cancellation', insured_request: 'Insured Request' };
     const total = Number(t.total_reference || 0);
 
-    document.getElementById('cd-receiptContent').innerHTML = `
+    const contentHtml = `
       <div style="text-align:center;">
         <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:90px; width:auto;">
         <h3 style="margin:10px 0 0;">GMAX ALL INSURANCE</h3>
@@ -8487,18 +8534,11 @@
         refund policies, unless otherwise noted above. GMAX All Insurance is not responsible for the carrier's
         underwriting decisions or refund timelines.
       </div>
-
-      <div style="margin-top:40px; display:flex; justify-content:space-between;">
-        <div>Insured Signature: ________________________________</div>
-        <div>Date: ______________________</div>
-      </div>
-      <div style="margin-top:30px; display:flex; justify-content:space-between;">
-        <div>Agent Signature: ________________________________</div>
-        <div>Date: ______________________</div>
-      </div>
     `;
-    document.getElementById('cd-receiptCard').style.display = 'block';
-    document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+    await renderSignGatedDocument(transactionId, contentHtml, {
+      title: 'Aviso de Cancelación — pendiente de firma',
+      description: 'Por ley, este aviso de cancelación no se puede ver completo, descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono.'
+    });
   }
 
   async function showReinstatementForm(transactionId){
@@ -8686,12 +8726,20 @@
       .map(s => ENDORSO_SUBTYPE_LABELS[s] || s)
       .join(' + ') || '—';
 
-    document.getElementById('cd-receiptContent').innerHTML = `
+    const totalEndoso = Number(t.total_reference || 0);
+    const contentHtml = `
       <div style="text-align:center;">
         <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:90px; width:auto;">
         <h3 style="margin:10px 0 0;">GMAX ALL INSURANCE</h3>
         <h4 style="margin-top:6px; text-decoration:underline;">Endorsement Request Form</h4>
       </div>
+
+      <div style="text-align:center; padding:20px 0; margin-top:18px; background:#F7F9FC; border-radius:12px;">
+        <div style="font-size:13px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Total charged</div>
+        <div style="font-size:38px; font-weight:800; color:var(--navy); line-height:1.2;">$${totalEndoso.toFixed(2)}</div>
+        ${totalEndoso === 0 ? '<div style="font-size:13px; color:var(--slate-light); margin-top:4px;">This endorsement has no cost.</div>' : ''}
+      </div>
+
       <div style="margin-top:24px; line-height:2;">
         <div>Date: <strong>${fecha}</strong></div>
         <div>Insured Name: <strong>${clienteNombre}</strong></div>
@@ -8705,17 +8753,11 @@
       <div style="margin-top:30px; font-size:12px; color:var(--slate-light); line-height:1.5;">
         The undersigned confirms the above endorsement request and authorizes GMAX All Insurance to submit this change to the insurance carrier on their behalf.
       </div>
-      <div style="margin-top:40px; display:flex; justify-content:space-between;">
-        <div>Insured Signature: ________________________________</div>
-        <div>Date: ______________________</div>
-      </div>
-      <div style="margin-top:30px; display:flex; justify-content:space-between;">
-        <div>Agent Signature: ________________________________</div>
-        <div>Date: ______________________</div>
-      </div>
     `;
-    document.getElementById('cd-receiptCard').style.display = 'block';
-    document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+    await renderSignGatedDocument(transactionId, contentHtml, {
+      title: 'Formulario de Endorsement — pendiente de firma',
+      description: 'Por ley, este formulario de endorsement no se puede ver completo, descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono.'
+    });
   }
 
   // ===================== MODAL AUTOMÁTICO: PAGO REALIZADO =====================
@@ -8759,6 +8801,64 @@
   }
   // =================== FIN MODAL AUTOMÁTICO: PAGO REALIZADO ===================
 
+  // ===================== FIRMA DEL CLIENTE: mostrar documento solo si ya firmó =====================
+  // Compartida por showReceipt/showCancellationForm/showEndorsementForm: mientras
+  // el cliente NO ha firmado, el agente NO ve el contenido del documento (montos,
+  // detalles, nada) — solo un panel para mandárselo a firmar (copiar link o por
+  // correo). Ya firmado, se ve el documento completo con el sello de "Firmado" y
+  // se puede imprimir/descargar. `contentHtml` se guarda siempre (aunque quede
+  // oculto) porque `ensureSignatureLink` lee de ahí lo que le manda al cliente.
+  async function renderSignGatedDocument(transactionId, contentHtml, opts){
+    opts = opts || {};
+    const { data: sigReq } = await sb.from('signature_requests')
+      .select('*')
+      .eq('transaction_id', transactionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const firmado = !!(sigReq && sigReq.status === 'firmado');
+
+    const receiptContentEl = document.getElementById('cd-receiptContent');
+    receiptContentEl.innerHTML = firmado ? `
+      <div style="margin-bottom:14px; padding:14px 16px; background:#E9F7F0; border:1.5px solid #A9DFC4; border-radius:10px;">
+        <div style="font-weight:700; color:#177A54;">✓ Firmado por ${escapeHtml(sigReq.signer_name || '')} el ${formatDateTimeUS(sigReq.signed_at)}</div>
+        ${sigReq.signature_image_data ? `<img src="${sigReq.signature_image_data}" alt="Firma" style="height:60px; margin-top:8px; border-bottom:1.5px solid #A9DFC4;">` : ''}
+        <p class="sub" style="margin-top:8px; margin-bottom:0;">El cliente ya recibió su copia firmada por correo automáticamente.</p>
+      </div>
+      ${contentHtml}
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">⬇️ Descargar</button>
+      </div>
+    ` : contentHtml;
+    receiptContentEl.style.display = firmado ? 'block' : 'none';
+    document.getElementById('cd-receiptPrintBtn').style.display = firmado ? 'inline-flex' : 'none';
+
+    const sendPanel = document.getElementById('cd-sendPanel');
+    if(firmado){
+      sendPanel.style.display = 'none';
+      sendPanel.innerHTML = '';
+    } else {
+      sendPanel.style.display = 'block';
+      sendPanel.innerHTML = `
+        <div style="text-align:center; padding:6px 0 2px;">
+          <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:52px; width:auto;">
+        </div>
+        <h3 style="text-align:center; margin-top:12px;">${opts.title || 'Documento pendiente de firma'}</h3>
+        <div style="margin-top:14px; padding:14px 16px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:10px;">
+          <div style="font-weight:700; color:#8a6116;">✍️ Falta la firma del cliente</div>
+          <p class="sub" style="margin-top:4px; margin-bottom:0;">${opts.description || 'Este documento no se puede ver completo, descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono o correo.'}</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; justify-content:center;">
+          <button type="button" class="btn-ghost" id="cd-receipt-copy-btn" style="width:auto; padding:10px 18px;" onclick="copySignatureLink('${transactionId}')">📋 Copiar link para enviar</button>
+          <button type="button" class="btn-ghost" id="cd-receipt-email-btn" style="width:auto; padding:10px 18px;" onclick="emailSignatureLink('${transactionId}')">✉️ Enviar por correo al cliente</button>
+        </div>
+        <div class="msg" id="cd-receipt-sign-msg" style="margin-top:8px;"></div>
+      `;
+    }
+    document.getElementById('cd-receiptCard').style.display = 'block';
+    document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
   async function showReceipt(transactionId, policyNumberArg){
     const { data: t } = await sb.from('client_transactions').select('*').eq('id', transactionId).single();
     if(!t) return;
@@ -8774,18 +8874,6 @@
       const { data: agentProfile } = await sb.from('profiles').select('full_name').eq('id', t.created_by).single();
       agentName = agentProfile ? agentProfile.full_name : '—';
     }
-
-    // Recibos con tarjeta requieren firma del cliente por ley (Texas — el
-    // service fee de la agencia tiene que llevar su consentimiento). Este
-    // recibo se queda "bloqueado" (sin poder descargar ni enviar directo)
-    // hasta que exista una firma guardada para esta transacción.
-    const { data: sigReq } = await sb.from('signature_requests')
-      .select('*')
-      .eq('transaction_id', transactionId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    const firmado = !!(sigReq && sigReq.status === 'firmado');
 
     const fecha = formatDateUS(t.receipt_issued_at ? t.receipt_issued_at.split('T')[0] : new Date().toISOString().split('T')[0]);
     const clienteNombre = document.getElementById('cd-nombre').textContent;
@@ -8806,32 +8894,7 @@
       ? `<div><div class="label" style="font-size:12px; color:var(--slate-light);">Tarjeta</div><div>${CARD_BRAND_LABELS[t.card_brand] || t.card_brand} terminada en ${t.card_last4}</div></div>`
       : '';
 
-    // Panel de acción: mientras no esté firmado, la ÚNICA acción posible es
-    // pedirle la firma al cliente (copiar link o mandarlo por correo) — nada
-    // de descargar ni de mandar el recibo directo sin firmar. Ya firmado, se
-    // desbloquea la descarga y se ve quién firmó y cuándo.
-    const accionesHtml = firmado ? `
-      <div style="margin-top:14px; padding:14px 16px; background:#E9F7F0; border:1.5px solid #A9DFC4; border-radius:10px;">
-        <div style="font-weight:700; color:#177A54;">✓ Firmado por ${escapeHtml(sigReq.signer_name || '')} el ${formatDateTimeUS(sigReq.signed_at)}</div>
-        ${sigReq.signature_image_data ? `<img src="${sigReq.signature_image_data}" alt="Firma" style="height:60px; margin-top:8px; border-bottom:1.5px solid #A9DFC4;">` : ''}
-        <p class="sub" style="margin-top:8px; margin-bottom:0;">El cliente ya recibió su copia firmada por correo automáticamente.</p>
-      </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-        <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">⬇️ Descargar recibo</button>
-      </div>
-    ` : `
-      <div style="margin-top:14px; padding:14px 16px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:10px;">
-        <div style="font-weight:700; color:#8a6116;">✍️ Falta la firma del cliente</div>
-        <p class="sub" style="margin-top:4px; margin-bottom:0;">Por ley, este recibo no se puede descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono.</p>
-      </div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
-        <button type="button" class="btn-ghost" id="cd-receipt-copy-btn" style="width:auto; padding:10px 18px;" onclick="copySignatureLink('${transactionId}')">📋 Copiar link para enviar</button>
-        <button type="button" class="btn-ghost" id="cd-receipt-email-btn" style="width:auto; padding:10px 18px;" onclick="emailSignatureLink('${transactionId}')">✉️ Enviar por correo al cliente</button>
-      </div>
-      <div class="msg" id="cd-receipt-sign-msg" style="margin-top:8px;"></div>
-    `;
-
-    document.getElementById('cd-receiptContent').innerHTML = `
+    const contentHtml = `
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
         <div style="display:flex; align-items:center; gap:12px;">
           <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:52px; width:auto;">
@@ -8840,7 +8903,7 @@
             <p class="sub" style="margin-top:4px;">GMAX All Insurance ${t.receipt_number ? '— #' + t.receipt_number : ''}</p>
           </div>
         </div>
-        <span class="badge ${firmado ? 'active' : 'pending'}">${firmado ? 'Firmado' : 'Pendiente de firma'}</span>
+        <span class="badge active">Firmado</span>
       </div>
 
       <!-- TOTAL: lo primero y más grande que ve el cliente -->
@@ -8888,11 +8951,11 @@
         ${desglose}
       </div>
       ${notaDeposito}
-
-      ${accionesHtml}
     `;
-    document.getElementById('cd-receiptCard').style.display = 'block';
-    document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+    await renderSignGatedDocument(transactionId, contentHtml, {
+      title: 'Recibo de pago — pendiente de firma',
+      description: 'Por ley, este recibo no se puede ver completo, descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono.'
+    });
   }
 
   // Marca de tarjeta tal como la devuelve Stripe → cómo se ve en el recibo.
