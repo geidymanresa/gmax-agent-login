@@ -401,7 +401,12 @@
     </div>
 
     <div id="sign-already-done" style="display:none; text-align:left;">
-      <p style="color:#1a7f37; font-weight:600; font-size:18px; text-align:center;">✓ Este documento ya fue firmado.</p>
+      <div id="sign-success-banner" style="display:none; text-align:center; margin-bottom:16px; padding:16px; background:#E9F7F0; border:1.5px solid #A9DFC4; border-radius:12px;">
+        <div style="font-size:34px; line-height:1;">🎉</div>
+        <p style="color:#177A54; font-weight:700; font-size:19px; margin:8px 0 2px;">¡Tu firma se envió con éxito!</p>
+        <p class="sub" style="margin:0;">Ya quedó todo listo — no necesitas hacer nada más. Abajo puedes ver y descargar tu copia.</p>
+      </div>
+      <p id="sign-already-done-title" style="color:#1a7f37; font-weight:600; font-size:18px; text-align:center;">✓ Este documento ya fue firmado.</p>
       <p class="sub" id="sign-already-done-detail" style="text-align:center;"></p>
       <div id="sign-already-done-doc" style="border:1.5px solid var(--line); border-radius:12px; padding:20px; margin:16px 0; background:#fff;"></div>
       <div style="text-align:center;">
@@ -873,6 +878,18 @@
         <div class="dash-card" id="controlAgentesCard" style="display:none; margin-bottom:20px; background:#F7F9FC; border:1.5px solid var(--line);">
           <h4 style="margin-top:0;">📋 Control de agentes</h4>
           <div id="controlAgentesList"></div>
+        </div>
+
+        <!-- Aviso de "el cliente acaba de firmar" — la administradora ve las de
+             todos los agentes, cada agente solo ve las suyas. Sigue apareciendo
+             cada vez que se entra al dashboard (incluso cerrando sesión y
+             volviendo a entrar) hasta que se marca como vista. -->
+        <div class="dash-card" id="signatureNotificationsCard" style="display:none; margin-bottom:20px; background:#E9F7F0; border:1.5px solid #A9DFC4;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <h4 style="margin:0; color:#177A54;">🔔 Firmas recientes de clientes</h4>
+            <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="dismissAllSignatureNotifications()">Marcar todas como vistas</button>
+          </div>
+          <div id="signatureNotificationsList" style="margin-top:8px;"></div>
         </div>
 
         <!-- Meta de producción mensual: círculo chiquito y esquineado (no un
@@ -1758,11 +1775,11 @@
                   <option value="Falta de pago">Falta de pago</option>
                   <option value="Cancelada por la aseguradora">Cancelada por la aseguradora</option>
                   <option value="Información faltante / no enviada a tiempo">Información faltante / no enviada a tiempo</option>
-                  <option value="Solicitud del cliente (sin firma — caso excepcional)">Solicitud del cliente (sin firma — caso excepcional)</option>
                   <option value="Otro">Otro</option>
                 </select>
               </div>
               <div class="form-row"><label>Detalle (opcional)</label><textarea id="mc-detalle" rows="2" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea></div>
+              <p class="sub" style="margin-top:0;">Sin importar el motivo, después de guardar te va a pedir subir la evidencia de la cancelación (por ejemplo, el Notice of Cancellation de la aseguradora, o una captura de la póliza donde se vea cancelada) — pasa por la misma revisión de Underwriting que los demás documentos.</p>
               <button type="submit" class="btn-primary" style="background:#C23B3B;">Marcar como cancelada</button>
               <button type="button" class="btn-ghost" style="width:auto; padding:12px 20px;" onclick="document.getElementById('cd-markCancelledCard').style.display='none'">Cancelar</button>
             </form>
@@ -3457,6 +3474,16 @@
 
       if(data.status === 'firmado'){
         document.getElementById('sign-already-done').style.display = 'block';
+        // Si esto se muestra justo después de que la persona dio clic en "Firmar
+        // y enviar" (no al reabrir un link ya firmado más tarde), se le muestra
+        // el banner grande de éxito y se ajusta el título de arriba para que
+        // quede claro que sí terminó/se envió — antes solo se veía el documento,
+        // sin ninguna confirmación explícita de "listo, ya se envió".
+        document.getElementById('sign-success-banner').style.display = window.__justSubmittedSignature ? 'block' : 'none';
+        document.getElementById('sign-already-done-title').textContent = window.__justSubmittedSignature
+          ? '✓ Recibido — ya quedó firmado y enviado.'
+          : '✓ Este documento ya fue firmado.';
+        window.__justSubmittedSignature = false;
         document.getElementById('sign-already-done-detail').textContent = 'Firmado por ' + data.signer_name + ' el ' + new Date(data.signed_at).toLocaleString('es-US') + '.';
         document.getElementById('sign-already-done-doc').innerHTML = `
           <h3 style="margin-top:0;">${data.document_title || 'Documento'}</h3>
@@ -3572,7 +3599,10 @@
       }
       document.getElementById('sign-content').style.display = 'none';
       // Vuelve a pedir el documento — ya viene marcado como firmado, con el
-      // contenido completo y la firma, listo para ver/descargar.
+      // contenido completo y la firma, listo para ver/descargar. La bandera le
+      // dice a loadSignatureDocument que muestre el banner grande de "¡se
+      // envió con éxito!" (solo aplica esta vez, no si se reabre el link después).
+      window.__justSubmittedSignature = true;
       await loadSignatureDocument(token);
       // Avisa por correo a la agencia que el cliente acaba de firmar y enviar
       // el documento. Es un aviso "mejor esfuerzo": si falla, no debe afectar
@@ -4395,6 +4425,7 @@
     await safeLoad(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
     await safeLoad(loadDashboardAgentAlerts, 'Tareas de la administradora');
     await safeLoad(loadDashboardAlerts, 'Alertas del dashboard');
+    await safeLoad(loadSignatureNotifications, 'Firmas recientes');
     await safeLoad(loadDashboardFollowups, 'Recordatorios de seguimiento');
     await safeLoad(loadRenewals, 'Próximas renovaciones');
     await safeLoad(loadLeads, 'Leads');
@@ -5669,12 +5700,36 @@
       showMsg('markCancelledMsg','error','No se pudo marcar como cancelada: ' + error.message);
       return;
     }
-    showMsg('markCancelledMsg','success','Póliza marcada como cancelada.');
+
+    // Sin importar el motivo, se pide subir evidencia de la cancelación (Notice
+    // of Cancellation de la aseguradora, o una captura de la póliza cancelada) —
+    // se reutiliza el mismo mecanismo de "requisitos" que ya usa Underwriting
+    // para todo lo demás (checklist con subida de foto/PDF + aprobación de
+    // la administradora), no es un sistema aparte.
+    const { data: { session } } = await sb.auth.getSession();
+    const dueDateISO = toISODateLocal(addBusinessDays(new Date(), REQUIREMENT_DEADLINE_DAYS));
+    const { error: reqError } = await sb.from('client_requirements').insert({
+      client_id: currentClientId,
+      policy_id: policyId,
+      title: 'Evidencia de cancelación',
+      checklist: [{ label: 'Juntar evidencia', done: false }],
+      due_date: dueDateISO,
+      created_by: session.user.id
+    });
+    if(reqError){
+      // La póliza ya quedó marcada como cancelada — esto solo avisa que el
+      // requisito de evidencia no se pudo crear, para no dejarlo pasar en silencio.
+      showMsg('markCancelledMsg','error','Póliza marcada como cancelada, pero no se pudo crear el requisito para subir la evidencia: ' + reqError.message);
+      if(currentClientId) await loadClientPolicies(currentClientId);
+      return;
+    }
+
+    showMsg('markCancelledMsg','success','Póliza marcada como cancelada. Sube la evidencia de cancelación en la tarjeta roja de abajo.');
     if(currentClientId){
       await loadClientPolicies(currentClientId);
       await loadClientRequirements(currentClientId);
     }
-    setTimeout(() => { document.getElementById('cd-markCancelledCard').style.display = 'none'; }, 700);
+    setTimeout(() => { document.getElementById('cd-markCancelledCard').style.display = 'none'; }, 900);
   });
   // =================== FIN MARCAR PÓLIZA CANCELADA DIRECTO ===================
 
@@ -6642,11 +6697,31 @@
     return !doc.storage_path && !!doc.receipt_transaction_id;
   }
 
+  // Badge de "⏳ Firma pendiente" / "✓ Firmado" para los documentos internos
+  // (recibo/endorsement/cancelación) que dependen de la firma electrónica del
+  // cliente — lee directo de signature_requests, así que siempre refleja el
+  // estado real, sin tener que abrir el documento para saberlo.
+  async function documentSignatureBadgeHtml(transactionId){
+    if(!transactionId) return '';
+    const { data: sigReq } = await sb.from('signature_requests')
+      .select('status')
+      .eq('transaction_id', transactionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if(!sigReq) return '';
+    const firmado = sigReq.status === 'firmado';
+    return firmado
+      ? ` <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; background:#E4F6EC; color:#177A54;">✓ Firmado</span>`
+      : ` <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; background:#FFF3CD; color:#8a6116;">⏳ Firma pendiente</span>`;
+  }
+
   async function documentLinkHtml(doc){
     if(isInternalFormDocument(doc)){
       const icon = doc.category === 'Formulario de Endorsement' ? '📝' : (doc.category === 'Formulario de Cancelación' ? '📄' : (doc.category === 'Formulario de Reinstalación' ? '✅' : '🧾'));
       const viewerFn = doc.category === 'Formulario de Endorsement' ? 'showEndorsementForm' : (doc.category === 'Formulario de Cancelación' ? 'showCancellationForm' : (doc.category === 'Formulario de Reinstalación' ? 'showReinstatementForm' : 'showReceipt'));
-      return `<a href="#" onclick="${viewerFn}('${doc.receipt_transaction_id}'); return false;">${icon} ${doc.file_name}</a>`;
+      const badgeHtml = await documentSignatureBadgeHtml(doc.receipt_transaction_id);
+      return `<a href="#" onclick="${viewerFn}('${doc.receipt_transaction_id}'); return false;">${icon} ${doc.file_name}</a>${badgeHtml}`;
     }
     const { data: signed } = await sb.storage.from('client-documents').createSignedUrl(doc.storage_path, 300);
     const url = signed ? signed.signedUrl : '#';
@@ -8544,6 +8619,7 @@
       </div>
 
       <div style="margin-top:24px; line-height:2;">
+        <div>Receipt #: <strong>${t.receipt_number || '—'}</strong></div>
         <div>Date: <strong>${fecha}</strong></div>
         <div>Insured Name: <strong>${clienteNombre}</strong></div>
         <div>Policy Number: <strong>${policyNumber}</strong></div>
@@ -8775,6 +8851,7 @@
       </div>
 
       <div style="margin-top:24px; line-height:2;">
+        <div>Receipt #: <strong>${t.receipt_number || '—'}</strong></div>
         <div>Date: <strong>${fecha}</strong></div>
         <div>Insured Name: <strong>${clienteNombre}</strong></div>
         <div>Policy Number: <strong>${policyNumber}</strong></div>
@@ -9131,6 +9208,20 @@
     return days;
   }
 
+  // Etiquetas cortas de requisito que necesitan una explicación extra se
+  // resuelven aquí a un ícono "?" con el detalle en el `title` (tooltip nativo
+  // del navegador) — el texto real de `item.label` se deja intacto en todos
+  // lados (se usa tal cual para nombrar el archivo subido y para emparejarlo
+  // en la revisión de Underwriting), esto solo cambia lo que se VE.
+  const REQUIREMENT_LABEL_HINTS = {
+    'Juntar evidencia': 'Sube el "Notice of Cancellation" que mandó la aseguradora, o una foto/captura de la póliza donde se vea claramente que está cancelada y la fecha de cancelación.'
+  };
+  function requirementItemLabelHtml(label){
+    const hint = REQUIREMENT_LABEL_HINTS[label];
+    if(!hint) return escapeHtml(label);
+    return `${escapeHtml(label)} <span title="${escapeHtml(hint)}" style="cursor:help; display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; border:1.5px solid var(--slate-light); color:var(--slate-light); font-size:10.5px; font-weight:700; vertical-align:middle;">?</span>`;
+  }
+
   function renderRequirementsAlerts(reqs){
     const container = document.getElementById('cd-requirementsAlerts');
     if(!container) return;
@@ -9147,10 +9238,11 @@
           ? `<button type="button" class="btn-ghost" style="width:auto; padding:6px 12px; font-size:13px;" ${r.expired || !r.transaction_id ? 'disabled' : ''} onclick="showReinstatementForm('${r.transaction_id}')">✍️ Ir a firmar</button>`
           : `<input type="file" accept="image/*,application/pdf" id="${inputId}" style="display:none;" onchange="uploadRequirementItemFile('${r.id}', ${idx}, this)">
              <button type="button" class="btn-ghost" style="width:auto; padding:6px 12px; font-size:13px;" ${r.expired ? 'disabled' : ''} onclick="document.getElementById('${inputId}').click()">${subido ? '📎 Reemplazar' : '📎 Subir documento'}</button>`;
+        const itemLabelHtml = requirementItemLabelHtml(item.label);
         return `
         <div style="margin-top:8px; padding:8px 10px; background:#fff; border:1px solid ${rechazado ? '#C23B3B' : '#F0C6C6'}; border-radius:8px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <span style="${subido ? 'color:var(--slate-light); text-decoration:line-through;' : ''}">${item.label}</span>
+            <span style="${subido ? 'color:var(--slate-light); text-decoration:line-through;' : ''}">${itemLabelHtml}</span>
             <span style="flex-shrink:0;">
               ${subido ? '<span style="color:var(--success); font-weight:700; font-size:13px;">✓ Listo</span> ' : ''}
               ${accionHtml}
@@ -9364,6 +9456,82 @@
   }
 
   // ---- Recordatorios de seguimiento (alertas de clientes) ----
+  // ===================== NOTIFICACIONES DE FIRMA (dashboard) =====================
+  // Avisa en el dashboard cada vez que un cliente firma un documento. "Visto"
+  // se guarda en este navegador (localStorage) — no se creó ninguna columna ni
+  // tabla nueva para esto. Por eso el aviso SÍ sigue apareciendo aunque se
+  // cierre sesión y se vuelva a entrar en el mismo navegador/computadora, pero
+  // si se entra desde otro navegador o dispositivo, vuelve a aparecer como
+  // "no visto" ahí (si se necesita que quede sincronizado entre dispositivos,
+  // avisar para agregarlo con una columna pequeña en la base de datos).
+  function getDismissedSignatureTokens(){
+    try { return JSON.parse(localStorage.getItem('gmax_dismissed_signatures') || '[]'); }
+    catch(e){ return []; }
+  }
+  function dismissSignatureToken(token){
+    try {
+      const set = new Set(getDismissedSignatureTokens());
+      set.add(token);
+      localStorage.setItem('gmax_dismissed_signatures', JSON.stringify(Array.from(set)));
+    } catch(e){ /* si el navegador bloquea localStorage, no rompe nada más */ }
+  }
+
+  let lastSignatureNotificationTokens = [];
+
+  async function loadSignatureNotifications(){
+    const card = document.getElementById('signatureNotificationsCard');
+    if(!card) return;
+    const { data: sigReqs } = await sb.from('signature_requests')
+      .select('token, signer_name, signed_at, document_title, transaction_id')
+      .eq('status', 'firmado')
+      .order('signed_at', { ascending: false })
+      .limit(25);
+    if(!sigReqs || sigReqs.length === 0){ card.style.display = 'none'; return; }
+
+    const dismissed = new Set(getDismissedSignatureTokens());
+    const isAdmin = isAdminUser();
+    const enriched = [];
+    for(const sr of sigReqs){
+      if(dismissed.has(sr.token) || !sr.transaction_id) continue;
+      const { data: t } = await sb.from('client_transactions').select('client_id, created_by').eq('id', sr.transaction_id).single();
+      if(!t) continue;
+      // Cada agente solo ve las firmas de sus propias transacciones — la
+      // administradora las ve todas, igual que el resto del dashboard.
+      if(!isAdmin && (!currentProfile || t.created_by !== currentProfile.id)) continue;
+      const { data: c } = await sb.from('clients').select('full_name').eq('id', t.client_id).single();
+      enriched.push({ token: sr.token, signed_at: sr.signed_at, document_title: sr.document_title, client_id: t.client_id, client_name: c ? c.full_name : 'Cliente' });
+      if(enriched.length >= 8) break;
+    }
+
+    lastSignatureNotificationTokens = enriched.map(e => e.token);
+    if(enriched.length === 0){ card.style.display = 'none'; return; }
+
+    card.style.display = 'block';
+    document.getElementById('signatureNotificationsList').innerHTML = enriched.map(sr => `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #A9DFC4;">
+        <div>
+          <strong>${escapeHtml(sr.client_name)}</strong> firmó — ${escapeHtml(sr.document_title || 'documento')}
+          <div class="sub" style="margin:2px 0 0;">${formatDateTimeUS(sr.signed_at)}</div>
+        </div>
+        <div style="white-space:nowrap; display:flex; gap:6px;">
+          <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="goToClientFromUnderwriting('${sr.client_id}')">Ver</button>
+          <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="dismissSignatureNotification('${sr.token}')">Marcar vista</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function dismissSignatureNotification(token){
+    dismissSignatureToken(token);
+    loadSignatureNotifications();
+  }
+
+  function dismissAllSignatureNotifications(){
+    lastSignatureNotificationTokens.forEach(t => dismissSignatureToken(t));
+    loadSignatureNotifications();
+  }
+  // =================== FIN NOTIFICACIONES DE FIRMA ===================
+
   async function loadDashboardFollowups(){
     const { data: alerts, error } = await sb.from('client_alerts')
       .select('*, client:client_id(full_name, assigned_agent_id)')
@@ -10206,7 +10374,7 @@
       return `
         <div style="padding:10px 12px; background:#fff; border:1px solid var(--line); border-radius:8px; margin-bottom:8px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <span>${item.done ? '✅' : '⏳'} ${item.label}</span>
+            <span>${item.done ? '✅' : '⏳'} ${requirementItemLabelHtml(item.label)}</span>
             <span style="display:flex; gap:12px; align-items:center; flex-shrink:0;">
               ${viewLink}
               ${(item.done && matchingDoc) ? `<button type="button" class="btn-ghost" style="width:auto; padding:5px 12px; font-size:12px; color:#C23B3B; border-color:#F0C6C6;" onclick="rejectRequirementItem('${requirementId}', ${idx})">✕ Rechazar / pedir reenvío</button>` : ''}
