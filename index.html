@@ -942,6 +942,30 @@
             <div id="dashFollowupList"></div>
           </div>
 
+          <!-- Pólizas con la aseguradora Venture que todavía no tienen marcado
+               el pago automático (EFT) — Venture cobra mes a mes y hay que
+               llamar al cliente para que lo active. Sale 3 días antes y 3
+               días después de la fecha mensual de cobro (el día del mes que
+               coincide con la fecha efectiva de la póliza), o sea 6 días en
+               total, y se repite cada mes mientras no se marque el EFT. -->
+          <div class="dash-card" id="ventureEftCard" style="display:none; margin:0; background:#FDF0E4; border:1.5px solid #F0B87F;">
+            <div style="display:inline-block; background:#C97A2E; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🟠 Importante</div>
+            <h4 style="margin-top:0; color:#9a5518;">💳 Pagos automáticos pendientes (Venture)</h4>
+            <p class="sub" style="margin:0 0 8px;">Estos clientes tienen póliza con Venture y todavía no tienen EFT activado — les toca cobro por estos días.</p>
+            <div id="ventureEftList"></div>
+          </div>
+
+          <!-- Revisión periódica de estatus: cada ~2.5 meses desde que empezó
+               (o desde la última vez que se revisó) cada póliza activa, sin
+               importar el tipo, para que Geidy confirme si el cliente sigue
+               al día o si hay que marcarla cancelada. -->
+          <div class="dash-card" id="statusReviewCard" style="display:none; margin:0; background:#EAF6F2; border:1.5px solid #A9DFC4;">
+            <div style="display:inline-block; background:#1E9E5A; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🟢 Revisión</div>
+            <h4 style="margin-top:0; color:#177A54;">📋 Revisar estatus de pólizas</h4>
+            <p class="sub" style="margin:0 0 8px;">Cada dos meses y medio, más o menos, desde que empezó cada póliza — confirma que el cliente sigue al día o márcala cancelada.</p>
+            <div id="statusReviewList"></div>
+          </div>
+
         </div>
 
         <div class="dash-card" id="leadsCard" style="margin-top:20px; background:#EAF1FB; border:1.5px solid #C7D9F3;">
@@ -4392,6 +4416,8 @@
     await safeLoad(loadSignatureNotifications, 'Firmas recientes');
     await safeLoad(loadDashboardFollowups, 'Recordatorios de seguimiento');
     await safeLoad(loadRenewals, 'Próximas renovaciones');
+    await safeLoad(loadStatusReviewAlerts, 'Revisar estatus de pólizas');
+    await safeLoad(loadVentureEftAlerts, 'Pagos automáticos Venture');
     await safeLoad(loadLeads, 'Leads');
     await safeLoad(() => setBookOfBusinessRange('today'), 'Libro de negocio');
     await safeLoad(loadUnderwriting, 'Underwriting');
@@ -5554,6 +5580,12 @@
           : co.name;
       }
       const cancelled = p.status === 'cancelled';
+      // Venture cobra mes a mes directo al cliente — Geidy tiene que activarle
+      // el pago automático (EFT) a cada uno. Este checkbox solo sale en
+      // pólizas de Venture, y mientras no esté marcado, el aviso del
+      // dashboard avisa cada mes cerca de la fecha de cobro (ver
+      // loadVentureEftAlerts).
+      const isVenture = (p.company || '').toLowerCase().includes('venture');
       const mainRow = `
       <tr${cancelled ? ' style="opacity:0.7;"' : ''}>
         <td>${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '—'}</td>
@@ -5564,6 +5596,12 @@
         <td>
           <span class="badge ${cancelled ? 'rejected' : 'active'}">${cancelled ? 'Cancelada' : 'Activa'}</span>
           ${cancelled && p.cancellation_reason ? `<div class="sub" style="font-size:11px; margin-top:4px;">${p.cancellation_reason}</div>` : ''}
+          ${!cancelled && isVenture ? `
+            <label style="display:flex; align-items:center; gap:5px; font-size:11px; margin-top:5px; cursor:pointer; color:${p.eft_enrolled ? '#177A54' : '#9a5518'};" title="Márcalo cuando el cliente ya activó el pago automático (EFT) con Venture. Mientras no esté marcado, el sistema avisa cada mes cerca de la fecha de cobro.">
+              <input type="checkbox" ${p.eft_enrolled ? 'checked' : ''} onchange="toggleEftEnrolledFromPolicyRow('${p.id}', this.checked)" style="margin:0;">
+              EFT (pago automático)
+            </label>
+          ` : ''}
         </td>
         <td>${p.notes || ''}</td>
         <td style="white-space:nowrap;">
@@ -9660,6 +9698,153 @@
     }, { onConflict: 'policy_id,user_id' });
     await loadRenewals();
   }
+
+  // ===================== REVISAR ESTATUS DE PÓLIZAS (cada ~2.5 meses) =====================
+  // Geidy pidió que, sin importar el tipo de póliza, cada dos meses y medio
+  // (contados desde la fecha efectiva, o desde la última vez que se revisó)
+  // le salga en el dashboard un recordatorio para confirmar si el cliente
+  // sigue activo o si ya hay que marcar la póliza como cancelada — porque hay
+  // clientes que dejan de pagar o cambian de información sin avisar.
+  const STATUS_REVIEW_INTERVAL_DAYS = 75; // ~2.5 meses
+
+  async function loadStatusReviewAlerts(){
+    const card = document.getElementById('statusReviewCard');
+    const list = document.getElementById('statusReviewList');
+    if(!card) return;
+
+    const { data, error } = await sb.from('client_policies')
+      .select('*, client:client_id(full_name)')
+      .neq('status', 'cancelled');
+    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const due = data.filter(p => {
+      const baseDateStr = (p.last_status_review_at || '').slice(0, 10) || p.effective_date;
+      if(!baseDateStr) return false;
+      const base = new Date(baseDateStr + 'T00:00:00');
+      const nextReview = new Date(base);
+      nextReview.setDate(nextReview.getDate() + STATUS_REVIEW_INTERVAL_DAYS);
+      return nextReview <= hoy;
+    }).sort((a, b) => (a.effective_date || '').localeCompare(b.effective_date || ''));
+
+    if(due.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = due.map(p => `
+      <div style="padding:10px 0; border-bottom:1px solid #A9DFC4; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${p.client_id}')">
+          <strong>${p.client ? p.client.full_name : 'Cliente'}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
+          con ${p.company || '—'} ${p.policy_number ? '(#' + p.policy_number + ')' : ''}
+          <span class="sub">— vigente desde ${formatDateUS(p.effective_date) || '—'}</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#177A54; border-color:#A9DFC4;" onclick="confirmPolicyStillActive('${p.id}', event)">✅ Activa</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#8a3030; border-color:#E3B8B8;" onclick="goToMarkPolicyCancelledFromDashboard('${p.client_id}', '${p.id}', event)">🚫 Cancelada</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // "Activa": deja constancia de que se revisó hoy (reinicia el conteo de
+  // ~2.5 meses para esta póliza) y la quita de la lista — sigue contando como
+  // activa en todo el sistema, no se toca nada más.
+  async function confirmPolicyStillActive(policyId, evt){
+    if(evt) evt.stopPropagation();
+    const { error } = await sb.from('client_policies')
+      .update({ last_status_review_at: new Date().toISOString() })
+      .eq('id', policyId);
+    if(error){ alert('No se pudo actualizar: ' + error.message); return; }
+    await loadStatusReviewAlerts();
+  }
+
+  // "Cancelada": va directo al cliente y abre el mismo formulario de "marcar
+  // cancelada directo" que ya existe (motivo + evidencia obligatoria) — no es
+  // un flujo nuevo, es el mismo de siempre, solo que se llega aquí desde el
+  // aviso del dashboard en vez de desde el perfil del cliente.
+  async function goToMarkPolicyCancelledFromDashboard(clientId, policyId, evt){
+    if(evt) evt.stopPropagation();
+    switchTab('clientes');
+    await openClient(clientId);
+    openMarkPolicyCancelled(policyId);
+  }
+  // =================== FIN REVISAR ESTATUS DE PÓLIZAS ===================
+
+  // ===================== VENTURE: AVISO DE PAGO AUTOMÁTICO (EFT) PENDIENTE =====================
+  // Venture cobra mes a mes directo al cliente (no en un solo pago como otras
+  // aseguradoras) — Geidy tiene que llamar a cada cliente para que active el
+  // pago automático (EFT). Mientras una póliza de Venture no tenga el EFT
+  // marcado, el sistema avisa automáticamente cada mes, 3 días antes y 3 días
+  // después de la fecha de cobro (el día del mes que coincide con la fecha
+  // efectiva de la póliza) — 6 días de ventana en total.
+  function nearestMonthlyOccurrenceDiff(targetDay, hoy){
+    // Busca, entre el mes pasado/actual/que viene, la ocurrencia del día
+    // "targetDay" más cercana a "hoy" (ajustando sola si el mes no llega a
+    // tener ese día, ej. día 31 cae en un mes de 30 — usa el último día).
+    let minDiff = null;
+    [-1, 0, 1].forEach(offset => {
+      const base = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1);
+      const daysInMonth = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+      base.setDate(Math.min(targetDay, daysInMonth));
+      const diffDays = Math.round((base - hoy) / (24 * 60 * 60 * 1000));
+      if(minDiff === null || Math.abs(diffDays) < Math.abs(minDiff)) minDiff = diffDays;
+    });
+    return minDiff;
+  }
+
+  async function loadVentureEftAlerts(){
+    const card = document.getElementById('ventureEftCard');
+    const list = document.getElementById('ventureEftList');
+    if(!card) return;
+
+    const { data, error } = await sb.from('client_policies')
+      .select('*, client:client_id(full_name)')
+      .neq('status', 'cancelled')
+      .ilike('company', '%venture%');
+    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const due = data
+      .filter(p => !p.eft_enrolled && p.effective_date)
+      .map(p => ({ p, diff: nearestMonthlyOccurrenceDiff(parseInt(p.effective_date.slice(8, 10), 10), hoy) }))
+      .filter(x => Math.abs(x.diff) <= 3)
+      .sort((a, b) => a.diff - b.diff);
+
+    if(due.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = due.map(({ p, diff }) => {
+      const diasTexto = diff === 0 ? 'hoy es el día de cobro' : diff < 0 ? `en ${Math.abs(diff)} día${Math.abs(diff) === 1 ? '' : 's'}` : `hace ${diff} día${diff === 1 ? '' : 's'}`;
+      return `
+      <div style="padding:8px 0; border-bottom:1px solid #F0B87F; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${p.client_id}')">
+          <strong>${p.client ? p.client.full_name : 'Cliente'}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
+          ${p.policy_number ? '(#' + p.policy_number + ')' : ''}
+          <span style="font-weight:700; color:#9a5518;">— cobro ${diasTexto}, sin EFT activado</span>
+        </div>
+        <button class="btn-ghost" style="width:auto; padding:6px 10px; flex-shrink:0;" onclick="markEftFromDashboard('${p.id}', event)">✓ Ya activó EFT</button>
+      </div>
+    `;
+    }).join('');
+  }
+
+  // Cambia el EFT de una póliza — se usa desde el checkbox en la lista de
+  // pólizas del cliente Y desde el botón rápido del aviso del dashboard.
+  async function setPolicyEftEnrolled(policyId, enrolled){
+    const { error } = await sb.from('client_policies').update({ eft_enrolled: enrolled }).eq('id', policyId);
+    return !error;
+  }
+
+  async function toggleEftEnrolledFromPolicyRow(policyId, enrolled){
+    const ok = await setPolicyEftEnrolled(policyId, enrolled);
+    if(!ok){ alert('No se pudo actualizar el pago automático.'); return; }
+    if(currentClientId) await loadClientPolicies(currentClientId);
+  }
+
+  async function markEftFromDashboard(policyId, evt){
+    if(evt) evt.stopPropagation();
+    const ok = await setPolicyEftEnrolled(policyId, true);
+    if(!ok){ alert('No se pudo actualizar el pago automático.'); return; }
+    await loadVentureEftAlerts();
+  }
+  // =================== FIN VENTURE: AVISO DE PAGO AUTOMÁTICO (EFT) ===================
 
   // ---- Leads en proceso ----
   const LEAD_STATUSES = ['lead_nuevo'];
