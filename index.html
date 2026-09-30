@@ -976,7 +976,7 @@
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <h4 style="margin:0;">📖 Libro de negocio</h4>
           </div>
-          <p class="sub">Pólizas nuevas vendidas, con filtro de fecha y tipo.</p>
+          <p class="sub">Todas las pólizas activas (no canceladas), por fecha en que se dieron de alta en el sistema — sin importar si entraron por "Nueva transacción" o se registraron directo como cliente/póliza activa.</p>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
             <button class="btn-ghost bon-range-btn active" data-range="today" onclick="setBookOfBusinessRange('today')" style="width:auto; padding:8px 16px;">Hoy</button>
             <button class="btn-ghost bon-range-btn" data-range="5" onclick="setBookOfBusinessRange('5')" style="width:auto; padding:8px 16px;">Últimos 5 días</button>
@@ -994,28 +994,34 @@
               <input type="text" id="bon-hasta" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); setBookOfBusinessRangeCustom();">
             </div>
           </div>
-          <div class="form-row" style="max-width:280px;">
-            <label>Tipo</label>
-            <select id="bon-tipo" onchange="renderBookOfBusiness()">
-              <option value="todos">Todos</option>
-              <option value="personal">Personal</option>
-              <option value="comercial">Comercial</option>
-            </select>
-          </div>
-
-          <!-- Filtro por producto específico (casa, auto, auto comercial, etc.) —
-               son casillas, no un select, porque se puede marcar más de uno a la
-               vez (ej. "casa" + "auto comercial" juntos). "Todos los productos"
-               es el maestro: lo desmarca cuando se toca cualquier producto suelto,
-               y vuelve a marcar/desmarcar todos los demás cuando se toca él. -->
-          <div class="form-row">
-            <label>Producto(s) — puedes marcar varios</label>
-            <div style="display:flex; flex-wrap:wrap; gap:10px 16px; padding:10px 0;">
-              <label style="display:flex; align-items:center; gap:6px; font-weight:700; cursor:pointer;">
-                <input type="checkbox" id="bon-prod-todos" checked onchange="onBonProductoTodosChange()"> Todos los productos
-              </label>
+          <div class="form-row-2" style="margin-top:4px;">
+            <div class="form-row">
+              <label>Tipo</label>
+              <select id="bon-tipo" onchange="renderBookOfBusiness()">
+                <option value="todos">Todos</option>
+                <option value="personal">Personal</option>
+                <option value="comercial">Comercial</option>
+              </select>
             </div>
-            <div id="bon-prod-list" style="display:flex; flex-wrap:wrap; gap:10px 16px; padding:2px 0 6px;"></div>
+
+            <!-- Filtro por producto específico (casa, auto, auto comercial, etc.),
+                 como una "pestañita": un botón compacto que abre un cuadro con
+                 casillas (se puede marcar más de un producto a la vez, ej. "casa" +
+                 "auto comercial" juntos), y se cierra solo al hacer clic afuera —
+                 mismo patrón que el menú de "⋯ Más opciones" de cada póliza. -->
+            <div class="form-row" style="position:relative;">
+              <label>Producto(s)</label>
+              <button type="button" class="btn-ghost" id="bon-prod-toggle-btn" style="width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; gap:8px;" onclick="toggleBonProductDropdown(event)">
+                <span id="bon-prod-summary">Todos los productos</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <div id="bon-prod-dropdown" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1.5px solid var(--line); border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); padding:10px 12px; margin-top:4px; min-width:260px; max-height:260px; overflow-y:auto;" onclick="event.stopPropagation()">
+                <label style="display:flex; align-items:center; gap:6px; font-weight:700; cursor:pointer; padding:4px 0 8px; border-bottom:1px solid var(--line); margin-bottom:8px;">
+                  <input type="checkbox" id="bon-prod-todos" checked onchange="onBonProductoTodosChange()"> Todos los productos
+                </label>
+                <div id="bon-prod-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+              </div>
+            </div>
           </div>
 
           <!-- Resumen de primas del rango/filtro actual — suma client_policies.total_premium
@@ -1325,6 +1331,7 @@
                   <div class="form-row"><label>Fecha efectiva</label><input type="text" id="nc-act-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateNewPolicyExpiration();"></div>
                 </div>
                 <div class="form-row-2">
+                  <div class="form-row"><label>Pago mensual ($) <span style="color:#C23B3B;">*</span></label><input type="number" min="0" step="0.01" id="nc-act-pago"></div>
                   <div class="form-row"><label>Término</label>
                     <select id="nc-act-termino" onchange="updateNewPolicyExpiration()">
                       <option value="">—</option>
@@ -1334,10 +1341,10 @@
                       <option value="12">12 meses</option>
                     </select>
                   </div>
-                  <div class="form-row">
-                    <label>Fecha de expiración (automática)</label>
-                    <input type="text" id="nc-act-expiracion" readonly style="background:#F5F6F8;">
-                  </div>
+                </div>
+                <div class="form-row">
+                  <label>Fecha de expiración (automática)</label>
+                  <input type="text" id="nc-act-expiracion" readonly style="background:#F5F6F8;">
                 </div>
                 <div class="form-row">
                   <label>Notas de la póliza</label>
@@ -1781,6 +1788,7 @@
                 </div>
                 <div class="form-row"><label>Fecha de expiración (automática)</label><input type="text" id="ep-expiracion" readonly style="background:#F5F6F8;"></div>
               </div>
+              <div class="form-row"><label>Pago mensual ($) <span title="Si la pones o la corriges aquí, se vuelve a calcular la prima total de esta póliza (pago mensual × término) — útil para corregir pólizas viejas que se registraron sin este dato." style="cursor:help; color:#8A96AC; font-weight:700;">?</span></label><input type="number" min="0" step="0.01" id="ep-pago"></div>
               <div class="form-row"><label>Notas</label><textarea id="ep-notas" rows="2" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea></div>
               <button type="submit" class="btn-primary">Guardar cambios</button>
               <button type="button" class="btn-ghost" style="width:auto; padding:12px 20px;" onclick="document.getElementById('cd-editPolicyCard').style.display='none'">Cancelar</button>
@@ -5217,10 +5225,14 @@
       const numero = document.getElementById('nc-act-numero').value.trim();
       const efectivaISO = mmddyyyyToISO(document.getElementById('nc-act-efectiva').value);
       const termino = document.getElementById('nc-act-termino').value;
+      // Pago mensual — obligatorio para que la póliza tenga una "Prima" real
+      // (antes este formulario no lo pedía y la póliza quedaba con Prima $0,
+      // sin contar en el Libro de negocio ni en las metas de producción).
+      const pago = document.getElementById('nc-act-pago').value;
 
       const tipoOk = tipo && (tipo !== '__otro__' || tipoOtro);
       const companyOk = companySelect && (companySelect !== '__otra__' || companyOther);
-      return tipoOk && companyOk && numero && efectivaISO && termino;
+      return tipoOk && companyOk && numero && efectivaISO && termino && pago;
     }
 
     // mode === 'lead'
@@ -5352,6 +5364,11 @@
       const polEfectiva = document.getElementById('nc-act-efectiva').value;
       const polTermino = document.getElementById('nc-act-termino').value;
       const polNotas = document.getElementById('nc-act-notas').value;
+      // Pago mensual → se calcula la "Prima" total igual que en "Editar cliente
+      // → marcar como Activo" (mensualidad × término) — antes este formulario
+      // no lo pedía y la póliza quedaba con Prima $0.
+      const polPagoMensual = parseFloat(document.getElementById('nc-act-pago').value) || 0;
+      const polTerminoMeses = polTermino ? parseInt(polTermino, 10) : 0;
 
       if(polTipo === '__otro__'){
         const newProductName = document.getElementById('nc-act-tipo-otro').value.trim();
@@ -5371,7 +5388,9 @@
         company: companyNameSnapshot,
         policy_number: polNumero || null,
         effective_date: mmddyyyyToISO(polEfectiva),
-        term_months: polTermino ? parseInt(polTermino, 10) : null,
+        term_months: polTerminoMeses || null,
+        monthly_payment: polPagoMensual,
+        total_premium: polPagoMensual * polTerminoMeses,
         notes: polNotas || null,
         created_by: session.user.id
       };
@@ -5816,6 +5835,7 @@
     document.getElementById('ep-numero').value = p.policy_number || '';
     document.getElementById('ep-efectiva').value = formatDateUS(p.effective_date) || '';
     document.getElementById('ep-termino').value = p.term_months || '';
+    document.getElementById('ep-pago').value = (p.monthly_payment !== null && p.monthly_payment !== undefined) ? p.monthly_payment : '';
     document.getElementById('ep-notas').value = p.notes || '';
     document.getElementById('ep-expiracion').value = formatDateUS(p.expiration_date) || '';
 
@@ -5845,15 +5865,25 @@
     const companyId = document.getElementById('ep-companyid').value;
     const companySelect = document.getElementById('ep-companyid');
     const companyName = companySelect.options[companySelect.selectedIndex] ? companySelect.options[companySelect.selectedIndex].textContent : null;
+    const epPagoRaw = document.getElementById('ep-pago').value;
+    const epTerminoRaw = document.getElementById('ep-termino').value;
+    const epTerminoMeses = epTerminoRaw ? parseInt(epTerminoRaw, 10) : null;
     const payload = {
       insurance_type: document.getElementById('ep-tipo').value || null,
       company_id: companyId || null,
       company: companyId ? companyName : null,
       policy_number: document.getElementById('ep-numero').value || null,
       effective_date: mmddyyyyToISO(document.getElementById('ep-efectiva').value),
-      term_months: document.getElementById('ep-termino').value ? parseInt(document.getElementById('ep-termino').value, 10) : null,
+      term_months: epTerminoMeses,
       notes: document.getElementById('ep-notas').value || null
     };
+    if(epPagoRaw !== ''){
+      const epPagoMensual = parseFloat(epPagoRaw) || 0;
+      payload.monthly_payment = epPagoMensual;
+      if(epTerminoMeses){
+        payload.total_premium = epPagoMensual * epTerminoMeses;
+      }
+    }
     const { error } = await sb.from('client_policies').update(payload).eq('id', id);
     if(error){
       showMsg('editPolicyMsg','error','No se pudo guardar: ' + error.message);
@@ -9789,6 +9819,16 @@
   }
 
   // ---- Libro de negocio ----
+  // IMPORTANTE (corregido 30 sep 2026): antes esto se armaba leyendo
+  // `client_transactions` (tipo 'nueva_poliza') — pero una póliza puede
+  // quedar activa en `client_policies` SIN pasar por "Nueva transacción"
+  // (ej. "Nuevo cliente" registrado directo como Activo, o "Editar cliente"
+  // → marcar como Activo), y esas nunca creaban una fila en
+  // `client_transactions`. Por eso el conteo salía más bajo que el real
+  // (Geidy reportó 25 pólizas activas contra solo 13 aquí). Ahora se lee
+  // directo de `client_policies`, que es la fuente de verdad de "pólizas
+  // activas" en todo el resto del CRM — así cuentan TODAS, sin importar por
+  // cuál de los formularios se hayan dado de alta.
   let bookOfBusinessRows = [];
 
   function setBookOfBusinessRange(rangeKey){
@@ -9818,13 +9858,12 @@
   async function fetchBookOfBusiness(desdeISO, hastaISO){
     const start = new Date(desdeISO + 'T00:00:00');
     const end = new Date(hastaISO + 'T23:59:59.999');
-    // policy:policy_id(..., total_premium) — la "prima" ya calculada al crear
-    // la póliza (depósito + mensualidades × término). Se usa para el resumen
-    // de "Total en primas" de abajo, no el service fee que cobra GMAX.
-    const { data, error } = await sb.from('client_transactions')
-      .select('*, client:client_id(full_name), policy:policy_id(policy_number, total_premium)')
-      .eq('transaction_type', 'nueva_poliza')
-      .is('deleted_at', null)
+    // .neq('status','cancelled') — mismo criterio de "póliza activa" que ya
+    // se usa en el resto del CRM (meta de $60,000 en primas, Control de
+    // agentes, etc.), para que este número cuadre con los demás.
+    const { data, error } = await sb.from('client_policies')
+      .select('*, client:client_id(full_name)')
+      .neq('status', 'cancelled')
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString())
       .order('created_at', { ascending: false });
@@ -9837,7 +9876,7 @@
   // arman a partir de `allProducts` (el catálogo real que administra la
   // administradora en "Productos"), no de una lista fija, porque el nombre
   // de cada producto es texto libre que ella misma escribió ahí y es
-  // exactamente lo que queda guardado en `client_transactions.product`.
+  // exactamente lo que queda guardado en `client_policies.insurance_type`.
   function renderBonProductChecklist(){
     const container = document.getElementById('bon-prod-list');
     if(!container) return;
@@ -9850,9 +9889,37 @@
     `).join('');
   }
 
+  // Dropdown compacto ("pestañita") del filtro de producto — mismo patrón que
+  // el menú "⋯ Más opciones" de cada póliza: se abre con el botón, se cierra
+  // solo al hacer clic afuera.
+  let bonProductDropdownOpen = false;
+  function toggleBonProductDropdown(evt){
+    evt.stopPropagation();
+    bonProductDropdownOpen = !bonProductDropdownOpen;
+    document.getElementById('bon-prod-dropdown').style.display = bonProductDropdownOpen ? 'block' : 'none';
+  }
+  document.addEventListener('click', function(){
+    if(bonProductDropdownOpen){
+      document.getElementById('bon-prod-dropdown').style.display = 'none';
+      bonProductDropdownOpen = false;
+    }
+  });
+
+  function updateBonProductSummary(){
+    const summary = document.getElementById('bon-prod-summary');
+    if(!summary) return;
+    const todos = document.getElementById('bon-prod-todos');
+    if(!todos || todos.checked){ summary.textContent = 'Todos los productos'; return; }
+    const checked = Array.from(document.querySelectorAll('.bon-prod-item:checked')).map(cb => cb.value);
+    if(checked.length === 0) summary.textContent = 'Ningún producto seleccionado';
+    else if(checked.length <= 2) summary.textContent = checked.join(', ');
+    else summary.textContent = checked.length + ' productos seleccionados';
+  }
+
   function onBonProductoTodosChange(){
     const todos = document.getElementById('bon-prod-todos').checked;
     document.querySelectorAll('.bon-prod-item').forEach(cb => { cb.checked = todos; });
+    updateBonProductSummary();
     renderBookOfBusiness();
   }
 
@@ -9860,6 +9927,7 @@
     const items = document.querySelectorAll('.bon-prod-item');
     const allChecked = items.length > 0 && Array.from(items).every(cb => cb.checked);
     document.getElementById('bon-prod-todos').checked = allChecked;
+    updateBonProductSummary();
     renderBookOfBusiness();
   }
 
@@ -9874,39 +9942,39 @@
     const tipo = document.getElementById('bon-tipo').value;
     const selectedProducts = getSelectedBonProducts();
     const tbody = document.getElementById('bon-body');
-    const filtered = bookOfBusinessRows.filter(t => {
+    const filtered = bookOfBusinessRows.filter(p => {
       if(tipo !== 'todos'){
-        const prod = allProducts.find(p => p.name === t.product);
+        const prod = allProducts.find(x => x.name === p.insurance_type);
         const cat = prod ? (prod.category || 'personal') : 'personal';
         if(cat !== tipo) return false;
       }
-      if(selectedProducts && !selectedProducts.includes(t.product)) return false;
+      if(selectedProducts && !selectedProducts.includes(p.insurance_type)) return false;
       return true;
     });
 
     // Resumen: cuántas pólizas y cuánto suman de prima (client_policies.total_premium)
     // dentro del rango de fechas y filtro de producto/tipo actuales.
-    const totalPrimas = filtered.reduce((sum, t) => sum + Number((t.policy && t.policy.total_premium) || 0), 0);
+    const totalPrimas = filtered.reduce((sum, p) => sum + Number(p.total_premium || 0), 0);
     const countEl = document.getElementById('bon-total-count');
     const primasEl = document.getElementById('bon-total-primas');
     if(countEl) countEl.textContent = String(filtered.length);
     if(primasEl) primasEl.textContent = '$' + totalPrimas.toFixed(2);
 
     if(filtered.length === 0){
-      tbody.innerHTML = '<tr><td colspan="7">No hay pólizas vendidas en este rango/filtro.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7">No hay pólizas activas en este rango/filtro.</td></tr>';
       return;
     }
-    tbody.innerHTML = filtered.map(t => {
-      const prod = allProducts.find(p => p.name === t.product);
+    tbody.innerHTML = filtered.map(p => {
+      const prod = allProducts.find(x => x.name === p.insurance_type);
       const cat = prod ? (prod.category || 'personal') : 'personal';
-      const prima = Number((t.policy && t.policy.total_premium) || 0);
+      const prima = Number(p.total_premium || 0);
       return `
-        <tr style="cursor:pointer;" onclick="goToClientFromUnderwriting('${t.client_id}')">
-          <td>${formatDateUS(t.created_at?.split('T')[0])}</td>
-          <td>${t.policy ? (t.policy.policy_number || 'pendiente') : '—'}</td>
-          <td>${t.client ? t.client.full_name : '—'}</td>
-          <td>${t.company_name || '—'}</td>
-          <td>${INSURANCE_TYPE_LABELS[t.product] || t.product || '—'}</td>
+        <tr style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')">
+          <td>${formatDateUS(p.created_at?.split('T')[0])}</td>
+          <td>${p.policy_number || 'pendiente'}</td>
+          <td>${p.client ? p.client.full_name : '—'}</td>
+          <td>${p.company || '—'}</td>
+          <td>${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '—'}</td>
           <td><span class="badge ${cat === 'comercial' ? 'purple' : 'blue'}">${cat === 'comercial' ? 'Comercial' : 'Personal'}</span></td>
           <td>$${prima.toFixed(2)}</td>
         </tr>
