@@ -1002,10 +1002,41 @@
               <option value="comercial">Comercial</option>
             </select>
           </div>
+
+          <!-- Filtro por producto específico (casa, auto, auto comercial, etc.) —
+               son casillas, no un select, porque se puede marcar más de uno a la
+               vez (ej. "casa" + "auto comercial" juntos). "Todos los productos"
+               es el maestro: lo desmarca cuando se toca cualquier producto suelto,
+               y vuelve a marcar/desmarcar todos los demás cuando se toca él. -->
+          <div class="form-row">
+            <label>Producto(s) — puedes marcar varios</label>
+            <div style="display:flex; flex-wrap:wrap; gap:10px 16px; padding:10px 0;">
+              <label style="display:flex; align-items:center; gap:6px; font-weight:700; cursor:pointer;">
+                <input type="checkbox" id="bon-prod-todos" checked onchange="onBonProductoTodosChange()"> Todos los productos
+              </label>
+            </div>
+            <div id="bon-prod-list" style="display:flex; flex-wrap:wrap; gap:10px 16px; padding:2px 0 6px;"></div>
+          </div>
+
+          <!-- Resumen de primas del rango/filtro actual — suma client_policies.total_premium
+               (depósito + mensualidades × término, ya calculado al crear la póliza) de
+               las pólizas nuevas que caen dentro del filtro, NO el monto cobrado por GMAX. -->
+          <div style="margin-top:6px; padding:16px 18px; background:#F7F9FC; border-radius:12px; display:flex; gap:28px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Pólizas en este filtro</div>
+              <div id="bon-total-count" style="font-size:22px; font-weight:800; color:var(--navy);">0</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Total en primas</div>
+              <div id="bon-total-primas" style="font-size:22px; font-weight:800; color:var(--navy);">$0.00</div>
+              <div class="sub" style="margin:2px 0 0;">Suma del depósito + mensualidades × término de cada póliza (campo "Prima" de la póliza), no el service fee cobrado.</div>
+            </div>
+          </div>
+
           <div class="dash-table-wrap">
             <table class="dash-table">
-              <thead><tr><th>Fecha</th><th># Póliza</th><th>Cliente</th><th>Compañía</th><th>Producto</th><th>Tipo</th></tr></thead>
-              <tbody id="bon-body"><tr><td colspan="6">Selecciona un rango.</td></tr></tbody>
+              <thead><tr><th>Fecha</th><th># Póliza</th><th>Cliente</th><th>Compañía</th><th>Producto</th><th>Tipo</th><th>Prima</th></tr></thead>
+              <tbody id="bon-body"><tr><td colspan="7">Selecciona un rango.</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -4632,6 +4663,7 @@
     renderProductsList();
     renderProductCatalog();
     populateProductSelects();
+    renderBonProductChecklist();
   }
 
   function renderProductsList(){
@@ -9786,8 +9818,11 @@
   async function fetchBookOfBusiness(desdeISO, hastaISO){
     const start = new Date(desdeISO + 'T00:00:00');
     const end = new Date(hastaISO + 'T23:59:59.999');
+    // policy:policy_id(..., total_premium) — la "prima" ya calculada al crear
+    // la póliza (depósito + mensualidades × término). Se usa para el resumen
+    // de "Total en primas" de abajo, no el service fee que cobra GMAX.
     const { data, error } = await sb.from('client_transactions')
-      .select('*, client:client_id(full_name), policy:policy_id(policy_number)')
+      .select('*, client:client_id(full_name), policy:policy_id(policy_number, total_premium)')
       .eq('transaction_type', 'nueva_poliza')
       .is('deleted_at', null)
       .gte('created_at', start.toISOString())
@@ -9798,22 +9833,73 @@
     renderBookOfBusiness();
   }
 
+  // Casillas de producto (Casa, Auto personal, Auto comercial, etc.) — se
+  // arman a partir de `allProducts` (el catálogo real que administra la
+  // administradora en "Productos"), no de una lista fija, porque el nombre
+  // de cada producto es texto libre que ella misma escribió ahí y es
+  // exactamente lo que queda guardado en `client_transactions.product`.
+  function renderBonProductChecklist(){
+    const container = document.getElementById('bon-prod-list');
+    if(!container) return;
+    const active = allProducts.filter(p => p.active !== false);
+    container.innerHTML = active.map(p => `
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13.5px;">
+        <input type="checkbox" class="bon-prod-item" value="${(p.name || '').replace(/"/g, '&quot;')}" checked onchange="onBonProductoItemChange()">
+        ${p.name}
+      </label>
+    `).join('');
+  }
+
+  function onBonProductoTodosChange(){
+    const todos = document.getElementById('bon-prod-todos').checked;
+    document.querySelectorAll('.bon-prod-item').forEach(cb => { cb.checked = todos; });
+    renderBookOfBusiness();
+  }
+
+  function onBonProductoItemChange(){
+    const items = document.querySelectorAll('.bon-prod-item');
+    const allChecked = items.length > 0 && Array.from(items).every(cb => cb.checked);
+    document.getElementById('bon-prod-todos').checked = allChecked;
+    renderBookOfBusiness();
+  }
+
+  // null = sin filtro de producto (todos). Un array = solo esos productos.
+  function getSelectedBonProducts(){
+    const todos = document.getElementById('bon-prod-todos');
+    if(!todos || todos.checked) return null;
+    return Array.from(document.querySelectorAll('.bon-prod-item:checked')).map(cb => cb.value);
+  }
+
   function renderBookOfBusiness(){
     const tipo = document.getElementById('bon-tipo').value;
+    const selectedProducts = getSelectedBonProducts();
     const tbody = document.getElementById('bon-body');
     const filtered = bookOfBusinessRows.filter(t => {
-      if(tipo === 'todos') return true;
-      const prod = allProducts.find(p => p.name === t.product);
-      const cat = prod ? (prod.category || 'personal') : 'personal';
-      return cat === tipo;
+      if(tipo !== 'todos'){
+        const prod = allProducts.find(p => p.name === t.product);
+        const cat = prod ? (prod.category || 'personal') : 'personal';
+        if(cat !== tipo) return false;
+      }
+      if(selectedProducts && !selectedProducts.includes(t.product)) return false;
+      return true;
     });
+
+    // Resumen: cuántas pólizas y cuánto suman de prima (client_policies.total_premium)
+    // dentro del rango de fechas y filtro de producto/tipo actuales.
+    const totalPrimas = filtered.reduce((sum, t) => sum + Number((t.policy && t.policy.total_premium) || 0), 0);
+    const countEl = document.getElementById('bon-total-count');
+    const primasEl = document.getElementById('bon-total-primas');
+    if(countEl) countEl.textContent = String(filtered.length);
+    if(primasEl) primasEl.textContent = '$' + totalPrimas.toFixed(2);
+
     if(filtered.length === 0){
-      tbody.innerHTML = '<tr><td colspan="6">No hay pólizas vendidas en este rango/filtro.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7">No hay pólizas vendidas en este rango/filtro.</td></tr>';
       return;
     }
     tbody.innerHTML = filtered.map(t => {
       const prod = allProducts.find(p => p.name === t.product);
       const cat = prod ? (prod.category || 'personal') : 'personal';
+      const prima = Number((t.policy && t.policy.total_premium) || 0);
       return `
         <tr style="cursor:pointer;" onclick="goToClientFromUnderwriting('${t.client_id}')">
           <td>${formatDateUS(t.created_at?.split('T')[0])}</td>
@@ -9822,6 +9908,7 @@
           <td>${t.company_name || '—'}</td>
           <td>${INSURANCE_TYPE_LABELS[t.product] || t.product || '—'}</td>
           <td><span class="badge ${cat === 'comercial' ? 'purple' : 'blue'}">${cat === 'comercial' ? 'Comercial' : 'Personal'}</span></td>
+          <td>$${prima.toFixed(2)}</td>
         </tr>
       `;
     }).join('');
