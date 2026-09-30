@@ -1008,7 +1008,7 @@
           </div>
 
           <div class="form-row" style="max-width:360px; margin-top:10px; margin-bottom:0;">
-            <input type="text" id="clientSearch" placeholder="Buscar por nombre, correo o teléfono..." oninput="renderClientsList()">
+            <input type="text" id="clientSearch" placeholder="Buscar por nombre, correo, teléfono (principal o secundario) o número de póliza..." oninput="renderClientsList()">
           </div>
           <div id="clientStatusFilter" style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; margin-bottom:14px;">
             <button type="button" class="btn-ghost client-status-filter-btn" data-status="" style="width:auto; padding:7px 14px; font-size:13.5px; background:var(--blue); color:#fff; border-color:var(--blue);" onclick="setClientStatusFilter('')">Todos</button>
@@ -1642,7 +1642,6 @@
               <div class="profile-field profile-field-compact">
                 <div class="label">Correo</div>
                 <div class="num" id="cd-view-correo">—</div>
-                <button type="button" class="btn-ghost" style="width:auto; padding:2px 8px; font-size:11px; margin-top:4px;" onclick="openClientEmailChange()">✏️ Cambiar correo</button>
               </div>
               <div class="profile-field profile-field-compact"><div class="label">Correo alternativo</div><div class="num" id="cd-view-correo-alt">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Teléfono</div><div class="num" id="cd-view-telefono">—</div></div>
@@ -1658,26 +1657,6 @@
               <div class="profile-field profile-field-compact"><div class="label">Contacto preferido</div><div class="num" id="cd-view-contacto">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Fuente del lead</div><div class="num" id="cd-view-fuente">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Referido por</div><div class="num" id="cd-view-referido">—</div></div>
-            </div>
-
-            <div id="cd-emailChangeCard" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
-              <div style="font-weight:700; font-size:13.5px;">Cambiar correo electrónico del cliente</div>
-              <p class="sub" style="margin:4px 0 12px;">Por seguridad — para que los recibos y documentos firmados nunca le lleguen a un correo equivocado — te vamos a mandar un código de verificación al correo NUEVO antes de guardarlo.</p>
-
-              <div id="cd-emailChange-formStep">
-                <div class="form-row" style="max-width:320px;"><label>Correo nuevo</label><input type="email" id="cd-emailChange-nuevo" autocomplete="off"></div>
-                <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="requestClientEmailChange()">Enviar código al correo nuevo</button>
-                <button type="button" class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="closeClientEmailChange()">Cancelar</button>
-              </div>
-
-              <div id="cd-emailChange-codeStep" style="display:none; margin-top:14px;">
-                <p class="sub" style="margin-bottom:8px;">Te mandamos un código de 6 dígitos al correo nuevo. Escríbelo aquí para confirmar el cambio.</p>
-                <div class="form-row" style="max-width:220px;"><label>Código de verificación</label><input type="text" id="cd-emailChange-codigo" maxlength="6" inputmode="numeric"></div>
-                <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="confirmClientEmailChange()">Confirmar cambio</button>
-                <button type="button" class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="closeClientEmailChange()">Cancelar</button>
-              </div>
-
-              <div class="msg" id="cdEmailChangeMsg"></div>
             </div>
           </div>
 
@@ -1757,6 +1736,35 @@
               <div class="form-row"><label>Notas</label><textarea id="ep-notas" rows="2" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea></div>
               <button type="submit" class="btn-primary">Guardar cambios</button>
               <button type="button" class="btn-ghost" style="width:auto; padding:12px 20px;" onclick="document.getElementById('cd-editPolicyCard').style.display='none'">Cancelar</button>
+            </form>
+          </div>
+
+          <!-- Marcar póliza como cancelada directamente (exclusivo admin) — SIN pasar
+               por el flujo de transacción/firma del cliente. Es para cuando la póliza
+               ya está cancelada por un motivo que no requiere autorización firmada del
+               cliente (falta de pago, la canceló la aseguradora, información faltante,
+               etc.). Si es el CLIENTE quien está pidiendo cancelar, se debe seguir usando
+               "Nueva transacción → Cancelación", que sí exige la firma. -->
+          <div class="dash-card" id="cd-markCancelledCard" style="display:none; border:2px solid #C23B3B;">
+            <h4 style="color:#8a3030;">Marcar póliza como cancelada</h4>
+            <p class="sub" style="margin-top:0;">Úsalo cuando la póliza ya está cancelada por un motivo que NO requiere la firma del cliente (falta de pago, la canceló la aseguradora, información faltante, etc.). Si es el cliente quien está pidiendo cancelar y hace falta que quede constancia firmada, usa mejor "Nueva transacción → Cancelación".</p>
+            <div class="msg" id="markCancelledMsg"></div>
+            <form id="markCancelledForm">
+              <input type="hidden" id="mc-policy-id">
+              <div class="form-row">
+                <label>Motivo de la cancelación <span style="color:#C23B3B;">*obligatorio</span></label>
+                <select id="mc-motivo">
+                  <option value="">—</option>
+                  <option value="Falta de pago">Falta de pago</option>
+                  <option value="Cancelada por la aseguradora">Cancelada por la aseguradora</option>
+                  <option value="Información faltante / no enviada a tiempo">Información faltante / no enviada a tiempo</option>
+                  <option value="Solicitud del cliente (sin firma — caso excepcional)">Solicitud del cliente (sin firma — caso excepcional)</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </div>
+              <div class="form-row"><label>Detalle (opcional)</label><textarea id="mc-detalle" rows="2" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea></div>
+              <button type="submit" class="btn-primary" style="background:#C23B3B;">Marcar como cancelada</button>
+              <button type="button" class="btn-ghost" style="width:auto; padding:12px 20px;" onclick="document.getElementById('cd-markCancelledCard').style.display='none'">Cancelar</button>
             </form>
           </div>
 
@@ -2097,7 +2105,7 @@
                 <div class="form-row"><label>Apellido(s)</label><input type="text" id="ec-apellido" required></div>
               </div>
               <div class="form-row-2">
-                <div class="form-row"><label>Correo</label><input type="email" id="ec-correo" readonly style="background:var(--canvas); color:var(--slate-light);"><p class="sub" style="margin-top:4px;">Para cambiar el correo usa el botón "✏️ Cambiar correo" en el perfil del cliente (pide código de verificación).</p></div>
+                <div class="form-row"><label>Correo</label><input type="email" id="ec-correo" autocomplete="off"></div>
                 <div class="form-row"><label>Correo alternativo <span style="font-weight:400; color:var(--slate-light);">(opcional)</span></label><input type="email" id="ec-correo-alt"></div>
               </div>
               <div class="form-row-2">
@@ -4905,18 +4913,33 @@
   let filteredClientsList = [];
 
   function renderClientsList(){
-    const term = (document.getElementById('clientSearch')?.value || '').toLowerCase();
+    const rawTerm = (document.getElementById('clientSearch')?.value || '').trim();
+    const term = rawTerm.toLowerCase();
+    // Para teléfono comparamos solo los dígitos — así no importa si el
+    // número se copió/pegó con paréntesis, guiones o espacios distinto a
+    // como está guardado ((713) 555-1234 vs 713-555-1234 vs 7135551234).
+    const termDigits = rawTerm.replace(/\D/g, '');
     const productFilter = document.getElementById('clientProductFilter')?.value || '';
     filteredClientsList = allClients.filter(c => {
       if(currentClientStatusFilter && c.client_status !== currentClientStatusFilter) return false;
+      const policies = allClientPoliciesByClient[c.id] || [];
       if(productFilter){
-        const policies = allClientPoliciesByClient[c.id] || [];
         if(!policies.some(p => p.insurance_type === productFilter)) return false;
       }
       if(!term) return true;
-      return (c.full_name || '').toLowerCase().includes(term) ||
-             (c.email || '').toLowerCase().includes(term) ||
-             (c.phone || '').toLowerCase().includes(term);
+      if((c.full_name || '').toLowerCase().includes(term)) return true;
+      if((c.email || '').toLowerCase().includes(term)) return true;
+      if((c.email_alt || '').toLowerCase().includes(term)) return true;
+      // Teléfono principal y secundario, comparando solo dígitos (mínimo 3
+      // dígitos escritos para evitar falsos positivos con búsquedas cortas).
+      if(termDigits.length >= 3){
+        const phoneDigits = (c.phone || '').replace(/\D/g, '');
+        const phone2Digits = (c.secondary_phone || '').replace(/\D/g, '');
+        if(phoneDigits.includes(termDigits) || phone2Digits.includes(termDigits)) return true;
+      }
+      // Número de póliza (cualquiera de las pólizas del cliente)
+      if(policies.some(p => (p.policy_number || '').toLowerCase().includes(term))) return true;
+      return false;
     });
     clientsCurrentPage = 1;
     renderClientsPage();
@@ -5521,6 +5544,13 @@
           <button class="btn-ghost" style="width:auto; padding:6px 10px;" title="Ver el historial de esta póliza: cada transacción con su recibo y los documentos de la aseguradora" onclick="togglePolicyHistory('${p.id}')">📜 Historial</button>
           ${isAdmin ? `<button class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="openEditPolicy('${p.id}')">Editar</button>` : ''}
           ${cancelled && isAdmin ? `<button class="btn-primary" style="width:auto; padding:6px 14px;" onclick="restorePolicy('${p.id}')">Restaurar</button>` : ''}
+          ${!cancelled && isAdmin ? `<button class="btn-ghost" style="width:auto; padding:6px 10px; color:#8a3030;" title="Marcar esta póliza como cancelada, sin pasar por el flujo de firma del cliente" onclick="openMarkPolicyCancelled('${p.id}')">🚫 Cancelada</button>` : ''}
+          ${isAdmin ? `<div class="dropdown" style="position:relative; display:inline-block;">
+            <button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" title="Más opciones" onclick="togglePolicyMoreMenu(event, '${p.id}')">⋯</button>
+            <div id="policy-more-menu-${p.id}" style="display:none; position:absolute; right:0; top:100%; z-index:20; background:#fff; border:1.5px solid var(--line); border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); min-width:200px; padding:6px;">
+              <button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px; color:#C23B3B;" onclick="deletePolicy('${p.id}')">🗑️ Eliminar póliza</button>
+            </div>
+          </div>` : ''}
         </td>
       </tr>
     `;
@@ -5584,6 +5614,92 @@
       if(desdeISO && hastaISO) await fetchUnderwritingAll(desdeISO, hastaISO);
     }
   }
+
+  // ===================== MARCAR PÓLIZA CANCELADA DIRECTO (sin firma del cliente) =====================
+  // Distinto del flujo de "Nueva transacción → Cancelación": ese exige la firma
+  // electrónica del cliente porque es él quien está pidiendo cancelar. Esto es
+  // para cuando la póliza YA está cancelada por un motivo administrativo (falta
+  // de pago, la canceló la aseguradora, etc.) y no hace falta ninguna firma —
+  // solo dejar constancia en el CRM. Exclusivo para admin/super_admin.
+  function openMarkPolicyCancelled(policyId){
+    document.getElementById('mc-policy-id').value = policyId;
+    document.getElementById('mc-motivo').value = '';
+    document.getElementById('mc-detalle').value = '';
+    document.getElementById('markCancelledMsg').className = 'msg';
+    document.getElementById('markCancelledMsg').textContent = '';
+    document.getElementById('cd-markCancelledCard').style.display = 'block';
+    document.getElementById('cd-markCancelledCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  document.getElementById('markCancelledForm').addEventListener('submit', async function(e){
+    e.preventDefault();
+    const policyId = document.getElementById('mc-policy-id').value;
+    const motivo = document.getElementById('mc-motivo').value;
+    const detalle = document.getElementById('mc-detalle').value.trim();
+    if(!motivo){
+      showMsg('markCancelledMsg','error','Selecciona el motivo de la cancelación.');
+      return;
+    }
+    const cancellation_reason = detalle ? (motivo + ' — ' + detalle) : motivo;
+    const { error } = await sb.from('client_policies').update({
+      status: 'cancelled',
+      cancellation_reason
+    }).eq('id', policyId);
+    if(error){
+      showMsg('markCancelledMsg','error','No se pudo marcar como cancelada: ' + error.message);
+      return;
+    }
+    showMsg('markCancelledMsg','success','Póliza marcada como cancelada.');
+    if(currentClientId){
+      await loadClientPolicies(currentClientId);
+      await loadClientRequirements(currentClientId);
+    }
+    setTimeout(() => { document.getElementById('cd-markCancelledCard').style.display = 'none'; }, 700);
+  });
+  // =================== FIN MARCAR PÓLIZA CANCELADA DIRECTO ===================
+
+  // ===================== ELIMINAR PÓLIZA (exclusivo admin) =====================
+  // Para corregir una póliza capturada por error. Es un borrado de verdad —
+  // si la póliza ya tiene transacciones, vehículos o requisitos asociados, la
+  // base de datos puede rechazar el borrado por integridad referencial; en ese
+  // caso se le avisa a la administradora en vez de forzarlo (no se borra nada
+  // en cascada automáticamente, para no perder registros financieros sin querer).
+  let openPolicyMoreMenuId = null;
+  function togglePolicyMoreMenu(evt, policyId){
+    evt.stopPropagation();
+    const menu = document.getElementById('policy-more-menu-' + policyId);
+    if(!menu) return;
+    const isOpen = menu.style.display === 'block';
+    // Cierra cualquier otro menú de "más opciones" que haya quedado abierto
+    if(openPolicyMoreMenuId && openPolicyMoreMenuId !== policyId){
+      const other = document.getElementById('policy-more-menu-' + openPolicyMoreMenuId);
+      if(other) other.style.display = 'none';
+    }
+    menu.style.display = isOpen ? 'none' : 'block';
+    openPolicyMoreMenuId = isOpen ? null : policyId;
+  }
+  document.addEventListener('click', function(){
+    if(openPolicyMoreMenuId){
+      const menu = document.getElementById('policy-more-menu-' + openPolicyMoreMenuId);
+      if(menu) menu.style.display = 'none';
+      openPolicyMoreMenuId = null;
+    }
+  });
+
+  async function deletePolicy(policyId){
+    if(!confirm('¿Eliminar esta póliza por completo? Esta acción no se puede deshacer. Úsalo solo para corregir un error de captura (por ejemplo, una póliza duplicada o con datos equivocados que acabas de crear).')) return;
+    const { error } = await sb.from('client_policies').delete().eq('id', policyId);
+    if(error){
+      alert('No se pudo eliminar la póliza: ' + error.message + '\n\nEsto suele pasar cuando la póliza ya tiene transacciones, vehículos o documentos guardados que dependen de ella — revisa el Historial de la póliza primero.');
+      return;
+    }
+    if(currentClientId){
+      await loadClientPolicies(currentClientId);
+      await loadClientRequirements(currentClientId);
+      await loadClientDocuments(currentClientId);
+    }
+  }
+  // =================== FIN ELIMINAR PÓLIZA ===================
 
   function openEditPolicy(id){
     const p = currentClientPolicies.find(x => x.id === id);
@@ -5654,7 +5770,6 @@
 
     document.getElementById('cd-view-correo').textContent = c.email || '—';
     document.getElementById('cd-view-correo-alt').textContent = c.email_alt || '—';
-    closeClientEmailChange();
     document.getElementById('cd-view-telefono').textContent = c.phone || '—';
     document.getElementById('cd-view-telefono2').textContent = c.secondary_phone || '—';
     document.getElementById('cd-view-licencia').textContent = c.drivers_license_number ? (c.drivers_license_number + (c.drivers_license_state ? ' (' + c.drivers_license_state + ')' : '')) : '—';
@@ -5764,107 +5879,6 @@
     document.getElementById('ec-b-correo').value = c.business_email || '';
     toggleBusinessFields('ec');
   }
-
-  // ===================== CAMBIO DE CORREO DEL CLIENTE (con verificación) =====================
-  // El correo del cliente es a donde le llegan los recibos y documentos
-  // firmados — por eso no se deja editar directo en el formulario (ec-correo
-  // quedó de solo lectura). Para cambiarlo hay que pasar por aquí: mandamos
-  // un código de 6 dígitos al correo NUEVO (no al viejo) y solo se guarda el
-  // cambio si ese código se confirma — así nos aseguramos de que el correo
-  // nuevo existe de verdad y de que nadie redirija los recibos por error.
-  function openClientEmailChange(){
-    const card = document.getElementById('cd-emailChangeCard');
-    card.style.display = 'block';
-    document.getElementById('cd-emailChange-nuevo').value = '';
-    document.getElementById('cd-emailChange-formStep').style.display = 'block';
-    document.getElementById('cd-emailChange-codeStep').style.display = 'none';
-    document.getElementById('cd-emailChange-codigo').value = '';
-    const msg = document.getElementById('cdEmailChangeMsg');
-    msg.className = 'msg'; msg.textContent = '';
-  }
-
-  function closeClientEmailChange(){
-    const card = document.getElementById('cd-emailChangeCard');
-    if(card) card.style.display = 'none';
-    const msg = document.getElementById('cdEmailChangeMsg');
-    if(msg){ msg.className = 'msg'; msg.textContent = ''; }
-  }
-
-  async function requestClientEmailChange(){
-    const msg = document.getElementById('cdEmailChangeMsg');
-    msg.className = 'msg'; msg.textContent = '';
-    if(!currentClientId){ msg.className = 'msg error'; msg.textContent = 'No hay un cliente abierto.'; return; }
-
-    const nuevoCorreo = document.getElementById('cd-emailChange-nuevo').value.trim();
-    if(!nuevoCorreo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nuevoCorreo)){
-      msg.className = 'msg error'; msg.textContent = 'Escribe un correo válido.'; return;
-    }
-
-    const { data: { session } } = await sb.auth.getSession();
-    if(!session){ msg.className = 'msg error'; msg.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión.'; return; }
-
-    try {
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/request-client-email-change', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + session.access_token,
-          'apikey': SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({ clientId: currentClientId, newEmail: nuevoCorreo })
-      });
-      const result = await resp.json();
-      if(!resp.ok || result.error){ msg.className = 'msg error'; msg.textContent = result.error || 'No se pudo enviar el código.'; return; }
-      msg.className = 'msg success';
-      msg.textContent = 'Te mandamos un código de verificación al correo nuevo.';
-      document.getElementById('cd-emailChange-formStep').style.display = 'none';
-      document.getElementById('cd-emailChange-codeStep').style.display = 'block';
-    } catch(err){
-      msg.className = 'msg error'; msg.textContent = 'No se pudo enviar el código: ' + err.message;
-    }
-  }
-
-  async function confirmClientEmailChange(){
-    const msg = document.getElementById('cdEmailChangeMsg');
-    msg.className = 'msg'; msg.textContent = '';
-    if(!currentClientId){ msg.className = 'msg error'; msg.textContent = 'No hay un cliente abierto.'; return; }
-
-    const code = document.getElementById('cd-emailChange-codigo').value.trim();
-    if(!code){ msg.className = 'msg error'; msg.textContent = 'Escribe el código que mandamos al correo nuevo.'; return; }
-
-    const { data: { session } } = await sb.auth.getSession();
-    if(!session){ msg.className = 'msg error'; msg.textContent = 'Tu sesión expiró. Vuelve a iniciar sesión.'; return; }
-
-    try {
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/confirm-client-email-change', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + session.access_token,
-          'apikey': SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({ clientId: currentClientId, code })
-      });
-      const result = await resp.json();
-      if(!resp.ok || result.error){ msg.className = 'msg error'; msg.textContent = result.error || 'No se pudo confirmar el código.'; return; }
-
-      msg.className = 'msg success'; msg.textContent = 'Correo del cliente actualizado.';
-      document.getElementById('cd-emailChange-codeStep').style.display = 'none';
-      // Actualizamos solo lo que cambió en pantalla (no llamamos fillClientDetail
-      // completo aquí porque eso reinicia/cierra este mismo panel y se
-      // borraría el mensaje de éxito antes de que se alcance a leer).
-      const { data: refreshed } = await sb.from('clients').select('email').eq('id', currentClientId).single();
-      if(refreshed){
-        currentClientEmail = refreshed.email || '';
-        document.getElementById('cd-view-correo').textContent = refreshed.email || '—';
-        document.getElementById('cd-subtitulo').textContent = refreshed.email || document.getElementById('cd-view-telefono').textContent || 'Sin datos de contacto';
-        document.getElementById('ec-correo').value = refreshed.email || '';
-      }
-    } catch(err){
-      msg.className = 'msg error'; msg.textContent = 'No se pudo confirmar: ' + err.message;
-    }
-  }
-  // ===================== FIN CAMBIO DE CORREO DEL CLIENTE =====================
 
   function backToClientsList(){
     currentClientId = null;
@@ -8807,9 +8821,23 @@
   // detalles, nada) — solo un panel para mandárselo a firmar (copiar link o por
   // correo). Ya firmado, se ve el documento completo con el sello de "Firmado" y
   // se puede imprimir/descargar. `contentHtml` se guarda siempre (aunque quede
-  // oculto) porque `ensureSignatureLink` lee de ahí lo que le manda al cliente.
+  // oculto) porque `ensureSignatureLink` lee de ahí lo que le manda al cliente —
+  // por eso el pie de página legal (GMAX_LEGAL_FOOTER_HTML) se agrega AQUÍ, una
+  // sola vez, y así queda incluido automáticamente en todo documento que se le
+  // manda al cliente a firmar (recibo, endorsement, cancelación), sin tener que
+  // repetirlo en cada función.
+  const GMAX_LEGAL_FOOTER_HTML = `
+    <div style="margin-top:32px; padding-top:18px; border-top:1.5px solid var(--line); text-align:center;">
+      <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:38px; width:auto; opacity:0.9;">
+      <p style="font-size:10.5px; color:var(--slate-light); line-height:1.6; margin-top:10px; max-width:560px; margin-left:auto; margin-right:auto; text-align:left;">
+        <strong>GMAX All Insurance</strong> is a licensed insurance agency in the State of Texas. This document and any related communication are confidential and intended solely for the named client. By signing electronically, you acknowledge that your electronic signature is the legal equivalent of a handwritten signature and constitutes your agreement to the terms described in this document, in accordance with the U.S. Electronic Signatures in Global and National Commerce Act (E-SIGN Act) and the Texas Uniform Electronic Transactions Act (UETA). This document does not by itself create, modify, or guarantee insurance coverage; coverage is at all times subject to the terms, conditions, exclusions, and limits of the policy actually issued by the insurance carrier. Any service fee referenced above is charged by GMAX All Insurance for policy placement and servicing and is separate from, and in addition to, the premium charged by the insurance carrier. Questions about this document should be directed to GMAX All Insurance at (832) 480-0217. Full Terms &amp; Conditions and Privacy Policy: <a href="https://gmaxallinsurance.com/terminos-y-condiciones.html" style="color:var(--navy);">gmaxallinsurance.com/terminos-y-condiciones.html</a>.
+      </p>
+    </div>
+  `;
+
   async function renderSignGatedDocument(transactionId, contentHtml, opts){
     opts = opts || {};
+    contentHtml = contentHtml + GMAX_LEGAL_FOOTER_HTML;
     const { data: sigReq } = await sb.from('signature_requests')
       .select('*')
       .eq('transaction_id', transactionId)
@@ -8970,6 +8998,17 @@
     const receiptHtml = document.getElementById('cd-receiptContent') ? document.getElementById('cd-receiptContent').innerHTML : document.getElementById('cd-receiptCard').innerHTML;
     const { data: { session } } = await sb.auth.getSession();
     const signLinkBase = window.location.origin + window.location.pathname;
+
+    // El título del documento se manda tal cual a la Edge Function (puede
+    // usarlo en el asunto/cuerpo del correo) — antes quedaba fijo en "Recibo
+    // de pago" sin importar si era en realidad un endorsement o cancelación.
+    let documentTitle = 'Recibo de pago — GMAX All Insurance';
+    const { data: txForTitle } = await sb.from('client_transactions').select('transaction_type').eq('id', transactionId).single();
+    if(txForTitle){
+      if(txForTitle.transaction_type === 'endorsement') documentTitle = 'Formulario de Endorsement — GMAX All Insurance';
+      else if(txForTitle.transaction_type === 'cancelacion') documentTitle = 'Aviso de Cancelación — GMAX All Insurance';
+    }
+
     const resp = await fetch(SUPABASE_URL + '/functions/v1/create-signature-request', {
       method: 'POST',
       headers: {
@@ -8980,7 +9019,7 @@
       body: JSON.stringify({
         transactionId,
         clientId: currentClientId,
-        documentTitle: 'Recibo de pago — GMAX All Insurance',
+        documentTitle,
         documentHtml: receiptHtml,
         agentName: currentProfile ? currentProfile.full_name : null,
         sendToEmail: sendToEmail || undefined,
