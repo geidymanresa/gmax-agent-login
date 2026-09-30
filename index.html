@@ -3574,8 +3574,28 @@
       // Vuelve a pedir el documento — ya viene marcado como firmado, con el
       // contenido completo y la firma, listo para ver/descargar.
       await loadSignatureDocument(token);
+      // Avisa por correo a la agencia que el cliente acaba de firmar y enviar
+      // el documento. Es un aviso "mejor esfuerzo": si falla, no debe afectar
+      // en nada la experiencia del cliente, que ya firmó exitosamente.
+      notifySignatureCompleted(token);
     } catch(err){
       showMsg('sign-msg','error','Error de conexión: ' + err.message);
+    }
+  }
+
+  // Llama a la Edge Function notify-signature-completed (nueva) para que le
+  // llegue un correo a la agencia cada vez que un cliente firma y envía un
+  // documento. No se espera nada de vuelta ni se le muestra nada al cliente;
+  // cualquier error se ignora a propósito.
+  async function notifySignatureCompleted(token){
+    try {
+      await fetch(SUPABASE_URL + '/functions/v1/notify-signature-completed', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ token })
+      });
+    } catch(err){
+      // Silencioso a propósito.
     }
   }
 
