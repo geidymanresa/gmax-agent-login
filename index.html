@@ -1004,6 +1004,22 @@
             <div id="statusReviewList"></div>
           </div>
 
+          <!-- Resultado de cada cobro automático con tarjeta (ver sección "Pago
+               automático con tarjeta" en el perfil del cliente) — lo llena la
+               función programada run-venture-auto-charges, que corre sola
+               todos los días, no el CRM. -->
+          <div class="dash-card" id="autoChargeAlertsCard" style="display:none; margin:0; background:#EFF3FF; border:1.5px solid #C7D3F5;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+              <div>
+                <div style="display:inline-block; background:#3B5FC9; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔵 Pago automático</div>
+                <h4 style="margin-top:0; color:#2B3F8C;">💳 Cobros automáticos (Venture)</h4>
+              </div>
+              <button type="button" class="btn-ghost" style="width:auto; padding:6px 12px; font-size:12px; flex-shrink:0;" onclick="markAllAutoChargesViewed()">Marcar todas vistas</button>
+            </div>
+            <p class="sub" style="margin:0 0 8px;">Clientes a los que ya se les intentó cobrar la mensualidad automático — revisa cuáles salieron bien y cuáles no.</p>
+            <div id="autoChargeAlertsList"></div>
+          </div>
+
         </div>
 
         <div class="dash-card" id="leadsCard" style="margin-top:20px; background:#EAF1FB; border:1.5px solid #C7D9F3;">
@@ -1796,6 +1812,30 @@
                 <tbody id="cd-polizasList"><tr><td colspan="8">—</td></tr></tbody>
               </table>
             </div>
+          </div>
+
+          <!-- Pago automático con tarjeta (solo pólizas de Venture) -->
+          <div class="dash-card" id="cd-autoPayCard" style="display:none;">
+            <h4>💳 Pago automático con tarjeta (Venture)</h4>
+            <p class="sub" style="margin-bottom:14px;">Para clientes de Venture que prefieren que GMAX les cobre la mensualidad con tarjeta automáticamente, en vez de activar el EFT directo con la aseguradora. El cliente firma una autorización una sola vez — después, cada cobro se hace solo y se le manda el recibo por correo, sin pedirle firma de nuevo.</p>
+            <div id="cd-autoPayCardInfo" style="margin-bottom:12px;">Cargando...</div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="btn-ghost" id="cd-autoPaySaveCardBtn" type="button" style="width:auto; padding:10px 18px;" onclick="openAutoPayCardPanel()">💳 Guardar tarjeta</button>
+              <button class="btn-ghost" id="cd-autoPayRemoveCardBtn" type="button" style="width:auto; padding:10px 18px; display:none; color:#C23B3B; border-color:#F0C6C6;" onclick="removeAutoPayCard()">Quitar tarjeta guardada</button>
+            </div>
+            <div id="cd-autoPayCardPanel" style="display:none; margin-top:16px; padding-top:16px; border-top:1px solid var(--line);">
+              <div class="form-row">
+                <label>Tarjeta del cliente</label>
+                <div id="autopay-card-element" style="padding:10px 12px; border:1.5px solid var(--line); border-radius:8px;"></div>
+                <div class="msg error" id="autopay-card-errors" style="margin-top:6px;"></div>
+              </div>
+              <div class="msg" id="cd-autoPayCardMsg"></div>
+              <div style="display:flex; gap:10px; margin-top:10px;">
+                <button type="button" class="btn-primary" id="cd-autoPaySubmitCardBtn" style="width:auto; padding:10px 18px;" onclick="saveAutoPayCard()">Guardar tarjeta</button>
+                <button type="button" class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="closeAutoPayCardPanel()">Cancelar</button>
+              </div>
+            </div>
+            <div id="cd-autoPayPoliciesList" style="margin-top:16px;"></div>
           </div>
 
           <!-- Edición de póliza (exclusivo super_admin) -->
@@ -4375,6 +4415,7 @@
     await safeLoad(loadRenewals, 'Próximas renovaciones');
     await safeLoad(loadStatusReviewAlerts, 'Revisar estatus de pólizas');
     await safeLoad(loadVentureEftAlerts, 'Pagos automáticos Venture');
+    await safeLoad(loadAutoChargeAlerts, 'Cobros automáticos Venture');
     await safeLoad(loadLeads, 'Leads');
     await safeLoad(() => setBookOfBusinessRange('today'), 'Libro de negocio');
     await safeLoad(loadUnderwriting, 'Underwriting');
@@ -4414,6 +4455,7 @@
       await safeAutoRefresh(loadDashboardAgentAlerts, 'Tareas de la administradora');
       await safeAutoRefresh(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
       await safeAutoRefresh(loadDashboardFollowups, 'Recordatorios de seguimiento');
+      await safeAutoRefresh(loadAutoChargeAlerts, 'Cobros automáticos Venture');
     }
 
     // Perfil de un cliente abierto: refresca sus pólizas (por si cambió el
@@ -5578,6 +5620,7 @@
     document.getElementById('cd-polizas-nota').style.display = isSA ? 'none' : 'block';
     if(!policies || policies.length === 0){
       tbody.innerHTML = '<tr><td colspan="8">Sin pólizas registradas.</td></tr>';
+      await loadClientAutoPay(clientId, []);
       return;
     }
     tbody.innerHTML = policies.map(p => {
@@ -5680,6 +5723,8 @@
     // Ahora que ya sabemos qué pólizas existen, refrescamos la tabla general de
     // Vehículos para que su columna "Póliza" también quede correcta.
     renderVehiclesTable();
+
+    await loadClientAutoPay(clientId, policies);
   }
 
   async function restorePolicy(policyId){
@@ -6766,8 +6811,8 @@
 
   async function documentLinkHtml(doc){
     if(isInternalFormDocument(doc)){
-      const icon = doc.category === 'Formulario de Endorsement' ? '📝' : (doc.category === 'Formulario de Cancelación' ? '📄' : (doc.category === 'Formulario de Reinstalación' ? '✅' : '🧾'));
-      const viewerFn = doc.category === 'Formulario de Endorsement' ? 'showEndorsementForm' : (doc.category === 'Formulario de Cancelación' ? 'showCancellationForm' : (doc.category === 'Formulario de Reinstalación' ? 'showReinstatementForm' : 'showReceipt'));
+      const icon = doc.category === 'Formulario de Endorsement' ? '📝' : (doc.category === 'Formulario de Cancelación' ? '📄' : (doc.category === 'Formulario de Reinstalación' ? '✅' : (doc.category === 'Autorización de Pago Automático' ? '🔁' : '🧾')));
+      const viewerFn = doc.category === 'Formulario de Endorsement' ? 'showEndorsementForm' : (doc.category === 'Formulario de Cancelación' ? 'showCancellationForm' : (doc.category === 'Formulario de Reinstalación' ? 'showReinstatementForm' : (doc.category === 'Autorización de Pago Automático' ? 'showAutoPayConsentForm' : 'showReceipt')));
       const badgeHtml = await documentSignatureBadgeHtml(doc.receipt_transaction_id);
       return `<a href="#" onclick="${viewerFn}('${doc.receipt_transaction_id}'); return false;">${icon} ${doc.file_name}</a>${badgeHtml}`;
     }
@@ -9033,6 +9078,28 @@
     document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
   }
 
+  // Para los recibos de "Pago Automático" (cobro mensual con tarjeta guardada,
+  // ver sección de Pago automático más abajo) — el cliente YA dio su
+  // consentimiento una sola vez al activar el pago automático (eso sí pasa por
+  // renderSignGatedDocument/firma electrónica, como cualquier otro documento).
+  // Cada cobro individual de ahí en adelante NO vuelve a pedir firma — este
+  // recibo se muestra directo, sin la pantalla de "falta la firma del cliente".
+  function renderUngatedReceipt(contentHtml){
+    const receiptContentEl = document.getElementById('cd-receiptContent');
+    receiptContentEl.innerHTML = contentHtml + GMAX_LEGAL_FOOTER_HTML + `
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">⬇️ Descargar</button>
+      </div>
+    `;
+    receiptContentEl.style.display = 'block';
+    document.getElementById('cd-receiptPrintBtn').style.display = 'inline-flex';
+    const sendPanel = document.getElementById('cd-sendPanel');
+    sendPanel.style.display = 'none';
+    sendPanel.innerHTML = '';
+    document.getElementById('cd-receiptCard').style.display = 'block';
+    document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
   async function showReceipt(transactionId, policyNumberArg){
     const { data: t } = await sb.from('client_transactions').select('*').eq('id', transactionId).single();
     if(!t) return;
@@ -9047,6 +9114,11 @@
     if(t.created_by){
       const { data: agentProfile } = await sb.from('profiles').select('full_name').eq('id', t.created_by).single();
       agentName = agentProfile ? agentProfile.full_name : '—';
+    } else if(t.transaction_type === 'pago_automatico'){
+      // Los cobros automáticos los hace la función programada, sin ninguna
+      // agente de por medio — created_by queda vacío a propósito (ver
+      // migracion_pago_automatico_venture.sql).
+      agentName = 'Cobro automático (sistema)';
     }
 
     const fecha = formatDateUS(t.receipt_issued_at ? t.receipt_issued_at.split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -9099,6 +9171,15 @@
       </div>
 
       <div style="margin-top:18px; font-size:11.5px; color:var(--slate-light); line-height:1.6;">
+        ${t.transaction_type === 'pago_automatico' ? `
+        <strong>AUTOMATIC PAYMENT NOTICE.</strong> This charge was processed automatically under the Automatic
+        Payment Authorization previously signed by the client for this policy, authorizing GMAX All Insurance
+        to charge the payment method on file each billing cycle until the client cancels this authorization or
+        the policy ends. No additional signature is required for this individual charge — this receipt is
+        provided for the client's records. The Agency Service Fee and Payment Processing Fee, when applicable,
+        remain separate from the insurance premium and are earned upon performance of the service, consistent
+        with the original signed authorization.
+        ` : `
         <strong>AUTHORIZATION AND CONSENT TO CHARGES.</strong> By signing this document, I, the undersigned, acknowledge
         and agree to the following: (1) I am purchasing and/or servicing an insurance policy, or requesting a
         related service (which may include, without limitation, a new policy, an endorsement, an assisted
@@ -9117,6 +9198,7 @@
         binding and has the same effect as a handwritten signature, pursuant to the Texas Uniform Electronic
         Transactions Act (Tex. Bus. & Com. Code Ch. 322) and the federal E-SIGN Act. (6) This authorization
         applies only to the transaction described on this receipt and does not authorize any future charge.
+        `}
       </div>
 
       <!-- Desglose y nota: debajo de los términos y condiciones -->
@@ -9126,6 +9208,10 @@
       </div>
       ${notaDeposito}
     `;
+    if(t.transaction_type === 'pago_automatico'){
+      renderUngatedReceipt(contentHtml);
+      return;
+    }
     await renderSignGatedDocument(transactionId, contentHtml, {
       title: 'Recibo de pago — pendiente de firma',
       description: 'Por ley, este recibo no se puede ver completo, descargar ni enviar hasta que el cliente lo firme. Mándale el link para que lo revise y firme desde su teléfono.'
@@ -9153,6 +9239,7 @@
     if(txForTitle){
       if(txForTitle.transaction_type === 'endorsement') documentTitle = 'Formulario de Endorsement — GMAX All Insurance';
       else if(txForTitle.transaction_type === 'cancelacion') documentTitle = 'Aviso de Cancelación — GMAX All Insurance';
+      else if(txForTitle.transaction_type === 'autorizacion_pago_automatico') documentTitle = 'Autorización de Pago Automático — GMAX All Insurance';
     }
 
     const resp = await fetch(SUPABASE_URL + '/functions/v1/create-signature-request', {
@@ -9837,7 +9924,12 @@
     if(due.length === 0){ card.style.display = 'none'; return; }
     card.style.display = 'block';
     list.innerHTML = due.map(({ p, diff }) => {
-      const diasTexto = diff === 0 ? 'le toca hoy' : diff < 0 ? `le toca en ${Math.abs(diff)} día${Math.abs(diff) === 1 ? '' : 's'}` : `le tocó hace ${diff} día${diff === 1 ? '' : 's'}`;
+      // OJO: "diff" sale de nearestMonthlyOccurrenceDiff(), que calcula
+      // (fecha_de_cobro - hoy) — si es positivo, la fecha de cobro todavía no
+      // llega (está en el futuro); si es negativo, ya pasó. Antes este texto
+      // estaba invertido (decía "le toca en N días" cuando en realidad ya
+      // había pasado, y viceversa) — corregido 1 oct 2026.
+      const diasTexto = diff === 0 ? 'le toca hoy' : diff > 0 ? `le toca en ${diff} día${diff === 1 ? '' : 's'}` : `le tocó hace ${Math.abs(diff)} día${Math.abs(diff) === 1 ? '' : 's'}`;
       return `
       <div style="padding:8px 0; border-bottom:1px solid #F0B87F; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${p.client_id}')">
@@ -9906,6 +9998,334 @@
     await loadVentureEftAlerts();
   }
   // =================== FIN VENTURE: AVISO DE PAGO AUTOMÁTICO (EFT) ===================
+
+  // ===================== PAGO AUTOMÁTICO CON TARJETA (solo Venture) =====================
+  // Opción alterna al EFT de arriba: en vez de que el cliente active el pago
+  // automático DIRECTO con Venture, GMAX le guarda la tarjeta y le cobra la
+  // mensualidad automático. El cliente firma UNA autorización (reutiliza la
+  // misma infraestructura de firma electrónica que ya usan los recibos/
+  // endorsements/cancelaciones) y de ahí en adelante una función programada en
+  // Supabase (run-venture-auto-charges — NO corre desde el CRM, corre sola
+  // todos los días) cobra la tarjeta guardada 4 días antes de la fecha de pago
+  // con la aseguradora, guarda la transacción real y el recibo en Documentos,
+  // y le manda el recibo por correo al cliente — sin pedir firma de nuevo en
+  // cada cobro. Si el cobro falla, NO reintenta sola — solo avisa en el
+  // dashboard (tarjeta "💳 Cobros automáticos (Venture)", más abajo) para que
+  // Geidy decida qué hacer.
+
+  let autopayStripeElements = null;
+  let autopayCardElement = null;
+  let autopayCardMounted = false;
+
+  function ensureAutopayCardMounted(){
+    if(!stripeClient || autopayCardMounted) return;
+    autopayStripeElements = stripeClient.elements();
+    autopayCardElement = autopayStripeElements.create('card', {
+      style: { base: { fontSize: '16px', color: '#1b2430', fontFamily: 'inherit' } }
+    });
+    autopayCardElement.mount('#autopay-card-element');
+    autopayCardElement.on('change', (event) => {
+      document.getElementById('autopay-card-errors').textContent = event.error ? event.error.message : '';
+    });
+    autopayCardMounted = true;
+  }
+
+  // Se llama junto con loadClientPolicies() cada vez que se abre un cliente (y
+  // en el auto-refresh de 20s) — muestra/oculta la tarjeta completa según si
+  // el cliente tiene al menos una póliza de Venture activa, pinta el estado de
+  // la tarjeta guardada, y el estado de cada póliza elegible (sin activar /
+  // pendiente de firma / activado). De paso, si detecta que el cliente ya
+  // firmó una autorización pendiente, activa auto_pay_enabled en ese momento
+  // (no hay forma de que la Edge Function avise al CRM en vivo, así que se
+  // detecta por sondeo, igual que el badge de "✓ Firmado" de Documentos).
+  async function loadClientAutoPay(clientId, policiesArg){
+    const card = document.getElementById('cd-autoPayCard');
+    if(!card) return;
+    const policies = (policiesArg || []).filter(p => p.status !== 'cancelled' && (p.company || '').toLowerCase().includes('venture'));
+    if(policies.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+
+    const { data: cliente } = await sb.from('clients').select('stripe_customer_id, stripe_pm_id, card_brand, card_last4').eq('id', clientId).single();
+    const info = document.getElementById('cd-autoPayCardInfo');
+    const saveBtn = document.getElementById('cd-autoPaySaveCardBtn');
+    const removeBtn = document.getElementById('cd-autoPayRemoveCardBtn');
+    const tieneTarjeta = !!(cliente && cliente.stripe_pm_id);
+    if(tieneTarjeta){
+      info.innerHTML = `<div style="padding:10px 14px; background:#E4F6EC; border:1.5px solid #A9DFC4; border-radius:8px; color:#177A54; font-weight:700;">💳 ${CARD_BRAND_LABELS[cliente.card_brand] || cliente.card_brand || 'Tarjeta'} terminada en ${cliente.card_last4 || '----'}</div>`;
+      saveBtn.textContent = '💳 Actualizar tarjeta';
+      removeBtn.style.display = 'inline-block';
+    } else {
+      info.innerHTML = `<div style="padding:10px 14px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:8px; color:#8a6116;">Este cliente todavía no tiene tarjeta guardada para pago automático.</div>`;
+      saveBtn.textContent = '💳 Guardar tarjeta';
+      removeBtn.style.display = 'none';
+    }
+
+    const rowsHtml = await Promise.all(policies.map(async p => {
+      let autoPayEnabled = !!p.auto_pay_enabled;
+      let lastConsentTxId = null;
+      if(!autoPayEnabled){
+        const { data: lastConsentTx } = await sb.from('client_transactions')
+          .select('id')
+          .eq('policy_id', p.id)
+          .eq('transaction_type', 'autorizacion_pago_automatico')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if(lastConsentTx){
+          lastConsentTxId = lastConsentTx.id;
+          const { data: sigReq } = await sb.from('signature_requests').select('status').eq('transaction_id', lastConsentTx.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+          if(sigReq && sigReq.status === 'firmado'){
+            await sb.from('client_policies').update({ auto_pay_enabled: true }).eq('id', p.id);
+            autoPayEnabled = true;
+          }
+        }
+      }
+
+      let estadoHtml;
+      if(autoPayEnabled){
+        estadoHtml = `<span style="color:#177A54; font-weight:700;">✓ Pago automático activado</span> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="disableAutoPayForPolicy('${p.id}')">Desactivar</button>`;
+      } else if(lastConsentTxId){
+        estadoHtml = `<span style="color:#8a6116; font-weight:700;">⏳ Falta que el cliente firme la autorización</span> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="showAutoPayConsentForm('${lastConsentTxId}')">Ver / reenviar</button>`;
+      } else {
+        estadoHtml = `<button type="button" class="btn-primary" style="width:auto; padding:6px 14px; font-size:12.5px;" onclick="requestAutoPayConsent('${p.id}')" ${tieneTarjeta ? '' : 'disabled title="Primero guarda la tarjeta del cliente"'}>Activar pago automático</button>`;
+      }
+
+      return `
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
+          <div>${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''} ${p.policy_number ? '(#' + p.policy_number + ')' : ''} — ${p.company || ''}</div>
+          <div>${estadoHtml}</div>
+        </div>
+      `;
+    }));
+    document.getElementById('cd-autoPayPoliciesList').innerHTML = rowsHtml.join('');
+  }
+
+  function openAutoPayCardPanel(){
+    document.getElementById('cd-autoPayCardPanel').style.display = 'block';
+    ensureAutopayCardMounted();
+  }
+
+  function closeAutoPayCardPanel(){
+    document.getElementById('cd-autoPayCardPanel').style.display = 'none';
+  }
+
+  async function saveAutoPayCard(){
+    if(!stripeClient || !autopayCardElement){
+      showMsg('cd-autoPayCardMsg','error','Stripe no está disponible.');
+      return;
+    }
+    const btn = document.getElementById('cd-autoPaySubmitCardBtn');
+    btn.disabled = true;
+    showMsg('cd-autoPayCardMsg','success','Guardando tarjeta...');
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const startResp = await fetch(SUPABASE_URL + '/functions/v1/manage-client-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ action: 'start', clientId: currentClientId })
+      });
+      const startData = await startResp.json();
+      if(!startResp.ok || startData.error) throw new Error(startData.error || 'No se pudo iniciar.');
+
+      const { error: stripeError, setupIntent } = await stripeClient.confirmCardSetup(startData.clientSecret, {
+        payment_method: { card: autopayCardElement }
+      });
+      if(stripeError) throw new Error(stripeError.message);
+
+      const finalResp = await fetch(SUPABASE_URL + '/functions/v1/manage-client-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ action: 'finalize', clientId: currentClientId, customerId: startData.customerId, paymentMethodId: setupIntent.payment_method })
+      });
+      const finalData = await finalResp.json();
+      if(!finalResp.ok || finalData.error) throw new Error(finalData.error || 'No se pudo guardar la tarjeta.');
+
+      showMsg('cd-autoPayCardMsg','success','✔ Tarjeta guardada correctamente.');
+      closeAutoPayCardPanel();
+      await loadClientPolicies(currentClientId);
+    } catch(err){
+      showMsg('cd-autoPayCardMsg','error', err.message);
+    }
+    btn.disabled = false;
+  }
+
+  async function removeAutoPayCard(){
+    if(!confirm('¿Quitar la tarjeta guardada de este cliente? Esto también apaga el pago automático en todas sus pólizas.')) return;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/manage-client-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ action: 'remove', clientId: currentClientId })
+      });
+      const data = await resp.json();
+      if(!resp.ok || data.error) throw new Error(data.error || 'No se pudo quitar la tarjeta.');
+      await loadClientPolicies(currentClientId);
+    } catch(err){
+      alert('No se pudo quitar la tarjeta: ' + err.message);
+    }
+  }
+
+  async function disableAutoPayForPolicy(policyId){
+    if(!confirm('¿Desactivar el pago automático de esta póliza? Ya no se le va a cobrar la tarjeta sola — tendrías que activarla de nuevo (con una nueva autorización firmada) si lo quieres reactivar después.')) return;
+    const { error } = await sb.from('client_policies').update({ auto_pay_enabled: false }).eq('id', policyId);
+    if(error){ alert('No se pudo desactivar: ' + error.message); return; }
+    await loadClientPolicies(currentClientId);
+  }
+
+  async function requestAutoPayConsent(policyId){
+    const { data: cliente } = await sb.from('clients').select('stripe_pm_id, card_brand, card_last4').eq('id', currentClientId).single();
+    if(!cliente || !cliente.stripe_pm_id){
+      alert('Primero hay que guardar la tarjeta del cliente.');
+      return;
+    }
+    const { data: pol } = await sb.from('client_policies').select('*').eq('id', policyId).single();
+    if(!pol) return;
+    if(!pol.monthly_payment){
+      alert('Esta póliza no tiene un pago mensual guardado — corrígelo primero en "Editar póliza" antes de activar el pago automático.');
+      return;
+    }
+
+    const { data: { session } } = await sb.auth.getSession();
+    const payload = {
+      client_id: currentClientId,
+      policy_id: policyId,
+      transaction_type: 'autorizacion_pago_automatico',
+      payment_method: 'tarjeta',
+      card_brand: cliente.card_brand,
+      card_last4: cliente.card_last4,
+      product: pol.insurance_type,
+      company_name: pol.company,
+      total_reference: pol.monthly_payment,
+      service_fee_amount: 0,
+      processing_fee_estimate: 0,
+      notes: 'Autorización de pago automático mensual para esta póliza (Venture).',
+      status: 'completada',
+      created_by: session.user.id
+    };
+    const { data: insertedTx, error } = await sb.from('client_transactions').insert(payload).select().single();
+    if(error){
+      alert('No se pudo crear la autorización: ' + error.message);
+      return;
+    }
+    await saveAutoPayConsentAsDocument(insertedTx.id, pol.policy_number || 's/n');
+    await loadClientDocuments(currentClientId);
+    await loadClientPolicies(currentClientId);
+    showAutoPayConsentForm(insertedTx.id);
+  }
+
+  async function saveAutoPayConsentAsDocument(transactionId, policyNumber){
+    const { data: { session } } = await sb.auth.getSession();
+    await sb.from('client_documents').insert({
+      client_id: currentClientId,
+      file_name: `Autorización de Pago Automático - #${policyNumber}`,
+      storage_path: null,
+      category: 'Autorización de Pago Automático',
+      receipt_transaction_id: transactionId,
+      uploaded_by: session.user.id
+    });
+  }
+
+  async function showAutoPayConsentForm(transactionId){
+    const { data: t } = await sb.from('client_transactions').select('*').eq('id', transactionId).single();
+    if(!t) return;
+    let policyNumber = '—';
+    if(t.policy_id){
+      const { data: pol } = await sb.from('client_policies').select('policy_number').eq('id', t.policy_id).single();
+      policyNumber = pol ? (pol.policy_number || '—') : '—';
+    }
+    const clienteNombre = document.getElementById('cd-nombre').textContent;
+    const fecha = formatDateUS(t.created_at ? t.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
+    const cardLine = (t.card_brand && t.card_last4)
+      ? `${CARD_BRAND_LABELS[t.card_brand] || t.card_brand} terminada en ${t.card_last4}`
+      : 'la tarjeta guardada en el sistema';
+
+    const contentHtml = `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <img src="logo-gmax-transparente.png" alt="GMAX All Insurance" style="height:52px; width:auto;">
+        <div>
+          <h3 style="margin:0;">Autorización de Pago Automático</h3>
+          <p class="sub" style="margin-top:4px;">GMAX All Insurance</p>
+        </div>
+      </div>
+
+      <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Cliente</div><div>${clienteNombre}</div></div>
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Fecha</div><div>${fecha}</div></div>
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Compañía</div><div>${t.company_name || '—'}</div></div>
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Número de póliza</div><div>${policyNumber}</div></div>
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Monto mensual a cobrar</div><div>$${Number(t.total_reference || 0).toFixed(2)}</div></div>
+        <div><div class="label" style="font-size:12px; color:var(--slate-light);">Tarjeta</div><div>${cardLine}</div></div>
+      </div>
+
+      <div style="margin-top:18px; font-size:11.5px; color:var(--slate-light); line-height:1.6;">
+        <strong>AUTOMATIC/RECURRING PAYMENT AUTHORIZATION.</strong> By signing this document, I, the undersigned,
+        authorize GMAX All Insurance ("the Agency") to automatically charge the payment method on file (described
+        above) for the monthly amount shown, each billing cycle, for as long as this policy remains active and
+        this authorization is not cancelled. I understand that: (1) this authorization covers EVERY future
+        recurring charge under this policy, not just a single transaction — this is the key difference between
+        this document and a normal one-time receipt; (2) I will receive a receipt by email each time a payment is
+        processed, and no additional signature will be requested for those individual charges; (3) I may cancel
+        this automatic payment authorization at any time by contacting the Agency, after which charges will stop
+        and I will be responsible for paying the carrier directly (for example, by enrolling in the carrier's own
+        EFT/automatic payment program); (4) if a charge cannot be processed (insufficient funds, expired card,
+        etc.), the Agency will not retry automatically and will contact me if needed; (5) I agree that my
+        electronic signature captured through this system is legally binding and has the same effect as a
+        handwritten signature, pursuant to the Texas Uniform Electronic Transactions Act (Tex. Bus. & Com. Code
+        Ch. 322) and the federal E-SIGN Act.
+      </div>
+    `;
+    await renderSignGatedDocument(transactionId, contentHtml, {
+      title: 'Autorización de Pago Automático — pendiente de firma',
+      description: 'El cliente tiene que firmar esto UNA sola vez para activar el pago automático de esta póliza. Mándale el link para que lo revise y firme desde su teléfono.'
+    });
+  }
+  // Tarjeta del dashboard "💳 Cobros automáticos (Venture)" — lee client_auto_charges,
+  // que llena la función programada run-venture-auto-charges (corre sola en
+  // Supabase, no desde el CRM) cada vez que intenta cobrar una póliza, haya
+  // salido bien o mal. Mismo patrón de "visto"/"marcar visto" que ya usa
+  // "🔔 Firmas recientes de clientes".
+  async function loadAutoChargeAlerts(){
+    const card = document.getElementById('autoChargeAlertsCard');
+    const list = document.getElementById('autoChargeAlertsList');
+    if(!card) return;
+    const { data, error } = await sb.from('client_auto_charges')
+      .select('*, client:client_id(full_name), policy:policy_id(policy_number, insurance_type)')
+      .eq('viewed', false)
+      .order('charged_at', { ascending: false })
+      .limit(20);
+    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = data.map(c => {
+      const ok = c.status === 'cobrado';
+      const fecha = formatDateTimeUS(c.charged_at);
+      const polizaTxt = c.policy ? ((INSURANCE_TYPE_LABELS[c.policy.insurance_type] || c.policy.insurance_type || '') + (c.policy.policy_number ? ' (#' + c.policy.policy_number + ')' : '')) : '';
+      return `
+      <div style="padding:8px 0; border-bottom:1px solid #C7D3F5; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${c.client_id}')">
+          ${ok ? '✅' : '⚠️'} <strong>${c.client ? c.client.full_name : 'Cliente'}</strong> — ${polizaTxt}
+          <div class="sub" style="margin-top:2px;">
+            ${ok ? `Se cobró $${Number(c.amount || 0).toFixed(2)}` : `No se pudo cobrar$${c.amount ? ' ($' + Number(c.amount).toFixed(2) + ')' : ''}${c.failure_reason ? ' — ' + escapeHtml(c.failure_reason) : ''}`}
+            — ${fecha}
+          </div>
+        </div>
+        <button class="btn-ghost" style="width:auto; padding:6px 10px; flex-shrink:0;" onclick="markAutoChargeViewed('${c.id}', event)">Marcar vista</button>
+      </div>
+    `;
+    }).join('');
+  }
+
+  async function markAutoChargeViewed(id, evt){
+    if(evt) evt.stopPropagation();
+    await sb.from('client_auto_charges').update({ viewed: true }).eq('id', id);
+    await loadAutoChargeAlerts();
+  }
+
+  async function markAllAutoChargesViewed(){
+    await sb.from('client_auto_charges').update({ viewed: true }).eq('viewed', false);
+    await loadAutoChargeAlerts();
+  }
+  // =================== FIN PAGO AUTOMÁTICO CON TARJETA ===================
 
   // ---- Leads en proceso ----
   const LEAD_STATUSES = ['lead_nuevo'];
@@ -10179,7 +10599,14 @@
     endorsement: 'Endorsement',
     pago_asistido: 'Pago Asistido',
     cancelacion: 'Cancelación',
-    reinstalacion: 'Reinstalación'
+    reinstalacion: 'Reinstalación',
+    // Estos dos NO se agregan a SERVICE_TYPE_EXPLAINER ni a los botones/selects
+    // de Service Fees a propósito — no son un tipo de servicio que la agente
+    // elija manualmente, son generados por el sistema de pago automático
+    // (ver sección "Pago automático con tarjeta" más abajo). Solo están acá
+    // para que se vean con un nombre bonito en Historial/Documentos/recibos.
+    autorizacion_pago_automatico: 'Autorización de Pago Automático',
+    pago_automatico: 'Pago Automático (Venture)'
   };
   const SERVICE_TYPE_EXPLAINER = {
     nueva_poliza: 'Se cobra únicamente cuando el agente registra una póliza nueva.',
