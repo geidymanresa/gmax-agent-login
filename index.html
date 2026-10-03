@@ -10038,7 +10038,28 @@
   // firmó una autorización pendiente, activa auto_pay_enabled en ese momento
   // (no hay forma de que la Edge Function avise al CRM en vivo, así que se
   // detecta por sondeo, igual que el badge de "✓ Firmado" de Documentos).
+  // OJO: esta función queda SIEMPRE dentro de su propio try/catch (ver abajo) a
+  // propósito — se llama desde loadClientPolicies(), que a su vez corre justo
+  // después de CUALQUIER transacción nueva (recibo, endorsement, cancelación,
+  // etc.), antes de mostrar la pantalla de "enviar para firma". Si esta función
+  // llegara a fallar sin este try/catch (por ejemplo, si todavía no se corrió
+  // la migración migracion_pago_automatico_venture.sql y faltan columnas como
+  // clients.stripe_pm_id), el error se propagaría hacia arriba y cortaría en
+  // seco TODO lo que viene después en el flujo de "Nueva transacción" —
+  // incluyendo la pantalla de firma — sin avisar nada, dejando a la agente
+  // pensando que algo se rompió cuando en realidad el cobro y el documento ya
+  // se habían guardado bien. Esto pasó una vez (1 oct 2026) y quedó corregido.
   async function loadClientAutoPay(clientId, policiesArg){
+    try {
+      await loadClientAutoPayInner(clientId, policiesArg);
+    } catch(err){
+      console.error('Error en loadClientAutoPay (no debería bloquear nada más):', err);
+      const card = document.getElementById('cd-autoPayCard');
+      if(card) card.style.display = 'none';
+    }
+  }
+
+  async function loadClientAutoPayInner(clientId, policiesArg){
     const card = document.getElementById('cd-autoPayCard');
     if(!card) return;
     const policies = (policiesArg || []).filter(p => p.status !== 'cancelled' && (p.company || '').toLowerCase().includes('venture'));
