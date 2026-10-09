@@ -4943,6 +4943,17 @@
   };
   const CLOSE_STATES = ['no_interesado', 'no_contactar'];
 
+  // Estado REAL del cliente según sus pólizas: si tiene al menos una póliza
+  // que no esté cancelada, es Activo; si TODAS están canceladas, es Inactivo.
+  // Los estados manuales de lead / no interesado / no contactar no se tocan,
+  // y un cliente sin pólizas conserva el estado que tenga guardado.
+  function effectiveClientStatus(clientStatus, policies){
+    if(clientStatus !== 'activo' && clientStatus !== 'inactivo') return clientStatus;
+    const list = policies || [];
+    if(!list.length) return clientStatus;
+    return list.some(p => p.status !== 'cancelled') ? 'activo' : 'inactivo';
+  }
+
   const INSURANCE_TYPE_LABELS = {
     auto_personal: 'Auto personal', home: 'Casa (Home)', vida: 'Vida', medico: 'Salud / Médico',
     renters: 'Renters', motocicleta: 'Motocicleta', auto_comercial: 'Auto comercial',
@@ -5047,8 +5058,8 @@
     const termDigits = rawTerm.replace(/\D/g, '');
     const productFilter = document.getElementById('clientProductFilter')?.value || '';
     filteredClientsList = allClients.filter(c => {
-      if(currentClientStatusFilter && c.client_status !== currentClientStatusFilter) return false;
       const policies = allClientPoliciesByClient[c.id] || [];
+      if(currentClientStatusFilter && effectiveClientStatus(c.client_status, policies) !== currentClientStatusFilter) return false;
       if(productFilter){
         if(!policies.some(p => p.insurance_type === productFilter)) return false;
       }
@@ -5650,6 +5661,20 @@
   async function loadClientPolicies(clientId){
     const { data: policies } = await sb.from('client_policies').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
     currentClientPolicies = policies || [];
+    // Mantiene la lista de Clientes y la etiqueta Activo/Inactivo al día después
+    // de cancelar, restaurar o agregar una póliza.
+    try{
+      allClientPoliciesByClient[clientId] = currentClientPolicies;
+      const cRow = allClients.find(x => x.id === clientId);
+      const badge = document.getElementById('cd-statusBadge');
+      if(cRow && badge){
+        const eff = effectiveClientStatus(cRow.client_status, currentClientPolicies);
+        badge.className = 'badge ' + (CLIENT_STATUS_BADGE[eff] || 'blue');
+        badge.textContent = CLIENT_STATUS_LABELS[eff] || eff;
+        const sel = document.getElementById('ec-clientstatus');
+        if(sel && (cRow.client_status === 'activo' || cRow.client_status === 'inactivo')) sel.value = eff;
+      }
+    } catch(err){ console.error('No se pudo refrescar el estado del cliente:', err); }
     const tbody = document.getElementById('cd-polizasList');
     const isSA = isSuperAdminUser();
     const isAdmin = isAdminUser();
@@ -5968,7 +5993,8 @@
     document.getElementById('cd-subtitulo').textContent = c.email || c.phone || 'Sin datos de contacto';
 
     const tags = [];
-    tags.push(`<span class="badge ${CLIENT_STATUS_BADGE[c.client_status] || 'blue'}">${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>`);
+    const effStatus = effectiveClientStatus(c.client_status, allClientPoliciesByClient[c.id] || []);
+    tags.push(`<span class="badge ${CLIENT_STATUS_BADGE[effStatus] || 'blue'}" id="cd-statusBadge">${CLIENT_STATUS_LABELS[effStatus] || effStatus}</span>`);
     tags.push(`<span class="badge purple">${c.client_type === 'business' ? 'Negocio' : 'Persona individual'}</span>`);
     tags.push(`<span class="badge gray">Cliente #${c.client_number || '—'}</span>`);
     document.getElementById('cd-tags').innerHTML = tags.join('');
@@ -6021,7 +6047,7 @@
     }
 
     document.getElementById('ec-tipo').value = c.client_type || 'individual';
-    document.getElementById('ec-clientstatus').value = c.client_status || 'lead_nuevo';
+    document.getElementById('ec-clientstatus').value = effectiveClientStatus(c.client_status, allClientPoliciesByClient[c.id] || []) || 'lead_nuevo';
     document.getElementById('ec-closeReason').value = c.close_reason || '';
     toggleCloseReason();
     document.getElementById('ec-nombre-p').value = c.first_name || '';
@@ -11698,6 +11724,15 @@
 
     const clientsList = data || [];
     const uniqueClients = Object.values(clientsList.reduce((acc, c) => { acc[c.id] = c; return acc; }, {}));
+    // Activo/Inactivo real según sus pólizas (todas canceladas = inactivo).
+    if(uniqueClients.length){
+      try{
+        const { data: pols } = await sb.from('client_policies').select('client_id, status').in('client_id', uniqueClients.map(c => c.id));
+        const byClient = {};
+        (pols || []).forEach(pp => { (byClient[pp.client_id] = byClient[pp.client_id] || []).push(pp); });
+        uniqueClients.forEach(c => { c.client_status = effectiveClientStatus(c.client_status, byClient[c.id] || []); });
+      } catch(err){ console.error('No se pudieron revisar las pólizas de los clientes del agente:', err); }
+    }
     const totalCount = uniqueClients.length;
     const activeCount = uniqueClients.filter(c => c.client_status === 'activo').length;
     const leadCount = uniqueClients.filter(c => LEAD_STATUSES.includes(c.client_status)).length;
