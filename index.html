@@ -3616,6 +3616,7 @@
       }
 
       document.getElementById('sign-content').style.display = 'block';
+      window.__signPageOpenedAt = Date.now();
       document.getElementById('sign-doc-title').textContent = data.document_title || 'Documento';
       document.getElementById('sign-doc-html').innerHTML = data.document_html || '';
       initSignaturePad();
@@ -3724,6 +3725,7 @@
       // el documento. Es un aviso "mejor esfuerzo": si falla, no debe afectar
       // en nada la experiencia del cliente, que ya firmó exitosamente.
       notifySignatureCompleted(token);
+      recordSignatureEvidence(token);
     } catch(err){
       showMsg('sign-msg','error','Error de conexión: ' + err.message);
     }
@@ -3739,6 +3741,40 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ token })
+      });
+    } catch(err){
+      // Silencioso a propósito.
+    }
+  }
+
+  // Guarda la "huella" de la firma (IP real que ve el servidor, dispositivo,
+  // idioma, zona horaria, huella SHA-256 del documento...) en signature_audit
+  // vía la Edge Function record-signature-evidence. Solo la ven administradoras
+  // (Certificado de firma). También es "mejor esfuerzo": si falla o la función
+  // todavía no está desplegada, no afecta en nada al cliente que ya firmó.
+  async function recordSignatureEvidence(token){
+    try {
+      const nav = navigator || {};
+      const clientInfo = {
+        language: nav.language || '',
+        languages: nav.languages ? Array.from(nav.languages) : [],
+        timezone: (Intl.DateTimeFormat().resolvedOptions().timeZone) || '',
+        timezoneOffsetMinutes: new Date().getTimezoneOffset(),
+        platform: nav.platform || '',
+        screen: (screen.width || 0) + 'x' + (screen.height || 0),
+        viewport: (window.innerWidth || 0) + 'x' + (window.innerHeight || 0),
+        pixelRatio: window.devicePixelRatio || 1,
+        touch: ('ontouchstart' in window) || (nav.maxTouchPoints > 0),
+        cookiesEnabled: !!nav.cookieEnabled,
+        referrer: document.referrer || '',
+        pageUrl: window.location.origin + window.location.pathname,
+        secondsOnPage: window.__signPageOpenedAt ? (Date.now() - window.__signPageOpenedAt) / 1000 : null,
+        clientClock: new Date().toISOString()
+      };
+      await fetch(SUPABASE_URL + '/functions/v1/record-signature-evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ token, clientInfo })
       });
     } catch(err){
       // Silencioso a propósito.
@@ -7725,7 +7761,7 @@
     if(companyKnown && collectsDeposit){
       cargoNota.innerHTML = '<span style="color:#177A54;">✓ Esta compañía permite cobrar este cargo desde la agencia: se incluye en el total a cobrar.</span>';
     } else if(companyKnown && !collectsDeposit){
-      cargoNota.innerHTML = '<div style="background:#FDEAEA; border:1px solid #F3C6C6; border-radius:8px; padding:10px 12px; color:#8a3030;">⚠ Este monto <strong>no aparecerá reflejado en el total a cobrar</strong>, ya que con esta aseguradora el pago se realiza directamente con ellos. Aquí solo queda guardado como referencia.</div>';
+      cargoNota.innerHTML = '<div style="background:#FDEAEA; border:1px solid #F3C6C6; border-radius:8px; padding:10px 12px; color:#8a3030;">⚠ Este monto <strong>no se cobra desde la agencia</strong>, ya que con esta aseguradora el pago se realiza directamente con ellos. Abajo, en el resumen, vas a ver por separado lo que cobra la agencia hoy y el <strong>total general</strong> (agencia + aseguradora) para que se lo digas al cliente.</div>';
     } else {
       cargoNota.innerHTML = '<span class="sub">Escribe $0 si esta transacción no tiene cargo de la aseguradora.</span>';
     }
@@ -7766,11 +7802,24 @@
       lines += `<p class="sub" style="color:#B8760F;">No hay un service fee configurado para "${INSURANCE_TYPE_LABELS[product] || product}" en este tipo de transacción. Se está calculando con $0 — revísalo en Service Fees.</p>`;
     }
     lines += `<div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Service Fee</span><strong>$${serviceFee.toFixed(2)}</strong></div>`;
-    if(cargoAmount > 0){
-      lines += `<div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Cargo de la aseguradora ${collectsDeposit ? '(incluido)' : '(informativo, no se cobra aquí)'}</span><strong>$${cargoAmount.toFixed(2)}</strong></div>`;
+    // Con aseguradoras que SÍ permiten cobrar el cargo desde la agencia, el cargo
+    // va dentro del total que se cobra aquí. Con las que NO (Geico, Next, etc.),
+    // el cargo se muestra aparte, abajo, porque lo paga el cliente directo a la
+    // aseguradora — pero igual se suma en un "Total general" para que la agente
+    // le pueda decir al cliente el monto completo sin hacer matemáticas.
+    if(cargoAmount > 0 && collectsDeposit){
+      lines += `<div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Cargo de la aseguradora (incluido)</span><strong>$${cargoAmount.toFixed(2)}</strong></div>`;
     }
     lines += `<div style="display:flex; justify-content:space-between; padding:6px 0;"><span>Processing Fee (${metodoLabel})</span><strong>$${processingFee.toFixed(2)}</strong></div>`;
-    lines += `<div style="display:flex; justify-content:space-between; padding:10px 0 0; border-top:1.5px solid var(--line); margin-top:6px;"><span><strong>Total a cobrar (referencia)</strong></span><strong>$${total.toFixed(2)}</strong></div>`;
+    lines += `<div style="display:flex; justify-content:space-between; padding:10px 0 0; border-top:1.5px solid var(--line); margin-top:6px;"><span><strong>${(cargoAmount > 0 && !collectsDeposit) ? 'Total que cobra la agencia hoy' : 'Total a cobrar'}</strong></span><strong>$${total.toFixed(2)}</strong></div>`;
+    if(cargoAmount > 0 && !collectsDeposit){
+      const totalGeneral = total + cargoAmount;
+      lines += `
+        <div style="margin-top:12px; padding:12px 14px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:10px;">
+          <div style="display:flex; justify-content:space-between; padding:2px 0;"><span>Cargo de la aseguradora <span class="sub">(el cliente lo paga directo a la aseguradora, no se cobra aquí)</span></span><strong>$${cargoAmount.toFixed(2)}</strong></div>
+          <div style="display:flex; justify-content:space-between; padding:8px 0 0; margin-top:6px; border-top:1.5px solid #F0D28A;"><span><strong>Total general para el cliente</strong> <span class="sub">(agencia + aseguradora)</span></span><strong style="font-size:18px;">$${totalGeneral.toFixed(2)}</strong></div>
+        </div>`;
+    }
 
     document.getElementById('tx-resumen-lineas').innerHTML = lines;
     resumen.style.display = 'block';
@@ -9047,6 +9096,7 @@
       ${contentHtml}
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
         <button type="button" class="btn-primary" style="width:auto; padding:10px 18px;" onclick="downloadReceiptPDF()">⬇️ Descargar</button>
+        ${isAdminUser() ? `<button type="button" class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="showSignatureCertificate('${transactionId}')">🛡️ Certificado de firma</button>` : ''}
       </div>
     ` : contentHtml;
     receiptContentEl.style.display = firmado ? 'block' : 'none';
@@ -9076,6 +9126,88 @@
     }
     document.getElementById('cd-receiptCard').style.display = 'block';
     document.getElementById('cd-receiptCard').scrollIntoView({ behavior: 'smooth' });
+  }
+
+  // Certificado de firma (solo administradoras) — equivalente al "certificado
+  // de finalización" de DocuSign: quién firmó, cuándo, desde qué IP/dispositivo,
+  // y una huella SHA-256 del documento para demostrar que no fue alterado.
+  // Lee signature_requests + signature_audit (esta última solo la pueden leer
+  // administradoras, por RLS). Se abre en una ventana aparte, lista para
+  // imprimir/guardar como PDF.
+  async function showSignatureCertificate(transactionId){
+    if(!isAdminUser()){ alert('Solo las administradoras pueden ver el certificado de firma.'); return; }
+    const { data: sigReq } = await sb.from('signature_requests').select('*').eq('transaction_id', transactionId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if(!sigReq || sigReq.status !== 'firmado'){ alert('Este documento todavía no está firmado.'); return; }
+    const { data: audit } = await sb.from('signature_audit').select('*').eq('token', sigReq.token).maybeSingle();
+
+    let hashEstado = '<span style="color:#8a6116;">No se pudo comprobar (no hay huella guardada para esta firma).</span>';
+    if(audit && audit.document_hash && sigReq.document_html){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sigReq.document_html));
+      const actual = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+      hashEstado = actual === audit.document_hash
+        ? '<span style="color:#177A54; font-weight:700;">✓ El documento coincide con el que se firmó — no ha sido alterado.</span>'
+        : '<span style="color:#C23B3B; font-weight:700;">⚠ El documento guardado NO coincide con la huella del momento de la firma.</span>';
+    }
+
+    const ci = (audit && audit.client_info) || {};
+    const fila = (k, v) => `<tr><td style="padding:5px 12px 5px 0; color:#5A6B85; vertical-align:top; white-space:nowrap;">${k}</td><td style="padding:5px 0; font-weight:600; word-break:break-all;">${v ? escapeHtml(String(v)) : '—'}</td></tr>`;
+    const ubicacion = audit ? [audit.ip_city, audit.ip_region, audit.ip_country].filter(Boolean).join(', ') : '';
+    const ipCoincide = audit && audit.submit_ip_address && audit.ip_address ? (audit.submit_ip_address === audit.ip_address ? ' (coincide con la IP del envío de la firma)' : ' (OJO: distinta a la IP del envío de la firma: ' + audit.submit_ip_address + ')') : '';
+
+    const html = `
+      <html><head><title>Certificado de firma - GMAX All Insurance</title>
+      <style>
+        body{ font-family: Arial, sans-serif; color:#0D1424; padding:28px; max-width:720px; margin:0 auto; font-size:13px; }
+        h1{ font-size:20px; margin:0 0 4px; } h2{ font-size:14px; margin:22px 0 6px; border-bottom:1.5px solid #D9E0EC; padding-bottom:4px; }
+        table{ border-collapse:collapse; width:100%; } .mono{ font-family: monospace; font-size:11.5px; word-break:break-all; }
+        @media print { button{ display:none !important; } }
+      </style></head><body>
+        <h1>🛡️ Certificado de firma electrónica</h1>
+        <div style="color:#5A6B85;">GMAX All Insurance — documento interno, solo para administración</div>
+
+        <h2>Documento</h2>
+        <table>
+          ${fila('Documento', sigReq.document_title)}
+          ${fila('ID de la solicitud (token)', sigReq.token)}
+          ${fila('Solicitud creada', sigReq.created_at ? new Date(sigReq.created_at).toLocaleString('es-US', { timeZone: 'America/Chicago' }) + ' (hora de Houston)' : '')}
+        </table>
+
+        <h2>Firmante</h2>
+        <table>
+          ${fila('Nombre escrito por el firmante', sigReq.signer_name)}
+          ${fila('Firmado el', sigReq.signed_at ? new Date(sigReq.signed_at).toLocaleString('es-US', { timeZone: 'America/Chicago' }) + ' (hora de Houston)  ·  UTC: ' + new Date(sigReq.signed_at).toISOString() : '')}
+        </table>
+        ${sigReq.signature_image_data ? `<div style="margin-top:8px;"><img src="${sigReq.signature_image_data}" alt="Firma" style="height:70px; border-bottom:1.5px solid #000;"></div>` : ''}
+
+        <h2>Desde dónde se firmó</h2>
+        ${audit ? `<table>
+          ${fila('Dirección IP (vista por el servidor)', (audit.ip_address || '') + ipCoincide)}
+          ${fila('Ubicación aproximada de la IP', ubicacion)}
+          ${fila('Navegador / dispositivo (servidor)', audit.user_agent)}
+          ${fila('Sistema (según el navegador)', ci.platform)}
+          ${fila('Idioma', ci.language)}
+          ${fila('Zona horaria del dispositivo', ci.timezone)}
+          ${fila('Pantalla', ci.screen + (ci.touch ? ' (táctil)' : ''))}
+          ${fila('Llegó desde', ci.referrer || '(directo / link)')}
+          ${fila('Tiempo en la página antes de firmar', ci.secondsOnPage != null ? ci.secondsOnPage + ' segundos' : '')}
+          ${fila('Evidencia guardada el', audit.recorded_at ? new Date(audit.recorded_at).toISOString() : '')}
+        </table>
+        <div style="color:#8A96AC; font-size:11.5px; margin-top:6px;">La IP, el navegador y las fechas las registra el servidor. Idioma, zona horaria, pantalla y sistema los reporta el navegador del firmante, así que son informativos.</div>`
+        : `<table>${fila('Dirección IP (del envío de la firma)', sigReq.ip_address)}</table>
+        <div style="color:#8a6116; margin-top:6px;">No hay evidencia ampliada (dispositivo, idioma, etc.) guardada para esta firma — probablemente se firmó antes de activar esta función.</div>`}
+
+        <h2>Integridad del documento</h2>
+        <table>
+          ${fila('Huella SHA-256 del documento al firmar', audit ? audit.document_hash : '')}
+          ${fila('Huella SHA-256 de la firma', audit ? audit.signature_hash : '')}
+        </table>
+        <div style="margin-top:6px;">${hashEstado}</div>
+
+        <div style="margin-top:26px;"><button onclick="window.print()" style="padding:9px 16px; font-size:13px;">🖨️ Imprimir / guardar como PDF</button></div>
+      </body></html>`;
+    const w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
   }
 
   // Para los recibos de "Pago Automático" (cobro mensual con tarjeta guardada,
@@ -9131,11 +9263,12 @@
     }
     desglose += `<div style="display:flex; justify-content:space-between; padding:4px 0; font-size:13px; color:var(--slate-light);"><span>Processing Fee (Stripe, 2.9% + $0.30)</span><span>$${Number(t.processing_fee_estimate || 0).toFixed(2)}</span></div>`;
 
+    // Geidy pidió (9 oct 2026): el recibo del cliente muestra SIEMPRE solo lo que
+    // cobró la agencia. Cuando la aseguradora no deja cobrar su cargo/depósito
+    // desde aquí (Geico, Next, etc.), ese monto ya NO aparece en el recibo —
+    // ni como nota ni como total general. Eso solo se ve en el resumen interno
+    // de "Nueva transacción", para que la agente se lo diga al cliente.
     let notaDeposito = '';
-    if(t.deposit_amount > 0 && !t.company_collects_deposit){
-      notaDeposito = `<p class="sub" style="margin-top:10px;">Nota: el depósito de $${Number(t.deposit_amount).toFixed(2)} que pide la aseguradora se paga directo con ellos y no está incluido en este recibo.</p>`;
-    }
-
     const cardLine = (t.card_brand && t.card_last4)
       ? `<div><div class="label" style="font-size:12px; color:var(--slate-light);">Tarjeta</div><div>${CARD_BRAND_LABELS[t.card_brand] || t.card_brand} terminada en ${t.card_last4}</div></div>`
       : '';
