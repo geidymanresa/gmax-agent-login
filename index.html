@@ -5901,10 +5901,38 @@
   });
 
   async function deletePolicy(policyId){
+    // Antes de preguntar nada, revisamos si la póliza ya tiene movimientos
+    // (transacciones/recibos, vehículos). Si los tiene, NO se puede borrar: son
+    // el registro de lo que se cobró y firmó, y la base de datos lo protege a
+    // propósito. En ese caso le explicamos claro y le ofrecemos marcarla como
+    // cancelada, que es lo correcto para una póliza que ya tuvo actividad.
+    let txCount = 0, vehCount = 0;
+    try{
+      const { count } = await sb.from('client_transactions').select('id', { count: 'exact', head: true }).eq('policy_id', policyId);
+      txCount = count || 0;
+    } catch(err){ console.error('No se pudo contar transacciones de la póliza:', err); }
+    try{
+      const { count } = await sb.from('client_vehicles').select('id', { count: 'exact', head: true }).eq('policy_id', policyId);
+      vehCount = count || 0;
+    } catch(err){ console.error('No se pudo contar vehículos de la póliza:', err); }
+
+    if(txCount > 0 || vehCount > 0){
+      const partes = [];
+      if(txCount > 0) partes.push(txCount + (txCount === 1 ? ' transacción/recibo' : ' transacciones/recibos'));
+      if(vehCount > 0) partes.push(vehCount + (vehCount === 1 ? ' vehículo' : ' vehículos'));
+      const quiere = confirm(
+        'Esta póliza no se puede eliminar porque ya tiene ' + partes.join(' y ') + ' guardados. ' +
+        'Eso es el registro de lo que se cobró y se firmó, y por seguridad no se borra.\n\n' +
+        '¿Quieres marcarla como CANCELADA en su lugar? (quedará en el historial del cliente como cancelada, y si todas sus pólizas están canceladas el cliente pasa a Inactivo).'
+      );
+      if(quiere) openMarkPolicyCancelled(policyId);
+      return;
+    }
+
     if(!confirm('¿Eliminar esta póliza por completo? Esta acción no se puede deshacer. Úsalo solo para corregir un error de captura (por ejemplo, una póliza duplicada o con datos equivocados que acabas de crear).')) return;
     const { error } = await sb.from('client_policies').delete().eq('id', policyId);
     if(error){
-      alert('No se pudo eliminar la póliza: ' + error.message + '\n\nEsto suele pasar cuando la póliza ya tiene transacciones, vehículos o documentos guardados que dependen de ella — revisa el Historial de la póliza primero.');
+      alert('No se pudo eliminar la póliza: ' + error.message + '\n\nEsto suele pasar cuando la póliza ya tiene documentos u otros registros que dependen de ella — mejor márcala como cancelada desde el menú ⋯.');
       return;
     }
     if(currentClientId){
