@@ -5732,7 +5732,7 @@
           <div class="dropdown" style="position:relative; display:inline-block;">
             <button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" title="Más opciones" onclick="togglePolicyMoreMenu(event, '${p.id}')">⋯</button>
             <div id="policy-more-menu-${p.id}" style="display:none; position:absolute; right:0; top:100%; z-index:20; background:#fff; border:1.5px solid var(--line); border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); min-width:210px; padding:6px;">
-              <button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px;" title="Ver el historial de esta póliza: cada transacción con su recibo y los documentos de la aseguradora" onclick="togglePolicyHistory('${p.id}')">📜 Ver historial</button>
+              <button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px;" title="Ver el historial de esta póliza: cada transacción con su recibo y los documentos de la aseguradora" onclick="togglePolicyHistory('${p.id}')">📜 Historial de la póliza</button>
               ${isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px;" onclick="openEditPolicy('${p.id}')">✏️ Editar póliza</button>` : ''}
               ${cancelled && isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px; color:#177A54;" onclick="restorePolicy('${p.id}')">↩️ Restaurar póliza</button>` : ''}
               ${!cancelled && isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px; color:#8a3030;" title="Marcar esta póliza como cancelada, sin pasar por el flujo de firma del cliente" onclick="openMarkPolicyCancelled('${p.id}')">🚫 Marcar cancelada</button>` : ''}
@@ -5879,26 +5879,43 @@
   // caso se le avisa a la administradora en vez de forzarlo (no se borra nada
   // en cascada automáticamente, para no perder registros financieros sin querer).
   let openPolicyMoreMenuId = null;
-  function togglePolicyMoreMenu(evt, policyId){
-    evt.stopPropagation();
-    const menu = document.getElementById('policy-more-menu-' + policyId);
-    if(!menu) return;
-    const isOpen = menu.style.display === 'block';
-    // Cierra cualquier otro menú de "más opciones" que haya quedado abierto
-    if(openPolicyMoreMenuId && openPolicyMoreMenuId !== policyId){
-      const other = document.getElementById('policy-more-menu-' + openPolicyMoreMenuId);
-      if(other) other.style.display = 'none';
-    }
-    menu.style.display = isOpen ? 'none' : 'block';
-    openPolicyMoreMenuId = isOpen ? null : policyId;
-  }
-  document.addEventListener('click', function(){
+  function closePolicyMoreMenu(){
     if(openPolicyMoreMenuId){
       const menu = document.getElementById('policy-more-menu-' + openPolicyMoreMenuId);
       if(menu) menu.style.display = 'none';
       openPolicyMoreMenuId = null;
     }
-  });
+  }
+  // El menú se posiciona con "fixed" (pegado a la ventana, no a la tabla) porque
+  // la tabla de pólizas tiene overflow:auto y recortaba el menú — por eso no se
+  // veía completo. Así siempre se ve entero, y si no cabe hacia abajo se abre
+  // hacia arriba.
+  function togglePolicyMoreMenu(evt, policyId){
+    evt.stopPropagation();
+    const menu = document.getElementById('policy-more-menu-' + policyId);
+    if(!menu) return;
+    const isOpen = menu.style.display === 'block';
+    closePolicyMoreMenu();
+    if(isOpen) return;
+    const btn = evt.currentTarget || evt.target;
+    const r = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.display = 'block';
+    menu.style.visibility = 'hidden';
+    const h = menu.offsetHeight, w = menu.offsetWidth;
+    const spaceBelow = window.innerHeight - r.bottom;
+    const top = (spaceBelow >= h + 8) ? r.bottom + 4 : Math.max(8, r.top - h - 4);
+    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    menu.style.top = top + 'px';
+    menu.style.left = left + 'px';
+    menu.style.right = 'auto';
+    menu.style.zIndex = '500';
+    menu.style.visibility = 'visible';
+    openPolicyMoreMenuId = policyId;
+  }
+  document.addEventListener('click', closePolicyMoreMenu);
+  window.addEventListener('resize', closePolicyMoreMenu);
+  document.addEventListener('scroll', closePolicyMoreMenu, true);
 
   async function deletePolicy(policyId){
     // Antes de preguntar nada, revisamos si la póliza ya tiene movimientos
@@ -6867,7 +6884,16 @@
 
   async function loadClientDocuments(clientId){
     const { data: docs, error } = await sb.from('client_documents').select('*').eq('client_id', clientId).order('uploaded_at', { ascending: false });
-    currentClientDocuments = error ? [] : (docs || []);
+    // Si por algún motivo quedaron dos documentos internos iguales (mismo recibo/
+    // formulario de la misma transacción), solo se muestra el primero que se guardó.
+    const vistos = new Set();
+    currentClientDocuments = error ? [] : (docs || []).slice().reverse().filter(d => {
+      if(d.storage_path || !d.receipt_transaction_id) return true;
+      const key = d.receipt_transaction_id + '|' + d.category;
+      if(vistos.has(key)) return false;
+      vistos.add(key);
+      return true;
+    }).reverse();
     await renderClientDocuments();
   }
 
@@ -8734,12 +8760,30 @@
     showReceipt(transactionId, numero);
   }
 
+  // Guarda un documento interno (recibo / formulario) SOLO si esa transacción
+  // todavía no tiene uno igual — así, aunque por cualquier motivo se llame dos
+  // veces para la misma transacción, en Documentos solo queda un recibo.
+  async function insertInternalDocumentOnce(row){
+    try{
+      const { data: existing } = await sb.from('client_documents')
+        .select('id')
+        .eq('receipt_transaction_id', row.receipt_transaction_id)
+        .eq('category', row.category)
+        .is('storage_path', null)
+        .limit(1);
+      if(existing && existing.length > 0) return;
+    } catch(err){
+      console.error('No se pudo revisar si el documento ya existía:', err);
+    }
+    return await sb.from('client_documents').insert(row);
+  }
+
   async function saveReceiptAsDocument(transactionId, policyNumber){
     const { data: t } = await sb.from('client_transactions').select('*').eq('id', transactionId).single();
     if(!t) return;
     const { data: { session } } = await sb.auth.getSession();
     const productLabel = INSURANCE_TYPE_LABELS[t.product] || t.product || 'Transacción';
-    await sb.from('client_documents').insert({
+    await insertInternalDocumentOnce({
       client_id: currentClientId,
       file_name: `Recibo - ${productLabel} - #${policyNumber}`,
       storage_path: null,
@@ -8754,7 +8798,7 @@
     const { data: t } = await sb.from('client_transactions').select('created_at,total_reference').eq('id', transactionId).single();
     const fechaLabel = t ? formatDateUS(t.created_at?.split('T')[0]) : '';
     const totalLabel = t ? Number(t.total_reference || 0).toFixed(2) : '0.00';
-    await sb.from('client_documents').insert({
+    await insertInternalDocumentOnce({
       client_id: currentClientId,
       file_name: `Recibo de Endorsement${fechaLabel ? ' - ' + fechaLabel : ''} - $${totalLabel} - #${policyNumber}`,
       storage_path: null,
@@ -8766,7 +8810,7 @@
 
   async function saveCancellationFormAsDocument(transactionId, policyNumber){
     const { data: { session } } = await sb.auth.getSession();
-    await sb.from('client_documents').insert({
+    await insertInternalDocumentOnce({
       client_id: currentClientId,
       file_name: `Formulario de Cancelación - #${policyNumber}`,
       storage_path: null,
@@ -8778,7 +8822,7 @@
 
   async function saveReinstatementFormAsDocument(transactionId, policyNumber){
     const { data: { session } } = await sb.auth.getSession();
-    await sb.from('client_documents').insert({
+    await insertInternalDocumentOnce({
       client_id: currentClientId,
       file_name: `Statement of No Loss - #${policyNumber}`,
       storage_path: null,
@@ -10424,7 +10468,7 @@
 
   async function saveAutoPayConsentAsDocument(transactionId, policyNumber){
     const { data: { session } } = await sb.auth.getSession();
-    await sb.from('client_documents').insert({
+    await insertInternalDocumentOnce({
       client_id: currentClientId,
       file_name: `Autorización de Pago Automático - #${policyNumber}`,
       storage_path: null,
