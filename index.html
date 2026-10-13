@@ -2875,6 +2875,12 @@
         <h2>Tesorería</h2>
         <p class="sub">Dinero de la agencia (Checking) vs. dinero que corresponde a las aseguradoras (Agency Sweep), por transacción. Solo tú puedes verlo.</p>
 
+        <div class="tr-subnav" id="tr-subnav">
+          <button type="button" class="tr-sub active" id="tr-sub-classic" onclick="trOpenClassic()">Resumen por transacción</button>
+          <button type="button" class="tr-sub" id="tr-sub-recon" onclick="trOpenRecon()">Conciliación Agency Sweep</button>
+        </div>
+        <div id="tr-view-classic">
+
         <div class="dash-card">
           <h4 style="margin-top:0;">🔎 Buscar recibo por número</h4>
           <p class="sub">Para control interno, o para conciliar con Stripe si hay que hacer un reembolso.</p>
@@ -2925,6 +2931,49 @@
             </table>
           </div>
         </div>
+        </div>
+<!-- ===== TREASURY-RECON-HTML-START ===== -->
+      <div id="tr-view-recon" style="display:none;">
+        <style>
+          #tr-view-recon .sub{margin-bottom:6px; font-size:13px;}
+          #tr-view-recon .dash-card{margin:14px 0; padding:18px;}
+          #tr-view-recon table.dash-table td, #tr-view-recon table.dash-table th{padding:8px 10px; font-size:13px; vertical-align:top;}
+          #tr-view-recon input[type=text], #tr-view-recon input[type=datetime-local], #tr-view-recon select, #tr-view-recon textarea{width:100%; padding:9px 11px; border:1.5px solid var(--line); border-radius:9px; font-family:inherit; font-size:14px;}
+          .tr-subnav{display:flex; gap:8px; margin:14px 0 4px;}
+          .tr-sub{background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:9px 18px; font-family:'Poppins',sans-serif; font-weight:700; font-size:13.5px; color:var(--navy); cursor:pointer;}
+          .tr-sub.active{background:var(--navy); color:#fff; border-color:var(--navy);}
+          .tr-pills{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 4px;}
+          .tr-pill{background:#fff; border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:12.5px; font-weight:600; color:var(--slate); cursor:pointer;}
+          .tr-pill.active{background:var(--gold); border-color:var(--gold); color:var(--navy);}
+          .tr-badge{display:inline-block; min-width:18px; padding:0 6px; border-radius:999px; background:#D14343; color:#fff; font-size:11px; text-align:center;}
+          .tr-chip{display:inline-block; padding:2px 9px; border-radius:999px; font-size:11.5px; font-weight:600; margin:1px 2px 1px 0; white-space:nowrap;}
+          .tr-chip-green{background:#E9F7F0; color:#177A54;} .tr-chip-red{background:#FDEAEA; color:#B23A3A;}
+          .tr-chip-amber{background:#FFF3DC; color:#8A5A00;} .tr-chip-gray{background:#EEF0F6; color:#4B5670;}
+          .tr-hero{border-radius:16px; padding:22px 24px; margin:14px 0 4px;}
+          .tr-hero-ok{background:#E9F7F0; border:2px solid #9AD8BC;} .tr-hero-block{background:#FDEAEA; border:2px solid #E39C9C;}
+          .tr-hero-label{font-size:12.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--slate-light); font-weight:700;}
+          .tr-hero-main{font-family:'Poppins',sans-serif; font-weight:800; font-size:30px; color:var(--navy); line-height:1.25; margin-top:2px;}
+          .tr-hero-block .tr-hero-main{color:#8a3030; font-size:24px;}
+          .tr-blockers{margin:8px 0 0 18px; font-size:13.5px; color:#8a3030;}
+          .tr-figs{grid-template-columns:repeat(auto-fit,minmax(200px,1fr));}
+          .tr-fig{background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px;}
+          .tr-fig.open{border-color:var(--navy); box-shadow:0 0 0 2px rgba(11,45,110,.12);}
+          .tr-fig .label{font-size:12.5px; color:var(--slate-light); font-weight:600;}
+          .tr-fig .num{font-family:'Poppins',sans-serif; font-weight:800; font-size:24px; color:var(--navy);}
+          .tr-fig .sub{margin:2px 0 0; font-size:11.5px;}
+          .tr-cols{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+          @media (max-width:800px){ .tr-cols{grid-template-columns:1fr;} }
+          .tr-box{background:var(--canvas); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+          .tr-modal-ov{position:fixed; inset:0; background:rgba(11,25,60,.55); z-index:100000; display:flex; align-items:flex-start; justify-content:center; overflow:auto; padding:30px 12px;}
+          .tr-modal-box{background:#fff; border-radius:16px; padding:22px 24px; width:100%; max-width:640px; box-shadow:0 20px 60px rgba(0,0,0,.3);}
+          .tr-modal-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:16px;}
+        </style>
+        <div id="tr-msg" class="msg" style="margin-top:12px;"></div>
+        <div id="tr-recon-nav" class="tr-pills"></div>
+        <div id="tr-recon-body"></div>
+        <p class="sub" style="margin-top:18px;">Herramienta de control interno. No sustituye la revisión de tu contador/a ni de un abogado sobre el manejo de fondos de aseguradoras (Texas Insurance Code, cap. 4005 y 550). Las transferencias bancarias son siempre manuales.</p>
+      </div>
+<!-- ===== TREASURY-RECON-HTML-END ===== -->
       </section>
 
       <!-- TAB: UNDERWRITING (administradores) -->
@@ -11973,6 +12022,1501 @@
     `;
     }).join('');
   }
+// ===== TREASURY-CORE-START =====
+// Núcleo PURO de la conciliación Agency Sweep (sin acceso a la base de datos ni
+// al DOM) — por eso se puede probar con node (ver tests/tesoreria). Todo el
+// dinero va en CENTAVOS ENTEROS; nunca se usan decimales flotantes para sumar.
+// Este bloque se copia tal cual dentro de index.html (entre los marcadores
+// TREASURY-CORE-START / TREASURY-CORE-END) y los tests leen index.html para
+// probar exactamente el código que se entrega.
+
+const TR_HOUR_MS = 3600000;
+const TR_DAY_MS = 86400000;
+const TR_TRANSFER_RESERVING = ['approved', 'executed'];     // estados que reservan dinero (variable X)
+
+// ---------- Dinero ----------
+function trToCents(v){
+  if(v === null || v === undefined || v === '') return 0;
+  const n = Number(v);
+  if(!isFinite(n)) return 0;
+  return Math.round(n * 100);
+}
+
+function trFmt(cents){
+  if(cents === null || cents === undefined || isNaN(cents)) return '—';
+  const neg = cents < 0;
+  const abs = Math.abs(Math.round(cents));
+  const whole = Math.floor(abs / 100).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const frac = String(abs % 100).padStart(2, '0');
+  return (neg ? '-' : '') + '$' + whole + '.' + frac;
+}
+
+// "$1,234.56", "(12.30)", "-12.30", "12.30-" → centavos. null si no es un importe válido.
+function trParseMoney(str){
+  if(str === null || str === undefined) return null;
+  let s = String(str).trim();
+  if(s === '') return null;
+  let neg = false;
+  if(/^\(.*\)$/.test(s)){ neg = true; s = s.slice(1, -1); }
+  if(/-$/.test(s)){ neg = !neg; s = s.slice(0, -1); }
+  if(/^\+/.test(s)) s = s.slice(1);
+  if(/^-/.test(s)){ neg = !neg; s = s.slice(1); }
+  s = s.replace(/[$\s]/g, '').replace(/,/g, '');
+  if(!/^\d+(\.\d{1,2})?$/.test(s) && !/^\.\d{1,2}$/.test(s)) return null;
+  const [w, f = ''] = s.split('.');
+  const cents = parseInt(w || '0', 10) * 100 + parseInt((f + '00').slice(0, 2), 10);
+  return neg ? -cents : cents;
+}
+
+// ---------- Fechas ----------
+const TR_MONTHS = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, sept:9, oct:10, nov:11, dec:12 };
+function trValidISO(y, m, d){
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if(dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return String(y).padStart(4, '0') + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+function trParseDate(str){
+  if(str === null || str === undefined) return null;
+  let s = String(str).trim();
+  if(!s) return null;
+  s = s.replace(/[T ]\d{1,2}:\d{2}(:\d{2})?(\.\d+)?\s*(am|pm|z|[+-]\d{2}:?\d{2})?.*$/i, '').trim();
+  let m = s.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})$/);
+  if(m) return trValidISO(+m[1], +m[2], +m[3]);
+  m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2}|\d{4})$/);
+  if(m){
+    let y = +m[3]; if(m[3].length === 2) y += 2000;
+    return trValidISO(y, +m[1], +m[2]);                       // formato EE.UU.: MM/DD/AAAA
+  }
+  m = s.match(/^([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})$/);
+  if(m){
+    const mon = TR_MONTHS[m[1].slice(0, 4).toLowerCase()] || TR_MONTHS[m[1].slice(0, 3).toLowerCase()];
+    if(mon) return trValidISO(+m[3], mon, +m[2]);
+  }
+  return null;
+}
+
+// ---------- CSV ----------
+function trParseCSV(text){
+  text = String(text || '').replace(/^﻿/, '');
+  const firstLine = text.split(/\r?\n/).find(l => l.trim() !== '') || '';
+  let delim = ',';
+  const counts = { ',': 0, ';': 0, '\t': 0 };
+  let inQ = false;
+  for(const ch of firstLine){ if(ch === '"') inQ = !inQ; else if(!inQ && counts[ch] !== undefined) counts[ch]++; }
+  if(counts[';'] > counts[','] && counts[';'] >= counts['\t']) delim = ';';
+  else if(counts['\t'] > counts[','] && counts['\t'] > counts[';']) delim = '\t';
+
+  const rows = []; let row = []; let field = ''; inQ = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(inQ){
+      if(ch === '"'){ if(text[i + 1] === '"'){ field += '"'; i++; } else inQ = false; }
+      else field += ch;
+    } else if(ch === '"'){ inQ = true; }
+    else if(ch === delim){ row.push(field); field = ''; }
+    else if(ch === '\n' || ch === '\r'){
+      if(ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if(row.some(c => c.trim() !== '')) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  row.push(field);
+  if(row.some(c => c.trim() !== '')) rows.push(row);
+  return rows;
+}
+
+// Intenta adivinar qué columna es cuál (el formato exacto de Bluevine NO está
+// confirmado, por eso en pantalla siempre se muestra una vista previa y la
+// persona puede corregir el mapeo antes de importar).
+function trDetectColumns(header){
+  const h = header.map(x => String(x || '').trim().toLowerCase());
+  const find = (...res) => { for(const re of res){ const i = h.findIndex(x => re.test(x)); if(i >= 0) return i; } return -1; };
+  return {
+    date: find(/^(posted|post|transaction|trans\.?)\s*date$/, /^date$/, /date/),
+    description: find(/^description$/, /memo|details|payee|name|narrative/),
+    amount: find(/^amount$/, /^(net\s*)?amount/),
+    debit: find(/debit|withdrawal|money out|outflow|paid out/),
+    credit: find(/credit|deposit|money in|inflow|paid in/),
+    balance: find(/running\s*balance|^balance$|balance/)
+  };
+}
+
+// rows[0] = encabezado. mapping = {date, description, amount|debit+credit, balance}. opts.invertSign si el banco muestra los débitos como positivos.
+function trBuildBankRows(rows, mapping, opts){
+  opts = opts || {};
+  const out = []; const errors = [];
+  for(let i = 1; i < rows.length; i++){
+    const r = rows[i]; const line = i + 1;
+    const date = trParseDate(r[mapping.date]);
+    if(!date){ errors.push({ line, msg: 'Fecha inválida: "' + (r[mapping.date] || '') + '"' }); continue; }
+    let cents = null;
+    if(mapping.amount >= 0 && mapping.amount !== undefined && mapping.amount !== null){
+      cents = trParseMoney(r[mapping.amount]);
+      if(cents !== null && opts.invertSign) cents = -cents;
+    } else {
+      const d = mapping.debit >= 0 ? trParseMoney(r[mapping.debit]) : null;
+      const c = mapping.credit >= 0 ? trParseMoney(r[mapping.credit]) : null;
+      if(d === null && c === null) cents = null;
+      else cents = (c || 0) - Math.abs(d || 0);
+    }
+    if(cents === null){ errors.push({ line, msg: 'Importe inválido o vacío' }); continue; }
+    if(cents === 0){ errors.push({ line, msg: 'Importe en cero (se omite)' }); continue; }
+    const bal = (mapping.balance >= 0 && mapping.balance !== undefined) ? trParseMoney(r[mapping.balance]) : null;
+    out.push({
+      posted_at: date,
+      amount_cents: cents,
+      description: String(r[mapping.description] || '').replace(/\s+/g, ' ').trim(),
+      running_balance_cents: bal,
+      line
+    });
+  }
+  return { rows: out, errors };
+}
+
+// Saldo final según un CSV que trae "saldo corriente". El orden del archivo (más nuevo primero o al revés) se
+// deduce comprobando la aritmética de filas vecinas; solo si no se puede, se usan las fechas.
+function trEndingBalance(rows){
+  const w = rows.filter(r => r.running_balance_cents !== null && r.running_balance_cents !== undefined);
+  if(!w.length) return null;
+  if(w.length === 1) return { cents: w[0].running_balance_cents, date: w[0].posted_at };
+  let asc = 0, desc = 0;
+  for(let i = 0; i + 1 < w.length; i++){
+    if(w[i + 1].running_balance_cents === w[i].running_balance_cents + w[i + 1].amount_cents) asc++;
+    if(w[i].running_balance_cents === w[i + 1].running_balance_cents + w[i].amount_cents) desc++;
+  }
+  let newestFirst;
+  if(asc !== desc) newestFirst = desc > asc;
+  else newestFirst = w[0].posted_at > w[w.length - 1].posted_at;
+  const r = newestFirst ? w[0] : w[w.length - 1];
+  return { cents: r.running_balance_cents, date: r.posted_at };
+}
+
+// Huella estable: fecha + importe + descripción normalizada + nº de repetición
+// dentro del archivo (dos débitos idénticos el mismo día son válidos). Así, si
+// luego se importa otro archivo que se traslapa, las mismas filas dan la misma huella.
+function trFingerprintBases(account, rows){
+  const seen = {};
+  return rows.map(r => {
+    const norm = String(r.description || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const key = [account, r.posted_at, r.amount_cents, norm].join('|');
+    seen[key] = (seen[key] || 0) + 1;
+    return key + '|' + seen[key];
+  });
+}
+// SHA-256 en JavaScript puro (respaldo para páginas abiertas sin HTTPS, donde crypto.subtle no existe).
+function trSha256Fallback(str){
+  const K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  const bytes = Array.from(new TextEncoder().encode(String(str)));
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80); while(bytes.length % 64 !== 56) bytes.push(0);
+  const hi = Math.floor(bitLen / 0x100000000), lo = bitLen >>> 0;
+  for(let i = 3; i >= 0; i--) bytes.push((hi >>> (i * 8)) & 255);
+  for(let i = 3; i >= 0; i--) bytes.push((lo >>> (i * 8)) & 255);
+  const H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+  const rotr = (x, n) => (x >>> n) | (x << (32 - n));
+  for(let off = 0; off < bytes.length; off += 64){
+    const w = new Array(64);
+    for(let i = 0; i < 16; i++) w[i] = (bytes[off + i * 4] << 24) | (bytes[off + i * 4 + 1] << 16) | (bytes[off + i * 4 + 2] << 8) | bytes[off + i * 4 + 3];
+    for(let i = 16; i < 64; i++){ const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3), s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10); w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0; }
+    let [a, b, c, d, e, f, g, h] = H;
+    for(let i = 0; i < 64; i++){
+      const S1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25), ch = (e & f) ^ (~e & g), t1 = (h + S1 + ch + K[i] + w[i]) | 0;
+      const S0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22), mj = (a & b) ^ (a & c) ^ (b & c), t2 = (S0 + mj) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0; H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
+async function trSha256Hex(text){
+  try {
+    if(typeof crypto !== 'undefined' && crypto.subtle){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(text)));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch(_e){ /* cae al respaldo */ }
+  return trSha256Fallback(text);
+}
+// Separa filas nuevas de duplicadas (por huella ya existente).
+function trSplitDuplicates(fingerprints, existingSet){
+  const fresh = [], dup = [];
+  fingerprints.forEach((fp, i) => { (existingSet.has(fp) ? dup : fresh).push(i); });
+  return { fresh, dup };
+}
+
+// ---------- Asignación de débitos de aseguradora ----------
+// debitCents: monto (positivo) del débito. alreadyAllocatedCents: suma ya asignada a ese débito.
+// lines: [{obligation_id, cents}] nuevas. obligationsById: {id: {carrier_name, payable_cents, paid_cents, refunded_cents}}
+function trValidateAllocation(debitCents, alreadyAllocatedCents, lines, obligationsById){
+  const errors = [];
+  let total = 0; let carrier = null;
+  (lines || []).forEach(l => {
+    const ob = obligationsById[l.obligation_id];
+    if(!ob){ errors.push('Obligación inexistente.'); return; }
+    if(!Number.isInteger(l.cents) || l.cents <= 0){ errors.push('Los importes deben ser mayores a cero (en centavos).'); return; }
+    const outstanding = ob.payable_cents - (ob.paid_cents || 0) - (ob.refunded_cents || 0);
+    if(l.cents > outstanding) errors.push(`${ob.carrier_name}: se quiere asignar ${trFmt(l.cents)} pero solo se debe ${trFmt(outstanding)}.`);
+    if(carrier === null) carrier = ob.carrier_name;
+    else if(String(ob.carrier_name).toLowerCase() !== String(carrier).toLowerCase()) errors.push('Un mismo débito solo puede repartirse entre pólizas de la MISMA aseguradora.');
+    total += l.cents;
+  });
+  if(alreadyAllocatedCents + total > debitCents) errors.push(`La suma asignada (${trFmt(alreadyAllocatedCents + total)}) supera el débito (${trFmt(debitCents)}).`);
+  return { ok: errors.length === 0, errors, total, remainder: debitCents - alreadyAllocatedCents - total };
+}
+
+// ---------- Payouts de Stripe ----------
+// Une cada pago del CRM con su transacción Stripe (por id exacto) y su payout.
+// Devuelve {paymentId: {stripeTxn, payout}}.
+function trAttachPayouts(payments, stripeTxns, payouts){
+  const payoutById = {}; payouts.forEach(p => { payoutById[p.payout_id] = p; });
+  const byPayment = {};
+  stripeTxns.forEach(t => {
+    if(!t.payment_id) return;
+    if(t.type === 'charge' || t.type === 'payment'){
+      byPayment[t.payment_id] = { stripeTxn: t, payout: t.payout_id ? (payoutById[t.payout_id] || null) : null };
+    }
+  });
+  return byPayment;
+}
+
+// ¿La suma de las partidas del payout es exactamente su neto?
+function trPayoutAllocation(payout, stripeTxns){
+  const items = stripeTxns.filter(t => t.payout_id === payout.payout_id && t.type !== 'payout');
+  const sum = items.reduce((s, t) => s + (t.net_cents || 0), 0);
+  return { sum, diff: payout.amount_cents - sum, complete: items.length > 0 && sum === payout.amount_cents, items: items.length };
+}
+
+// Sugiere el crédito bancario de cada payout. NUNCA asigna solo si es ambiguo.
+function trSuggestPayoutMatches(payouts, bankTxns, opts){
+  opts = opts || {};
+  const before = opts.daysBefore === undefined ? 2 : opts.daysBefore;
+  const after = opts.daysAfter === undefined ? 7 : opts.daysAfter;
+  const credits = bankTxns.filter(b => b.account === 'sweep' && b.amount_cents > 0 && b.classification === 'unclassified');
+  const res = payouts.filter(p => p.status === 'paid' && !p.bank_txn_id).map(p => {
+    const arrival = p.arrival_date ? Date.parse(p.arrival_date + 'T00:00:00Z') : null;
+    const cands = credits.filter(b => {
+      if(b.amount_cents !== p.amount_cents) return false;
+      if(arrival === null) return true;
+      const t = Date.parse(b.posted_at + 'T00:00:00Z');
+      return t >= arrival - before * TR_DAY_MS && t <= arrival + after * TR_DAY_MS;
+    });
+    const byRef = cands.filter(b => (b.description || '').toLowerCase().includes(String(p.payout_id).toLowerCase()));
+    let kind = 'none', pick = null;
+    if(byRef.length === 1){ kind = 'reference'; pick = byRef[0]; }
+    else if(cands.length === 1){ kind = 'unique'; pick = cands[0]; }
+    else if(cands.length > 1){ kind = 'ambiguous'; }
+    return { payout: p, kind, candidates: cands, pick };
+  });
+  // Un mismo crédito no puede ser la única opción de dos payouts a la vez.
+  const used = {};
+  res.forEach(r => { if(r.pick){ (used[r.pick.id] = used[r.pick.id] || []).push(r); } });
+  Object.values(used).forEach(list => { if(list.length > 1) list.forEach(r => { if(r.kind !== 'reference'){ r.kind = 'ambiguous'; r.pick = null; } }); });
+  return res;
+}
+
+// ---------- Estados separados de cada pago ----------
+function trPaymentStatuses(p, link){
+  const stripeTxn = link ? link.stripeTxn : null;
+  const payout = link ? link.payout : null;
+  const charge = p.voided_at ? 'voided' : p.disputed ? 'disputed'
+    : (p.refunded_cents > 0 ? (p.refunded_cents >= p.gross_cents ? 'refunded' : 'partially_refunded') : (p.charge_status || 'succeeded'));
+  let settlement = 'unassigned';
+  if(stripeTxn){
+    settlement = 'in_stripe';
+    if(payout){
+      settlement = payout.status === 'paid' ? 'payout_paid' : payout.status === 'failed' || payout.status === 'canceled' ? 'payout_failed'
+        : payout.status === 'in_transit' ? 'in_transit' : 'payout_created';
+    }
+  }
+  let bank = 'not_received';
+  if(payout && payout.bank_txn_id) bank = payout.allocation_status === 'complete' ? 'matched' : 'partially_matched';
+  else if(payout && payout.status === 'paid') bank = 'unmatched';
+  const identified = !!(p.policy_id && p.carrier_name) || !!p.identified_manually || (p.premium_payable_cents === 0 && !!p.policy_id);
+  const feeKnown = p.stripe_fee_cents !== null && p.stripe_fee_cents !== undefined;
+  const ownNet = feeKnown ? p.gross_cents - p.premium_payable_cents - p.stripe_fee_cents : null;
+  const ownEffective = ownNet === null ? null : ownNet - (p.refunded_cents || 0);
+  let fee = 'unverified';
+  if(charge === 'voided') fee = 'reversed';
+  else if(feeKnown && bank === 'matched' && identified && charge !== 'disputed') fee = (ownEffective < 0 ? 'held' : 'eligible');
+  else if(feeKnown) fee = 'confirmed';
+  if(p.transferred) fee = 'transferred';
+  return { charge, settlement, bank, fee, identified, feeKnown, ownNet, ownEffective };
+}
+
+// ---------- Excepciones (derivadas de los datos; la resolución con justificación se guarda aparte) ----------
+function trBuildExceptions(s){
+  const ex = []; const now = s.nowMs;
+  const add = (type, severity, title, detail, entity_type, entity_id, amount_cents, resolvable) =>
+    ex.push({ key: type + ':' + entity_id, type, severity, title, detail, entity_type, entity_id, amount_cents: amount_cents || 0, resolvable: !!resolvable });
+  const res = s.resolutions || new Set();
+  const links = trAttachPayouts(s.payments, s.stripeTxns || [], s.payouts || []);
+
+  (s.payments || []).forEach(p => {
+    if(p.voided_at) return;
+    const st = trPaymentStatuses(p, links[p.id]);
+    const ref = p.client_name ? ` (${p.client_name})` : '';
+    if(p.charge_status && p.charge_status !== 'succeeded') return;      // cobro aún sin confirmar en Stripe: todavía no hay dinero
+    if(!st.identified && !res.has('payment_no_policy:' + p.id))
+      add('payment_no_policy', 'critical', 'Pago sin póliza/aseguradora identificada' + ref, `Cobro de ${trFmt(p.gross_cents)}. Sus fondos se tratan como "sin identificar" (no son service fee) hasta que se identifiquen.`, 'payment', p.id, p.gross_cents, true);
+    if(p.disputed && !res.has('dispute:' + p.id))
+      add('dispute', 'critical', 'Disputa / contracargo abierto' + ref, 'Fondos congelados hasta resolver la disputa.', 'payment', p.id, p.gross_cents, true);
+    if(p.refunded_cents > 0 && !res.has('refund:' + p.id))
+      add('refund', 'warning', 'Reembolso aplicado' + ref, `Reembolsado ${trFmt(p.refunded_cents)}. Se descuenta del ingreso propio de esta venta; revisa si también hay prima que recuperar de la aseguradora.`, 'payment', p.id, p.refunded_cents, true);
+    if(st.ownEffective !== null && st.ownEffective < 0 && !res.has('fee_deficit:' + p.id))
+      add('fee_deficit', 'critical', 'Déficit: el costo de Stripe/reembolsos supera el fee propio' + ref, `Ingreso propio neto de esta venta: ${trFmt(st.ownEffective)}. Nunca se cubre con dinero de primas.`, 'payment', p.id, -st.ownEffective, true);
+    if(!st.feeKnown && p.stripe_payment_intent_id && p.created_ms && now - p.created_ms > 3 * TR_DAY_MS)
+      add('stripe_fee_missing', 'warning', 'Cobro sin datos de Stripe todavía' + ref, 'Han pasado más de 3 días y no hay comisión real de Stripe. Ejecuta "Sincronizar Stripe".', 'payment', p.id, 0, false);
+  });
+
+  (s.stripeTxns || []).forEach(t => {
+    if((t.type === 'charge' || t.type === 'payment') && !t.payment_id && !res.has('stripe_charge_unlinked:' + t.stripe_id))
+      add('stripe_charge_unlinked', 'critical', 'Cobro en Stripe sin registro en el CRM', `${t.stripe_id} por ${trFmt(t.amount_cents)}. No se sabe a qué póliza/aseguradora pertenece (¿se borró la transacción en el CRM o se cobró directo en Stripe?). Mientras tanto no se cuenta como ganancia.`, 'stripe_txn', t.stripe_id, t.amount_cents, true);
+  });
+
+  (s.payouts || []).forEach(po => {
+    if(po.status === 'failed' || po.status === 'canceled'){
+      if(!res.has('payout_failed:' + po.payout_id))
+        add('payout_failed', 'critical', 'Payout de Stripe fallido/cancelado', `${po.payout_id} por ${trFmt(po.amount_cents)}. Ese dinero NO llegó al banco.`, 'payout', po.payout_id, po.amount_cents, true);
+      return;
+    }
+    if(po.status === 'paid'){
+      if(po.allocation_status === 'difference')
+        add('payout_difference', 'critical', 'Payout con diferencia de asignación', `${po.payout_id}: las partidas no suman exactamente ${trFmt(po.amount_cents)}. Vuelve a sincronizar; si persiste, es una diferencia por investigar.`, 'payout', po.payout_id, 0, false);
+      if(!po.bank_txn_id){
+        const arrival = po.arrival_date ? Date.parse(po.arrival_date + 'T00:00:00Z') : null;
+        const late = arrival !== null && now - arrival > 5 * TR_DAY_MS;
+        add('payout_unmatched', late ? 'critical' : 'warning', late ? 'Payout pagado sin depósito en Bluevine' : 'Payout pagado: falta confirmar el depósito',
+          `${po.payout_id} por ${trFmt(po.amount_cents)} (llegada ${po.arrival_date || '—'}). Importa el CSV de Bluevine y concílialo.`, 'payout', po.payout_id, po.amount_cents, false);
+      }
+    }
+  });
+
+  (s.bankTxns || []).forEach(b => {
+    if(b.account !== 'sweep') return;
+    if(b.classification === 'unclassified'){
+      if(b.amount_cents < 0) add('unassigned_debit', 'critical', 'Retiro sin asignar', `${b.posted_at}: ${trFmt(b.amount_cents)} — ${b.description}`, 'bank_txn', b.id, -b.amount_cents, false);
+      else add('unclassified_credit', 'critical', 'Depósito sin clasificar', `${b.posted_at}: ${trFmt(b.amount_cents)} — ${b.description}. No cuenta como ganancia: queda bloqueado como "sin identificar".`, 'bank_txn', b.id, b.amount_cents, false);
+    } else if(b.classification === 'carrier_debit'){
+      const allocated = (s.allocations || []).filter(a => a.bank_txn_id === b.id).reduce((x, a) => x + a.allocated_cents, 0);
+      const remainder = -b.amount_cents - allocated;
+      if(remainder > 0 && !res.has('debit_partial:' + b.id))
+        add('debit_partial', 'critical', 'Retiro de aseguradora no asignado por completo', `${b.posted_at}: faltan ${trFmt(remainder)} por asignar a pólizas (${b.description}).`, 'bank_txn', b.id, remainder, true);
+    }
+  });
+
+  (s.transfers || []).forEach(t => {
+    if(t.status === 'executed' && t.executed_ms && now - t.executed_ms > 3 * TR_DAY_MS)
+      add('transfer_stale', 'warning', 'Transferencia ejecutada que no aparece en el banco', `${trFmt(t.proposed_cents)} ejecutada hace más de 3 días y todavía sin conciliar con el banco.`, 'transfer', t.id, t.proposed_cents, false);
+  });
+  return ex;
+}
+
+// ---------- Posición de Agency Sweep: B, O, R, U, C, X, F ----------
+function trComputePosition(s){
+  const now = s.nowMs;
+  const settings = s.settings || {};
+  const C = settings.buffer_cents || 0;
+  const maxAgeMs = (settings.max_balance_age_hours || 48) * TR_HOUR_MS;
+  const links = trAttachPayouts(s.payments || [], s.stripeTxns || [], s.payouts || []);
+  const resolutions = s.resolutions || new Set();
+  const bd = { B: [], O: [], R: [], U: [], X: [], F: [] };
+
+  // B: saldo bancario verificado (nunca el balance de Stripe).
+  const B = s.balance ? s.balance.balance_cents : null;
+  if(s.balance) bd.B.push({ label: 'Saldo verificado de Agency Sweep', detail: 'al ' + s.balance.as_of, cents: B });
+
+  // O: obligaciones pendientes con aseguradoras (aunque el cliente aún esté en Stripe).
+  let O = 0, O_deposited = 0;
+  (s.obligations || []).forEach(ob => {
+    if(ob.status === 'cancelled') return;
+    const out = Math.max(0, ob.payable_cents - (ob.paid_cents || 0) - (ob.refunded_cents || 0));
+    if(out === 0) return;
+    O += out;
+    const pay = ob.payment_id ? (s.payments || []).find(p => p.id === ob.payment_id) : null;
+    const received = pay ? (trPaymentStatuses(pay, links[pay.id]).bank === 'matched') : true;   // opening/manual = ya está en el banco
+    if(received) O_deposited += out;
+    bd.O.push({ label: ob.carrier_name + (pay && pay.client_name ? ' — ' + pay.client_name : ''), detail: (ob.source === 'opening' ? 'saldo inicial' : (received ? 'ya depositado en Sweep' : 'aún en Stripe/tránsito')), cents: out });
+  });
+
+  // R y U: retenciones y fondos sin identificar.
+  let R = 0, U = 0;
+  (s.holds || []).forEach(h => {
+    if(h.status !== 'open') return;
+    if(h.kind === 'unreconciled'){ U += h.amount_cents; bd.U.push({ label: 'Diferencia sin conciliar', detail: h.note || '', cents: h.amount_cents }); }
+    else { R += h.amount_cents; bd.R.push({ label: h.kind, detail: h.note || '', cents: h.amount_cents }); }
+  });
+  (s.bankTxns || []).forEach(b => {
+    if(b.account === 'sweep' && b.classification === 'unclassified' && b.amount_cents > 0){
+      U += b.amount_cents; bd.U.push({ label: 'Depósito sin clasificar', detail: b.posted_at + ' — ' + b.description, cents: b.amount_cents });
+    }
+  });
+  (s.payments || []).forEach(p => {
+    if(p.voided_at || (p.charge_status && p.charge_status !== 'succeeded')) return;
+    const st = trPaymentStatuses(p, links[p.id]);
+    if(!st.identified && !resolutions.has('payment_no_policy:' + p.id)){
+      U += p.gross_cents; bd.U.push({ label: 'Pago sin póliza identificada', detail: p.client_name || p.id, cents: p.gross_cents });
+    }
+    if(p.disputed && !resolutions.has('dispute:' + p.id)){
+      R += p.gross_cents; bd.R.push({ label: 'Disputa abierta', detail: p.client_name || p.id, cents: p.gross_cents });
+    }
+  });
+
+  // X: transferencias aprobadas/ejecutadas que el banco aún no refleja.
+  let X = 0;
+  (s.transfers || []).forEach(t => {
+    if(TR_TRANSFER_RESERVING.includes(t.status)){ X += t.proposed_cents; bd.X.push({ label: 'Transferencia ' + (t.status === 'approved' ? 'aprobada' : 'ejecutada, pendiente en banco'), detail: t.id, cents: t.proposed_cents }); }
+  });
+
+  // F: ingreso propio realmente recibido y conciliado, menos lo ya transferido.
+  let F = 0;
+  (s.payments || []).forEach(p => {
+    const st = trPaymentStatuses(p, links[p.id]);
+    if(st.charge === 'voided') return;
+    if(st.bank === 'matched' && st.feeKnown && st.identified && st.charge !== 'disputed'){
+      F += st.ownEffective;
+      bd.F.push({ label: (p.client_name || 'Cobro') + ' — ' + (p.carrier_name || 'sin aseguradora'), detail: `cobrado ${trFmt(p.gross_cents)} − prima ${trFmt(p.premium_payable_cents)} − Stripe ${trFmt(p.stripe_fee_cents)}${p.refunded_cents ? ' − reembolso ' + trFmt(p.refunded_cents) : ''}`, cents: st.ownEffective });
+    }
+  });
+  const opening = s.opening && s.opening.status === 'approved' ? s.opening : null;
+  if(opening && opening.own_fees_pending_cents){ F += opening.own_fees_pending_cents; bd.F.push({ label: 'Saldo inicial: fees propios acreditados y no transferidos', detail: '', cents: opening.own_fees_pending_cents }); }
+  let posted = 0;
+  (s.transfers || []).forEach(t => { if(t.status === 'posted'){ posted += (t.posted_cents || t.proposed_cents); bd.F.push({ label: 'Ya transferido a Checking', detail: t.id, cents: -(t.posted_cents || t.proposed_cents) }); } });
+  F -= posted;
+
+  const capacityRaw = (B === null) ? null : B - O - R - U - C - X;
+  const capacity = capacityRaw === null ? null : Math.max(0, capacityRaw);
+  const ownAvailable = Math.max(0, F - X);                                   // conservador: lo reservado en X no vuelve a ofrecerse
+  const maxTransferable = capacity === null ? null : Math.min(capacity, ownAvailable);
+
+  // ----- Bloqueos: nunca mostrar un monto utilizable si algo no se puede probar -----
+  const blockers = [];
+  if(!opening) blockers.push({ code: 'no_opening', message: 'Falta aprobar el saldo inicial (asiento de apertura) conciliado.' });
+  if(opening && !settings.activated){
+    const need = Math.max(0, 2 - (s.closesCount || 0));
+    blockers.push({ code: 'not_activated', message: need > 0 ? `Pendiente de activación: faltan ${need} cierre(s) diario(s) de prueba comparados contra Bluevine y Stripe.` : 'Pendiente de activación: falta que la administración active el cálculo.' });
+  }
+  if(B === null) blockers.push({ code: 'no_balance', message: 'No hay un saldo verificado de Agency Sweep. No se asume $0.' });
+  else if(now - Date.parse(s.balance.as_of) > maxAgeMs) blockers.push({ code: 'stale_balance', message: `El saldo verificado está desactualizado (al ${s.balance.as_of}). Registra un saldo vigente.` });
+  if(!s.lastImportMs) blockers.push({ code: 'no_import', message: 'Todavía no se ha importado ningún movimiento bancario de Agency Sweep.' });
+  else if(now - s.lastImportMs > maxAgeMs) blockers.push({ code: 'stale_import', message: 'La última importación de movimientos del banco está desactualizada.' });
+  const exceptions = trBuildExceptions(Object.assign({}, s, { resolutions }));
+  const critical = exceptions.filter(e => e.severity === 'critical');
+  if(critical.length) blockers.push({ code: 'critical_exceptions', message: `${critical.length} excepción(es) crítica(s) sin resolver.` });
+  if(capacityRaw !== null && capacityRaw < 0) blockers.push({ code: 'overdraft_risk', message: `Riesgo de sobregiro: faltan ${trFmt(-capacityRaw)} para cubrir primas, retenciones y colchón.` });
+  if(B !== null && B < O_deposited) blockers.push({ code: 'liquidity', message: `Alerta de liquidez: el banco (${trFmt(B)}) no cubre las primas ya depositadas (${trFmt(O_deposited)}).` });
+
+  const blocked = blockers.length > 0;
+  return {
+    B, O, R, U, C, X, F, capacityRaw, capacity, ownAvailable,
+    maxTransferable: blocked ? null : maxTransferable,
+    calculatedMax: maxTransferable,        // solo informativo; NO se muestra como utilizable cuando hay bloqueo
+    blocked, blockers, exceptions, breakdown: bd,
+    ownPendingFromPayments: F + posted - (opening ? (opening.own_fees_pending_cents || 0) : 0)
+  };
+}
+// ===== TREASURY-CORE-END =====
+
+// ===== TREASURY-UI-START =====
+// Conciliación Agency Sweep — interfaz (vive dentro de la pestaña Tesorería).
+// Solo super_admin. Las transferencias bancarias son MANUALES: aquí solo se
+// proponen, aprueban y se documentan; este código nunca mueve dinero.
+const TR = {
+  view: 'resumen', loaded: false, loading: false, error: null,
+  d: {}, pos: null, filters: { status: 'all', q: '' }, openBreak: null, busy: false
+};
+const TR_VIEWS = [
+  ['resumen', 'Resumen'], ['pagos', 'Pagos y pólizas'], ['stripe', 'Depósitos Stripe'],
+  ['retiros', 'Retiros de aseguradoras'], ['transfer', 'Propuestas de transferencia'],
+  ['excepciones', 'Excepciones y auditoría'], ['config', 'Configuración']
+];
+const TR_CLASS_LABELS = {
+  unclassified: 'Sin clasificar', stripe_payout: 'Depósito de Stripe', carrier_debit: 'Retiro de aseguradora',
+  transfer_out: 'Transferencia a Checking', transfer_in: 'Transferencia recibida', other_credit: 'Otro ingreso',
+  other_debit: 'Otro egreso', opening_carryover: 'Arrastre de apertura'
+};
+const trE = v => escapeHtml(String(v === null || v === undefined ? '' : v));
+
+// ---------- Utilidades de pantalla ----------
+function trToast(msg, kind){
+  const el = document.getElementById('tr-msg'); if(!el) return;
+  el.className = 'msg ' + (kind || 'success'); el.textContent = msg; el.style.display = 'block';
+  clearTimeout(trToast._t); trToast._t = setTimeout(() => { el.style.display = 'none'; }, kind === 'error' ? 9000 : 4500);
+}
+function trModal(title, bodyHtml, buttons){
+  trModalClose();
+  const ov = document.createElement('div'); ov.id = 'tr-modal'; ov.className = 'tr-modal-ov';
+  ov.innerHTML = `<div class="tr-modal-box" role="dialog" aria-modal="true"><h3 style="margin:0 0 6px;">${trE(title)}</h3><div id="tr-modal-body">${bodyHtml}</div><div id="tr-modal-err" class="msg error" style="display:none; margin-top:10px;"></div><div class="tr-modal-actions" id="tr-modal-actions"></div></div>`;
+  document.body.appendChild(ov);
+  const act = ov.querySelector('#tr-modal-actions');
+  (buttons || [{ label: 'Cerrar' }]).forEach(b => {
+    const btn = document.createElement('button'); btn.type = 'button';
+    btn.className = b.primary ? 'btn-primary' : 'btn-ghost'; btn.style.cssText = 'width:auto; padding:9px 18px;'; btn.textContent = b.label;
+    btn.onclick = async () => {
+      if(!b.onClick){ trModalClose(); return; }
+      btn.disabled = true;
+      try { const r = await b.onClick(); if(r !== false) trModalClose(); }
+      catch(e){ trModalError(e.message || String(e)); }
+      finally { btn.disabled = false; }
+    };
+    act.appendChild(btn);
+  });
+  return ov;
+}
+function trModalError(msg){ const e = document.getElementById('tr-modal-err'); if(e){ e.textContent = msg; e.style.display = 'block'; } }
+function trModalClose(){ const m = document.getElementById('tr-modal'); if(m) m.remove(); }
+function trVal(id){ const el = document.getElementById(id); return el ? el.value : ''; }
+function trDownload(filename, text, mime){
+  const blob = new Blob([text], { type: (mime || 'text/csv') + ';charset=utf-8' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function trCsvLine(cells){ return cells.map(c => { const s = String(c === null || c === undefined ? '' : c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(','); }
+function trAgo(iso){
+  if(!iso) return 'nunca';
+  const ms = Date.now() - Date.parse(iso); if(isNaN(ms)) return '—';
+  const h = ms / TR_HOUR_MS; if(h < 1) return 'hace ' + Math.max(1, Math.round(h * 60)) + ' min';
+  if(h < 48) return 'hace ' + Math.round(h) + ' h'; return 'hace ' + Math.round(h / 24) + ' días';
+}
+async function trAudit(action, entity, entityId, detail){
+  const { error } = await sb.from('treasury_audit_log').insert({ action, entity: entity || null, entity_id: entityId === undefined || entityId === null ? null : String(entityId), detail: detail || null });
+  if(error) console.warn('treasury_audit_log:', error.message);
+}
+
+// ---------- Carga de datos ----------
+async function trSelectAll(table, orderCol, asc){
+  const out = []; const page = 1000;
+  for(let from = 0; from < 50000; from += page){
+    const { data, error } = await sb.from(table).select('*').order(orderCol, { ascending: asc }).range(from, from + page - 1);
+    if(error) throw new Error(table + ': ' + error.message);
+    out.push(...(data || []));
+    if(!data || data.length < page) break;
+  }
+  return out;
+}
+async function trLoad(force){
+  if(!isSuperAdminUser()) return;
+  if(TR.loading) return; TR.loading = true;
+  try {
+    const [settings, payments, obligations, stripeTxns, payouts, bankTxns, allocations, holds, transfers, openings, closes, resolutions, balances, imports, audit] = await Promise.all([
+      trSelectAll('treasury_settings', 'updated_at', false), trSelectAll('treasury_payments', 'created_at', false), trSelectAll('treasury_obligations', 'created_at', true),
+      trSelectAll('treasury_stripe_txns', 'created_at_stripe', false), trSelectAll('treasury_payouts', 'created_at_stripe', false), trSelectAll('treasury_bank_txns', 'posted_at', false),
+      trSelectAll('treasury_allocations', 'created_at', true), trSelectAll('treasury_holds', 'created_at', false), trSelectAll('treasury_transfers', 'proposed_at', false),
+      trSelectAll('treasury_opening', 'created_at', false), trSelectAll('treasury_closes', 'created_at', false), trSelectAll('treasury_exception_resolutions', 'resolved_at', false),
+      trSelectAll('treasury_balances', 'as_of', false), trSelectAll('treasury_bank_imports', 'imported_at', false),
+      sb.from('treasury_audit_log').select('*').order('at', { ascending: false }).limit(300).then(r => { if(r.error) throw new Error(r.error.message); return r.data || []; })
+    ]);
+    TR.d = { settings: settings[0] || {}, payments, obligations, stripeTxns, payouts, bankTxns, allocations, holds, transfers, openings, closes, resolutions, balances, imports, audit };
+    TR.error = null; TR.loaded = true;
+    trRecompute();
+  } catch(e){
+    TR.error = /relation|does not exist|schema cache/i.test(e.message) ? 'Falta correr la migración SQL de Tesorería (migracion_tesoreria_conciliacion.sql) en Supabase.' : e.message;
+  } finally { TR.loading = false; }
+}
+function trRecompute(){
+  const d = TR.d; const sweepBalances = (d.balances || []).filter(b => b.account === 'sweep');
+  const latest = sweepBalances.slice().sort((a, b) => (Date.parse(b.as_of) - Date.parse(a.as_of)) || (Date.parse(b.created_at || 0) - Date.parse(a.created_at || 0)))[0] || null;
+  const opening = (d.openings || []).find(o => o.status === 'approved') || null;
+  const sweepImports = (d.imports || []).filter(i => i.account === 'sweep');
+  const lastImport = sweepImports.length ? Math.max(...sweepImports.map(i => Date.parse(i.imported_at))) : null;
+  const closeDays = new Set((d.closes || []).filter(c => c.matches).map(c => c.close_date));
+  TR.closesCount = closeDays.size;
+  TR.pos = trComputePosition({
+    nowMs: Date.now(),
+    settings: { buffer_cents: d.settings.buffer_cents || 0, max_balance_age_hours: d.settings.max_balance_age_hours || 48, activated: !!d.settings.activated },
+    opening: opening ? { status: 'approved', own_fees_pending_cents: opening.own_fees_pending_cents || 0 } : null,
+    closesCount: closeDays.size,
+    balance: latest ? { balance_cents: latest.balance_cents, as_of: latest.as_of } : null,
+    lastImportMs: lastImport,
+    payments: (d.payments || []).map(p => Object.assign({}, p, { created_ms: Date.parse(p.created_at) })),
+    stripeTxns: d.stripeTxns || [], payouts: d.payouts || [],
+    obligations: d.obligations || [], bankTxns: d.bankTxns || [], allocations: d.allocations || [],
+    holds: d.holds || [],
+    transfers: (d.transfers || []).map(t => Object.assign({}, t, { executed_ms: t.executed_at ? Date.parse(t.executed_at) : null })),
+    resolutions: new Set((d.resolutions || []).map(r => r.exception_key))
+  });
+  TR.latestBalance = latest; TR.opening = opening; TR.lastImportMs = lastImport;
+}
+
+// ---------- Sincronización: CRM → cobros, Stripe → movimientos, obligaciones ----------
+async function trSyncFromCrm(){
+  const cutoff = TR.d.settings && TR.d.settings.cutoff_date;
+  if(!cutoff) throw new Error('Primero define la fecha de corte en Configuración (solo se concilian cobros desde esa fecha).');
+  const { data: txs, error } = await sb.from('client_transactions')
+    .select('id, client_id, policy_id, transaction_type, company_name, company_collects_deposit, deposit_amount, service_fee_amount, processing_fee_estimate, total_reference, stripe_payment_intent_id, stripe_checkout_session_id, created_at, client:client_id(full_name)')
+    .gte('created_at', cutoff + 'T00:00:00').is('deleted_at', null).order('created_at', { ascending: true }).limit(5000);
+  if(error) throw new Error('Leyendo transacciones: ' + error.message);
+  const existing = {}; (TR.d.payments || []).forEach(p => { if(p.transaction_id) existing[p.transaction_id] = p; });
+  const inserts = [], updates = [];
+  (txs || []).forEach(t => {
+    if(!t.stripe_payment_intent_id && !t.stripe_checkout_session_id) return;          // no pasó por Stripe
+    const gross = trToCents(t.total_reference); if(gross <= 0) return;
+    const premium = t.company_collects_deposit ? Math.min(gross, trToCents(t.deposit_amount)) : 0;
+    const row = {
+      client_id: t.client_id, policy_id: t.policy_id || null, client_name: t.client ? t.client.full_name : null,
+      carrier_name: t.company_name || null, transaction_type: t.transaction_type, gross_cents: gross, premium_payable_cents: premium,
+      service_fee_cents: trToCents(t.service_fee_amount), processing_collected_cents: trToCents(t.processing_fee_estimate),
+      stripe_payment_intent_id: t.stripe_payment_intent_id || null, stripe_checkout_session_id: t.stripe_checkout_session_id || null
+    };
+    const cur = existing[t.id];
+    if(!cur){ inserts.push(Object.assign({ transaction_id: t.id, created_at: t.created_at }, row)); return; }
+    const diff = {}; Object.keys(row).forEach(k => { if(row[k] !== cur[k] && !(row[k] === null && cur[k] === undefined)){
+      // no pisar con null lo que Stripe ya completó
+      if((k === 'stripe_payment_intent_id' || k === 'stripe_checkout_session_id') && !row[k]) return;
+      // si una persona identificó la póliza/aseguradora a mano, el CRM no lo deshace
+      if(cur.identified_manually && (k === 'carrier_name' || k === 'policy_id') && !row[k]) return;
+      diff[k] = row[k];
+    } });
+    if(Object.keys(diff).length) updates.push({ id: cur.id, diff });
+  });
+  for(let i = 0; i < inserts.length; i += 200){
+    const { error: e } = await sb.from('treasury_payments').upsert(inserts.slice(i, i + 200), { onConflict: 'transaction_id', ignoreDuplicates: true });
+    if(e) throw new Error('Guardando cobros: ' + e.message);
+  }
+  for(const u of updates){
+    const { error: e } = await sb.from('treasury_payments').update(Object.assign({ updated_at: new Date().toISOString() }, u.diff)).eq('id', u.id);
+    if(e) throw new Error('Actualizando cobro: ' + e.message);
+  }
+  return { inserted: inserts.length, updated: updates.length };
+}
+async function trSyncObligations(){
+  const have = new Set((TR.d.obligations || []).filter(o => o.payment_id).map(o => o.payment_id));
+  const rows = (TR.d.payments || []).filter(p => p.charge_status === 'succeeded' && !p.voided_at && p.premium_payable_cents > 0 && p.carrier_name && !have.has(p.id))
+    .map(p => ({ payment_id: p.id, policy_id: p.policy_id || null, carrier_name: p.carrier_name, payable_cents: p.premium_payable_cents, source: 'payment' }));
+  for(let i = 0; i < rows.length; i += 200){
+    const { error } = await sb.from('treasury_obligations').upsert(rows.slice(i, i + 200), { onConflict: 'payment_id', ignoreDuplicates: true });
+    if(error) throw new Error('Guardando obligaciones: ' + error.message);
+  }
+  // si cambió la prima de un cobro que aún no tiene nada asignado, se ajusta; si ya hay pagos, se avisa
+  let adjusted = 0, warned = 0;
+  for(const o of (TR.d.obligations || [])){
+    if(!o.payment_id || o.status === 'cancelled') continue;
+    const p = (TR.d.payments || []).find(x => x.id === o.payment_id); if(!p) continue;
+    if(p.premium_payable_cents > 0 && p.premium_payable_cents !== o.payable_cents){
+      if(o.paid_cents === 0 && o.refunded_cents === 0){ await sb.from('treasury_obligations').update({ payable_cents: p.premium_payable_cents, updated_at: new Date().toISOString() }).eq('id', o.id); adjusted++; }
+      else warned++;
+    }
+  }
+  return { created: rows.length, adjusted, warned };
+}
+async function trCallStripeSync(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session) throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.');
+  const resp = await fetch(SUPABASE_URL + '/functions/v1/treasury-sync-stripe', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY }, body: '{}'
+  });
+  let j = {}; try { j = await resp.json(); } catch(_e){}
+  if(resp.status === 404) throw new Error('La función treasury-sync-stripe todavía no está desplegada en Supabase.');
+  if(!resp.ok || j.error) throw new Error(j.error || 'No se pudo sincronizar con Stripe.');
+  return j;
+}
+async function trSyncAll(){
+  if(TR.busy) return; TR.busy = true; trRender();
+  const notes = [];
+  try {
+    const a = await trSyncFromCrm(); notes.push(`CRM: ${a.inserted} cobro(s) nuevo(s), ${a.updated} actualizado(s)`);
+    let stripeOk = true;
+    try { const s = await trCallStripeSync(); notes.push(`Stripe: ${s.counts.balance_txns} movimientos, ${s.counts.payouts} payouts` + ((s.warnings || []).length ? ` (${s.warnings.length} aviso/s)` : '')); }
+    catch(e){ stripeOk = false; notes.push('Stripe NO se sincronizó: ' + e.message); }
+    await trLoad();
+    const o = await trSyncObligations(); if(o.created) notes.push(`${o.created} obligación(es) con aseguradoras creada(s)`);
+    if(o.warned) notes.push(`${o.warned} cobro(s) cambiaron de prima pero ya tienen pagos asignados: revísalos`);
+    await trLoad();
+    await trAudit('sync', 'all', null, { notes });
+    trToast(notes.join(' · '), stripeOk ? 'success' : 'error');
+  } catch(e){ trToast(e.message, 'error'); }
+  finally { TR.busy = false; await trLoad(); trRender(); }
+}
+
+// ---------- Importación CSV de Bluevine ----------
+function trOpenImport(account){
+  account = account || 'sweep';
+  trModal('Importar movimientos del banco (CSV)', `
+    <p class="sub" style="margin-top:0;">Descarga el CSV de movimientos desde Bluevine y súbelo aquí. El mismo archivo (o filas repetidas) <strong>no se duplica</strong>. Antes de importar verás una vista previa.</p>
+    <div class="form-row-2">
+      <div class="form-row"><label>Cuenta</label><select id="tri-account"><option value="sweep" ${account === 'sweep' ? 'selected' : ''}>Agency Sweep ••${trE(TR.d.settings.sweep_last4 || '7770')}</option><option value="checking" ${account === 'checking' ? 'selected' : ''}>Checking P&amp;C ••${trE(TR.d.settings.checking_last4 || '9139')}</option></select></div>
+      <div class="form-row"><label>Archivo CSV</label><input type="file" id="tri-file" accept=".csv,text/csv,.txt"></div>
+    </div>
+    <div id="tri-preview"></div>`,
+    [{ label: 'Cancelar' }, { label: 'Importar', primary: true, onClick: trDoImport }]);
+  document.getElementById('tri-file').addEventListener('change', trImportFileChosen);
+  document.getElementById('tri-account').addEventListener('change', () => { if(TR.imp) trImportRenderPreview(); });
+}
+async function trImportFileChosen(ev){
+  const f = ev.target.files && ev.target.files[0]; if(!f) return;
+  const text = await f.text(); const rows = trParseCSV(text);
+  if(rows.length < 2){ document.getElementById('tri-preview').innerHTML = '<div class="msg error">El archivo no tiene filas.</div>'; return; }
+  TR.imp = { name: f.name, text, rows, hash: await trSha256Hex(text), mapping: trDetectColumns(rows[0]), invert: false };
+  trImportRenderPreview();
+}
+function trImportRenderPreview(){
+  const I = TR.imp; const el = document.getElementById('tri-preview'); if(!el || !I) return;
+  const head = I.rows[0];
+  const opts = (sel, withNone) => (withNone ? `<option value="-1">— ninguna —</option>` : '') + head.map((h, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${trE(h || 'columna ' + (i + 1))}</option>`).join('');
+  const m = I.mapping; const hasAmount = m.amount >= 0;
+  const built = trBuildBankRows(I.rows, hasAmount ? { date: m.date, description: m.description, amount: m.amount, balance: m.balance } : { date: m.date, description: m.description, debit: m.debit, credit: m.credit, balance: m.balance }, { invertSign: I.invert });
+  I.built = built;
+  const account = trVal('tri-account') || 'sweep';
+  const fps = trFingerprintBases(account, built.rows);
+  const existing = new Set((TR.d.bankTxns || []).map(b => b.fingerprint));
+  I.fps = fps; I.split = trSplitDuplicates(fps, existing);
+  I.fileDup = (TR.d.imports || []).some(x => x.account === account && x.file_hash === I.hash);
+  const credits = built.rows.filter(r => r.amount_cents > 0).reduce((s, r) => s + r.amount_cents, 0);
+  const debits = built.rows.filter(r => r.amount_cents < 0).reduce((s, r) => s + r.amount_cents, 0);
+  const endBal = trEndingBalance(built.rows);
+  I.endBal = endBal;
+  el.innerHTML = `
+    <div class="tr-box">
+      <strong>Asigna las columnas</strong> <span class="sub">(el formato de Bluevine no está confirmado: revisa que coincidan)</span>
+      <div class="form-row-2" style="margin-top:8px;">
+        <div class="form-row"><label>Fecha</label><select id="trm-date">${opts(m.date)}</select></div>
+        <div class="form-row"><label>Descripción</label><select id="trm-desc">${opts(m.description)}</select></div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-row"><label>Importe (una sola columna)</label><select id="trm-amount">${opts(m.amount, true)}</select></div>
+        <div class="form-row"><label>Saldo corriente (opcional)</label><select id="trm-bal">${opts(m.balance, true)}</select></div>
+      </div>
+      <div class="form-row-2">
+        <div class="form-row"><label>Débitos (si van aparte)</label><select id="trm-debit">${opts(m.debit, true)}</select></div>
+        <div class="form-row"><label>Créditos (si van aparte)</label><select id="trm-credit">${opts(m.credit, true)}</select></div>
+      </div>
+      <label style="display:flex; gap:8px; align-items:center; font-size:13px;"><input type="checkbox" id="trm-invert" ${I.invert ? 'checked' : ''}> El banco muestra los retiros como números positivos (invertir signo)</label>
+    </div>
+    ${I.fileDup ? '<div class="msg error" style="display:block;">Este mismo archivo ya fue importado antes en esta cuenta. No se volverá a importar.</div>' : ''}
+    <p style="margin:10px 0 4px;"><strong>${built.rows.length}</strong> filas válidas · <strong>${I.split.fresh.length}</strong> nuevas · <strong>${I.split.dup.length}</strong> repetidas (se omiten) · <strong>${built.errors.length}</strong> con error. Entradas ${trFmt(credits)} · Salidas ${trFmt(debits)}.</p>
+    ${built.errors.length ? `<details><summary class="sub">Ver filas con error</summary><div class="sub">${built.errors.slice(0, 15).map(e => `Línea ${e.line}: ${trE(e.msg)}`).join('<br>')}</div></details>` : ''}
+    <div class="dash-table-wrap" style="max-height:220px; overflow:auto;"><table class="dash-table"><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th></th></tr></thead><tbody>
+      ${built.rows.slice(0, 12).map((r, i) => `<tr><td>${formatDateUS(r.posted_at)}</td><td>${trE(r.description)}</td><td style="text-align:right;">${trFmt(r.amount_cents)}</td><td>${I.split.dup.includes(i) ? '<span class="sub">repetida</span>' : ''}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${endBal && account === 'sweep' ? `<label style="display:flex; gap:8px; align-items:flex-start; margin-top:10px; font-size:13px;"><input type="checkbox" id="tri-usebal"> <span>Usar como saldo verificado el saldo final del archivo: <strong>${trFmt(endBal.cents)}</strong> al ${formatDateUS(endBal.date)}. <span class="sub">Márcalo solo si coincide con lo que ves en Bluevine.</span></span></label>` : ''}`;
+  ['trm-date', 'trm-desc', 'trm-amount', 'trm-bal', 'trm-debit', 'trm-credit', 'trm-invert'].forEach(id => document.getElementById(id).addEventListener('change', () => {
+    I.mapping = { date: +trVal('trm-date'), description: +trVal('trm-desc'), amount: +trVal('trm-amount'), balance: +trVal('trm-bal'), debit: +trVal('trm-debit'), credit: +trVal('trm-credit') };
+    I.invert = document.getElementById('trm-invert').checked; trImportRenderPreview();
+  }));
+}
+async function trDoImport(){
+  const I = TR.imp; if(!I || !I.built) throw new Error('Primero elige un archivo.');
+  if(I.fileDup) throw new Error('Este archivo ya se importó antes.');
+  if(!I.built.rows.length) throw new Error('No hay filas válidas para importar.');
+  if(I.built.errors.length && !confirmImportErrors(I)) return false;
+  const account = trVal('tri-account') || 'sweep';
+  const { data: imp, error } = await sb.from('treasury_bank_imports').insert({ account, file_name: I.name, file_hash: I.hash, row_count: I.built.rows.length, new_count: I.split.fresh.length, duplicate_count: I.split.dup.length, mapping: I.mapping }).select().single();
+  if(error) throw new Error(/duplicate key/i.test(error.message) ? 'Este archivo ya se importó antes.' : error.message);
+  const rows = I.split.fresh.map(i => { const r = I.built.rows[i]; return { account, posted_at: r.posted_at, amount_cents: r.amount_cents, description: r.description, running_balance_cents: r.running_balance_cents, fingerprint: I.fps[i], import_id: imp.id }; });
+  for(let i = 0; i < rows.length; i += 200){
+    const { error: e } = await sb.from('treasury_bank_txns').upsert(rows.slice(i, i + 200), { onConflict: 'fingerprint', ignoreDuplicates: true });
+    if(e) throw new Error('Guardando movimientos: ' + e.message);
+  }
+  const useBal = document.getElementById('tri-usebal') && document.getElementById('tri-usebal').checked && I.endBal;
+  if(useBal){
+    const { error: e2 } = await sb.from('treasury_balances').insert({ account, balance_cents: I.endBal.cents, as_of: new Date(Math.min(Date.parse(I.endBal.date + 'T23:59:59'), Date.now())).toISOString(), source: 'csv', note: 'Saldo final del archivo ' + I.name });
+    if(e2) throw new Error('Guardando saldo: ' + e2.message);
+  }
+  await trAudit('bank_import', 'bank_import', imp.id, { account, file: I.name, rows: I.built.rows.length, new: rows.length, duplicates: I.split.dup.length, balance_used: !!useBal });
+  TR.imp = null; await trLoad(); trRender();
+  trToast(`Importación lista: ${rows.length} movimiento(s) nuevo(s), ${I.split.dup.length} repetido(s) omitido(s).` + (useBal ? ' Saldo verificado actualizado.' : ' Recuerda registrar el saldo verificado de Bluevine.'));
+}
+function confirmImportErrors(I){ return window.confirm(I.built.errors.length + ' fila(s) con error se omitirán (fechas o importes inválidos). ¿Importar el resto?'); }
+
+// ---------- Render principal ----------
+function trChip(text, kind){ return `<span class="tr-chip tr-chip-${kind || 'gray'}">${trE(text)}</span>`; }
+function trSetView(v){ TR.view = v; TR.openBreak = null; trRender(); }
+function trRender(){
+  const body = document.getElementById('tr-recon-body'); if(!body) return;
+  const nav = document.getElementById('tr-recon-nav');
+  if(nav) nav.innerHTML = TR_VIEWS.map(([k, l]) => `<button type="button" class="tr-pill ${TR.view === k ? 'active' : ''}" onclick="trSetView('${k}')">${l}${k === 'excepciones' && TR.pos && TR.pos.exceptions.length ? ` <span class="tr-badge">${TR.pos.exceptions.length}</span>` : ''}</button>`).join('');
+  if(TR.busy){ body.innerHTML = '<div class="dash-card">⏳ Sincronizando con el CRM y Stripe… esto puede tardar unos segundos.</div>'; return; }
+  if(TR.error){ body.innerHTML = `<div class="dash-card"><div class="msg error" style="display:block;">${trE(TR.error)}</div><button class="btn-ghost" style="width:auto; padding:8px 16px; margin-top:10px;" onclick="trReload()">Reintentar</button></div>`; return; }
+  if(!TR.loaded){ body.innerHTML = '<div class="dash-card">Cargando conciliación…</div>'; return; }
+  const map = { resumen: trViewResumen, pagos: trViewPagos, stripe: trViewStripe, retiros: trViewRetiros, transfer: trViewTransfer, excepciones: trViewExcepciones, config: trViewConfig };
+  try { body.innerHTML = (map[TR.view] || trViewResumen)(); }
+  catch(e){ console.error(e); body.innerHTML = `<div class="dash-card"><div class="msg error" style="display:block;">Error al mostrar esta sección: ${trE(e.message)}</div></div>`; }
+}
+async function trReload(){ TR.error = null; TR.loaded = false; trRender(); await trLoad(); trRender(); }
+async function trOpenRecon(){
+  if(!isSuperAdminUser()) return;
+  document.getElementById('tr-view-classic').style.display = 'none';
+  document.getElementById('tr-view-recon').style.display = 'block';
+  document.getElementById('tr-sub-classic').classList.remove('active'); document.getElementById('tr-sub-recon').classList.add('active');
+  if(!TR.loaded){ trRender(); await trLoad(); }
+  trRender();
+}
+function trOpenClassic(){
+  document.getElementById('tr-view-recon').style.display = 'none';
+  document.getElementById('tr-view-classic').style.display = 'block';
+  document.getElementById('tr-sub-recon').classList.remove('active'); document.getElementById('tr-sub-classic').classList.add('active');
+}
+
+// ---------- RESUMEN ----------
+function trLinks(){ return trAttachPayouts(TR.d.payments || [], TR.d.stripeTxns || [], TR.d.payouts || []); }
+function trToggleBreak(k){ TR.openBreak = TR.openBreak === k ? null : k; trRender(); }
+function trViewResumen(){
+  const P = TR.pos, d = TR.d, s = d.settings || {};
+  const onlyNotActivated = P.blocked && P.blockers.every(b => b.code === 'not_activated');
+  let hero;
+  if(P.blocked){
+    hero = `<div class="tr-hero tr-hero-block">
+      <div class="tr-hero-label">Monto máximo transferible a Checking</div>
+      <div class="tr-hero-main">Bloqueado: pendiente de conciliación</div>
+      <ul class="tr-blockers">${P.blockers.map(b => `<li>${trE(b.message)}</li>`).join('')}</ul>
+      ${onlyNotActivated && P.calculatedMax !== null ? `<div class="sub" style="margin-top:8px;">Cálculo de referencia para tus cierres de prueba: <strong>${trFmt(P.calculatedMax)}</strong> — <em>no es una autorización para transferir</em>.</div>` : ''}
+    </div>`;
+  } else {
+    hero = `<div class="tr-hero tr-hero-ok">
+      <div class="tr-hero-label">Puedes transferir hasta</div>
+      <div class="tr-hero-main">${trFmt(P.maxTransferable)}</div>
+      <div class="sub" style="margin:4px 0 0;">de Agency Sweep a Checking, sin comprometer lo que se debe a las aseguradoras. <strong>La transferencia la haces tú, a mano, en Bluevine.</strong></div>
+    </div>`;
+  }
+  const bal = TR.latestBalance;
+  const chips = [
+    bal ? trChip('Saldo verificado ' + trAgo(bal.as_of), (Date.now() - Date.parse(bal.as_of)) > (s.max_balance_age_hours || 48) * TR_HOUR_MS ? 'red' : 'green') : trChip('Sin saldo verificado', 'red'),
+    TR.lastImportMs ? trChip('Banco importado ' + trAgo(new Date(TR.lastImportMs).toISOString()), (Date.now() - TR.lastImportMs) > (s.max_balance_age_hours || 48) * TR_HOUR_MS ? 'red' : 'green') : trChip('Sin importar movimientos', 'red'),
+    trChip('Stripe sincronizado ' + trAgo(s.stripe_last_sync_at), s.stripe_last_sync_at && (Date.now() - Date.parse(s.stripe_last_sync_at)) < 24 * TR_HOUR_MS ? 'green' : 'amber'),
+    s.activated ? trChip('Cálculo activado', 'green') : trChip(`Sin activar (${TR.closesCount}/2 cierres)`, 'amber')
+  ].join(' ');
+  const figs = [
+    ['B', 'Saldo real en Agency Sweep', P.B, 'Lo que dice Bluevine (verificado, no Stripe).'],
+    ['O', 'Primas pendientes con aseguradoras', P.O, 'Lo que las aseguradoras todavía van a debitar.'],
+    ['R', 'Retenciones', P.R, 'Disputas y reembolsos pendientes.'],
+    ['U', 'Sin identificar / sin conciliar', P.U, 'Dinero que no se sabe de quién es: no es ganancia.'],
+    ['X', 'Transferencias en proceso', P.X, 'Aprobadas o ejecutadas que el banco aún no refleja.'],
+    ['C', 'Colchón mínimo', P.C, 'Se deja siempre en Sweep (Configuración).'],
+    ['CAP', 'Capacidad bancaria', P.capacity, 'Saldo − primas − retenciones − sin identificar − colchón − en proceso.'],
+    ['F', 'Ingreso propio ya conciliado', P.F, 'Service fee − costo real de Stripe, solo si el dinero ya llegó a Sweep.']
+  ];
+  const figHtml = figs.map(([k, label, val, tip]) => `<div class="tr-fig ${TR.openBreak === k ? 'open' : ''}" ${P.breakdown[k] ? `onclick="trToggleBreak('${k}')" style="cursor:pointer;"` : ''} title="${trE(tip)}"><div class="label">${label}</div><div class="num">${val === null ? '—' : trFmt(val)}</div><p class="sub">${trE(tip)}</p></div>`).join('');
+  let breakHtml = '';
+  if(TR.openBreak && P.breakdown[TR.openBreak]){
+    const items = P.breakdown[TR.openBreak];
+    breakHtml = `<div class="dash-card tr-break"><h4 style="margin-top:0;">Detalle: ${trE((figs.find(f => f[0] === TR.openBreak) || [])[1])}</h4>${items.length ? `<table class="dash-table"><tbody>${items.map(i => `<tr><td>${trE(i.label)}</td><td class="sub">${trE(i.detail)}</td><td style="text-align:right;"><strong>${trFmt(i.cents)}</strong></td></tr>`).join('')}</tbody></table>` : '<p class="sub">Sin partidas.</p>'}</div>`;
+  }
+  // Qué debitarán las aseguradoras (por aseguradora)
+  const byCarrier = {};
+  (d.obligations || []).forEach(o => { if(o.status === 'cancelled') return; const out = Math.max(0, o.payable_cents - o.paid_cents - o.refunded_cents); if(out) byCarrier[o.carrier_name] = (byCarrier[o.carrier_name] || 0) + out; });
+  const carriers = Object.entries(byCarrier).sort((a, b) => b[1] - a[1]);
+  // Stripe / tránsito / banco
+  const sb_ = s.stripe_balance || null;
+  const inTransit = (d.payouts || []).filter(p => p.status === 'pending' || p.status === 'in_transit').reduce((x, p) => x + p.amount_cents, 0);
+  const awaitingBank = (d.payouts || []).filter(p => p.status === 'paid' && !p.bank_txn_id).reduce((x, p) => x + p.amount_cents, 0);
+  return `
+    ${hero}
+    <div style="margin:10px 0;">${chips}</div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:6px;">
+      <button class="btn-primary" style="width:auto; padding:9px 18px;" onclick="trSyncAll()">🔄 Sincronizar CRM + Stripe</button>
+      <button class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="trOpenImport('sweep')">📥 Importar CSV de Bluevine</button>
+      <button class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="trOpenBalance()">🏦 Registrar saldo verificado</button>
+      <button class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="trOpenClose()">🗓 Cierre diario</button>
+    </div>
+    <div class="dash-stats tr-figs" style="margin-top:14px;">${figHtml}</div>
+    ${breakHtml}
+    <div class="tr-cols">
+      <div class="dash-card"><h4 style="margin-top:0;">1 · Lo que las aseguradoras van a debitar</h4>
+        ${carriers.length ? `<table class="dash-table"><tbody>${carriers.map(([c, v]) => `<tr><td>${trE(c)}</td><td style="text-align:right;"><strong>${trFmt(v)}</strong></td></tr>`).join('')}<tr><td><strong>Total</strong></td><td style="text-align:right;"><strong>${trFmt(P.O)}</strong></td></tr></tbody></table>` : '<p class="sub">No hay primas pendientes registradas.</p>'}
+      </div>
+      <div class="dash-card"><h4 style="margin-top:0;">2 y 3 · Dónde está el dinero</h4>
+        <table class="dash-table"><tbody>
+          <tr><td>En Stripe (disponible)</td><td style="text-align:right;">${sb_ ? trFmt(sb_.available_cents) : '—'}</td></tr>
+          <tr><td>En Stripe (pendiente de liberarse)</td><td style="text-align:right;">${sb_ ? trFmt(sb_.pending_cents) : '—'}</td></tr>
+          <tr><td>Payouts en camino al banco</td><td style="text-align:right;">${trFmt(inTransit)}</td></tr>
+          <tr><td>Payouts pagados que faltan confirmar en Bluevine</td><td style="text-align:right;">${trFmt(awaitingBank)}</td></tr>
+          <tr><td><strong>Saldo real en Agency Sweep</strong></td><td style="text-align:right;"><strong>${P.B === null ? '—' : trFmt(P.B)}</strong></td></tr>
+        </tbody></table>
+        <p class="sub" style="margin-bottom:0;">El saldo de Stripe es solo informativo: nunca se cuenta como dinero disponible en el banco.</p>
+      </div>
+    </div>
+    <div class="dash-card"><h4 style="margin-top:0;">4 · Qué respalda lo transferible</h4>
+      <p class="sub">Toca “Ingreso propio ya conciliado” arriba para ver cada cobro: cuánto se cobró, cuánto era prima y cuál fue el costo real de Stripe. Nada que no esté probado entra en esa cifra.</p>
+      <p class="sub" style="margin:0;">Última sincronización con Stripe: ${s.stripe_last_sync_at ? trE(new Date(s.stripe_last_sync_at).toLocaleString()) : 'nunca'} ${s.stripe_last_sync_note ? '— ' + trE(s.stripe_last_sync_note) : ''}</p>
+    </div>`;
+}
+
+// ---------- PAGOS Y PÓLIZAS ----------
+function trSetFilter(k, v){ TR.filters[k] = v; trRender(); }
+function trPaymentRows(){
+  const links = trLinks();
+  return (TR.d.payments || []).map(p => ({ p, st: trPaymentStatuses(p, links[p.id]), link: links[p.id] }));
+}
+function trViewPagos(){
+  const f = TR.filters; const q = (f.q || '').toLowerCase();
+  let rows = trPaymentRows();
+  const cat = ({ p, st }) => {
+    if(!st.identified) return 'sin_identificar';
+    if(p.disputed || p.refunded_cents > 0) return 'alerta';
+    if(!st.feeKnown) return 'sin_fee';
+    if(st.bank === 'matched') return 'conciliado';
+    return 'sin_deposito';
+  };
+  const counts = {}; rows.forEach(r => { const c = cat(r); counts[c] = (counts[c] || 0) + 1; });
+  rows = rows.filter(r => (f.status === 'all' || cat(r) === f.status) && (!q || (String(r.p.client_name || '') + ' ' + String(r.p.carrier_name || '') + ' ' + String(r.p.stripe_payment_intent_id || '')).toLowerCase().includes(q)));
+  const lab = { all: 'Todos', sin_identificar: 'Sin identificar', alerta: 'Disputa / reembolso', sin_fee: 'Sin datos de Stripe', sin_deposito: 'Esperando depósito', conciliado: 'Conciliados' };
+  const chipFor = (st, p) => [
+    trChip({ succeeded: 'Cobro confirmado', pending: 'Cobro sin confirmar', failed: 'Cobro fallido', canceled: 'Cobro cancelado', voided: 'Anulado', disputed: 'Disputa', refunded: 'Reembolsado', partially_refunded: 'Reembolso parcial' }[p.charge_status !== 'succeeded' && st.charge === 'succeeded' ? p.charge_status : st.charge] || st.charge, st.charge === 'succeeded' && p.charge_status === 'succeeded' ? 'green' : 'amber'),
+    trChip({ unassigned: 'Sin Stripe', in_stripe: 'En Stripe', payout_created: 'Payout creado', in_transit: 'En camino', payout_paid: 'Payout pagado', payout_failed: 'Payout fallido' }[st.settlement], st.settlement === 'payout_paid' ? 'green' : 'gray'),
+    trChip({ not_received: 'No llega al banco', unmatched: 'Falta conciliar', partially_matched: 'Banco parcial', matched: 'En Sweep ✓' }[st.bank], st.bank === 'matched' ? 'green' : 'gray')
+  ].join(' ');
+  return `<div class="dash-card">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+      ${Object.keys(lab).map(k => `<button type="button" class="tr-pill ${f.status === k ? 'active' : ''}" onclick="trSetFilter('status','${k}')">${lab[k]}${k !== 'all' && counts[k] ? ` <span class="tr-badge">${counts[k]}</span>` : ''}</button>`).join('')}
+      <input type="text" placeholder="Buscar cliente o aseguradora…" value="${trE(f.q)}" oninput="TR.filters.q=this.value; clearTimeout(trPagosT); trPagosT=setTimeout(trRender,250)" style="margin-left:auto; max-width:240px;">
+      <button class="btn-ghost" style="width:auto; padding:7px 14px;" onclick="trExportPayments()">⬇ CSV</button>
+    </div>
+    <p class="sub">Cada fila separa los estados: lo cobrado, lo que está en Stripe y lo que ya llegó a Sweep. El ingreso propio solo cuenta cuando el dinero llegó al banco y se conoce el costo real de Stripe.</p>
+    <div class="dash-table-wrap"><table class="dash-table">
+      <thead><tr><th>Fecha</th><th>Cliente</th><th>Aseguradora</th><th style="text-align:right;">Cobrado</th><th style="text-align:right;">Prima</th><th style="text-align:right;">Stripe real</th><th style="text-align:right;">Ingreso propio</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${rows.length ? rows.slice(0, 400).map(({ p, st }) => `<tr>
+        <td>${formatDateUS((p.created_at || '').slice(0, 10))}</td><td>${trE(p.client_name || '—')}</td><td>${trE(p.carrier_name || '—')}</td>
+        <td style="text-align:right;">${trFmt(p.gross_cents)}</td><td style="text-align:right;">${p.premium_payable_cents ? trFmt(p.premium_payable_cents) : '—'}</td>
+        <td style="text-align:right;">${st.feeKnown ? trFmt(p.stripe_fee_cents) : '<span class="sub">pendiente</span>'}</td>
+        <td style="text-align:right;">${st.ownEffective === null ? '—' : trFmt(st.ownEffective)}${p.refunded_cents ? `<div class="sub">reembolso ${trFmt(p.refunded_cents)}</div>` : ''}</td>
+        <td>${chipFor(st, p)}</td>
+        <td>${!st.identified ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenIdentify('${trE(p.id)}')">Identificar</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="9">No hay cobros con este filtro. Usa “Sincronizar” en el Resumen.</td></tr>'}</tbody></table></div>
+    ${rows.length > 400 ? `<p class="sub">Mostrando 400 de ${rows.length}. Usa los filtros o descarga el CSV.</p>` : ''}
+  </div>`;
+}
+let trPagosT = null;
+function trExportPayments(){
+  const lines = [trCsvLine(['fecha', 'cliente', 'aseguradora', 'cobrado', 'prima_aseguradora', 'stripe_real', 'reembolsado', 'ingreso_propio_neto', 'cobro', 'stripe', 'banco', 'payment_intent'])];
+  trPaymentRows().forEach(({ p, st }) => lines.push(trCsvLine([(p.created_at || '').slice(0, 10), p.client_name, p.carrier_name, (p.gross_cents / 100).toFixed(2), (p.premium_payable_cents / 100).toFixed(2), p.stripe_fee_cents === null ? '' : (p.stripe_fee_cents / 100).toFixed(2), (p.refunded_cents / 100).toFixed(2), st.ownEffective === null ? '' : (st.ownEffective / 100).toFixed(2), st.charge, st.settlement, st.bank, p.stripe_payment_intent_id])));
+  trDownload('tesoreria_pagos.csv', lines.join('\n'));
+}
+function trOpenIdentify(paymentId){
+  const p = (TR.d.payments || []).find(x => x.id === paymentId); if(!p) return;
+  const carriers = Array.from(new Set((TR.d.payments || []).map(x => x.carrier_name).concat((TR.d.obligations || []).map(x => x.carrier_name)).filter(Boolean))).sort();
+  trModal('Identificar cobro', `
+    <p class="sub" style="margin-top:0;">Cobro de <strong>${trFmt(p.gross_cents)}</strong>${p.client_name ? ' de ' + trE(p.client_name) : ''}. Mientras no se identifique, ese dinero cuenta como “sin identificar” y <strong>no</strong> como ganancia.</p>
+    <div class="form-row"><label>Aseguradora</label><input type="text" id="tid-carrier" list="tid-list" value="${trE(p.carrier_name || '')}" placeholder="Nombre de la aseguradora"><datalist id="tid-list">${carriers.map(c => `<option value="${trE(c)}">`).join('')}</datalist></div>
+    <div class="form-row"><label>¿Cuánto de este cobro es prima que se debe a la aseguradora? (USD)</label><input type="text" id="tid-premium" inputmode="decimal" value="${(p.premium_payable_cents / 100).toFixed(2)}"><p class="sub">Pon 0.00 si este cobro es solo service fee de la agencia.</p></div>
+    <div class="form-row"><label>Motivo / nota (obligatorio)</label><input type="text" id="tid-note" placeholder="Ej.: confirmado con el recibo #… y la póliza del cliente"></div>`,
+    [{ label: 'Cancelar' }, { label: 'Guardar', primary: true, onClick: async () => {
+      const carrier = trVal('tid-carrier').trim(); const prem = trParseMoney(trVal('tid-premium')); const note = trVal('tid-note').trim();
+      if(prem === null || prem < 0 || prem > p.gross_cents) throw new Error('La prima debe estar entre $0.00 y lo cobrado (' + trFmt(p.gross_cents) + ').');
+      if(prem > 0 && !carrier) throw new Error('Si hay prima, indica la aseguradora.');
+      if(note.length < 5) throw new Error('Escribe una nota breve del porqué (queda en la bitácora).');
+      const { error } = await sb.from('treasury_payments').update({ carrier_name: carrier || null, premium_payable_cents: prem, identified_manually: true, updated_at: new Date().toISOString() }).eq('id', p.id);
+      if(error) throw new Error(error.message);
+      await trAudit('payment_identified', 'payment', p.id, { carrier, premium_cents: prem, note, previous: { carrier: p.carrier_name, premium_cents: p.premium_payable_cents } });
+      await trLoad(); const o = await trSyncObligations(); await trLoad(); trRender(); trToast('Cobro identificado.' + (o.created ? ' Se creó la obligación con la aseguradora.' : ''));
+    } }]);
+}
+
+// ---------- DEPÓSITOS STRIPE ----------
+function trViewStripe(){
+  const d = TR.d; const links = trLinks();
+  const payouts = (d.payouts || []).slice().sort((a, b) => String(b.arrival_date || '').localeCompare(String(a.arrival_date || '')));
+  const sug = {}; trSuggestPayoutMatches(d.payouts || [], d.bankTxns || []).forEach(r => { sug[r.payout.payout_id] = r; });
+  const bankById = {}; (d.bankTxns || []).forEach(b => { bankById[b.id] = b; });
+  const unlinked = (d.stripeTxns || []).filter(t => (t.type === 'charge' || t.type === 'payment') && !t.payment_id && !(TR.pos.exceptions.length === 0 && false));
+  const credits = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents > 0 && b.classification === 'unclassified');
+  const statusLab = { pending: 'Pendiente', in_transit: 'En camino', paid: 'Pagado', failed: 'Fallido', canceled: 'Cancelado' };
+  return `<div class="dash-card"><div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;"><h4 style="margin:0;">Payouts de Stripe → Agency Sweep</h4>
+      <button class="btn-primary" style="width:auto; padding:7px 14px;" onclick="trSyncAll()">🔄 Sincronizar</button></div>
+    <p class="sub">Un payout cuenta como dinero real solo cuando (1) sus cobros suman <strong>exactamente</strong> su monto y (2) el depósito aparece en Bluevine por el mismo importe. Si hay duda, no se asigna solo: tú eliges.</p>
+    <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Payout</th><th>Llegada</th><th style="text-align:right;">Monto</th><th>Estado</th><th>Cobros que contiene</th><th>Depósito en Bluevine</th><th></th></tr></thead><tbody>
+      ${payouts.length ? payouts.slice(0, 200).map(po => {
+        const al = trPayoutAllocation(po, (d.stripeTxns || []).filter(t => t.payout_id === po.payout_id));
+        const b = po.bank_txn_id ? bankById[po.bank_txn_id] : null; const sg = sug[po.payout_id];
+        return `<tr><td><code>${trE(po.payout_id)}</code></td><td>${po.arrival_date ? formatDateUS(po.arrival_date) : '—'}</td><td style="text-align:right;">${trFmt(po.amount_cents)}</td>
+          <td>${trChip(statusLab[po.status] || po.status, po.status === 'paid' ? 'green' : (po.status === 'failed' || po.status === 'canceled') ? 'red' : 'amber')}</td>
+          <td>${po.status === 'paid' || al.items ? (al.complete ? trChip(`${al.items} partida(s) = exacto ✓`, 'green') : trChip(`${al.items} partida(s) · diferencia ${trFmt(al.diff)}`, po.status === 'paid' ? 'red' : 'gray')) : '—'}</td>
+          <td>${b ? trChip('✓ ' + formatDateUS(b.posted_at) + ' ' + trFmt(b.amount_cents), 'green') : po.status === 'paid' ? (sg && sg.kind === 'unique' || sg && sg.kind === 'reference' ? trChip('Coincidencia sugerida', 'amber') : sg && sg.kind === 'ambiguous' ? trChip('Varias coincidencias', 'amber') : trChip('No aparece', 'red')) : '—'}</td>
+          <td>${po.status === 'paid' && !po.bank_txn_id ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenMatchPayout('${trE(po.payout_id)}')">Conciliar</button>` : ''}</td></tr>`;
+      }).join('') : '<tr><td colspan="7">Todavía no hay payouts. Usa “Sincronizar”.</td></tr>'}
+    </tbody></table></div></div>
+    <div class="dash-card"><h4 style="margin-top:0;">Depósitos en Agency Sweep sin clasificar (${credits.length})</h4>
+      ${credits.length ? `<table class="dash-table"><tbody>${credits.map(b => `<tr><td>${formatDateUS(b.posted_at)}</td><td>${trE(b.description)}</td><td style="text-align:right;"><strong>${trFmt(b.amount_cents)}</strong></td><td><button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenClassify('${trE(b.id)}')">Clasificar</button></td></tr>`).join('')}</tbody></table>` : '<p class="sub">No hay depósitos pendientes de clasificar.</p>'}
+    </div>
+    ${unlinked.length ? `<div class="dash-card" style="border-color:#E39C9C;"><h4 style="margin-top:0; color:#8a3030;">Cobros en Stripe sin registro en el CRM (${unlinked.length})</h4><table class="dash-table"><tbody>${unlinked.slice(0, 50).map(t => `<tr><td><code>${trE(t.stripe_id)}</code></td><td>${t.created_at_stripe ? formatDateUS(t.created_at_stripe.slice(0, 10)) : ''}</td><td style="text-align:right;">${trFmt(t.amount_cents)}</td></tr>`).join('')}</tbody></table><p class="sub">Aparecen también en “Excepciones”, donde se pueden resolver con justificación.</p></div>` : ''}`;
+}
+function trOpenMatchPayout(payoutId){
+  const po = (TR.d.payouts || []).find(p => p.payout_id === payoutId); if(!po) return;
+  const r = trSuggestPayoutMatches([po], TR.d.bankTxns || [])[0];
+  const al = trPayoutAllocation(po, (TR.d.stripeTxns || []).filter(t => t.payout_id === po.payout_id));
+  const cands = r ? r.candidates : [];
+  trModal('Conciliar payout con Bluevine', `
+    <p class="sub" style="margin-top:0;">Payout <code>${trE(po.payout_id)}</code> por <strong>${trFmt(po.amount_cents)}</strong>, llegada ${po.arrival_date ? formatDateUS(po.arrival_date) : '—'}.</p>
+    ${al.complete ? '' : `<div class="msg error" style="display:block;">Las partidas del payout no suman exacto (diferencia ${trFmt(al.diff)}). Puedes vincular el depósito, pero el ingreso propio de estos cobros seguirá sin contarse hasta que cuadre.</div>`}
+    ${cands.length ? `<p><strong>Depósitos con ese mismo importe</strong> (±${2}/+${7} días de la llegada):</p>${cands.map((b, i) => `<label style="display:flex; gap:8px; padding:6px 0;"><input type="radio" name="trmp" value="${trE(b.id)}" ${r.pick && r.pick.id === b.id ? 'checked' : ''}> ${formatDateUS(b.posted_at)} — ${trE(b.description)} — <strong>${trFmt(b.amount_cents)}</strong></label>`).join('')}
+      ${r.kind === 'ambiguous' ? '<p class="sub">Hay más de una coincidencia posible: elige tú la correcta.</p>' : ''}`
+      : '<p class="msg error" style="display:block;">No hay ningún depósito sin clasificar por este importe en esa ventana de fechas. Importa el CSV de Bluevine más reciente y vuelve a intentar.</p>'}`,
+    cands.length ? [{ label: 'Cancelar' }, { label: 'Vincular depósito', primary: true, onClick: async () => {
+      const pick = document.querySelector('input[name="trmp"]:checked'); if(!pick) throw new Error('Elige un depósito.');
+      const b = (TR.d.bankTxns || []).find(x => x.id === pick.value);
+      if(!b || b.amount_cents !== po.amount_cents) throw new Error('El depósito debe ser EXACTAMENTE por ' + trFmt(po.amount_cents) + '.');
+      const { error } = await sb.from('treasury_payouts').update({ bank_txn_id: b.id, matched_at: new Date().toISOString() }).eq('payout_id', po.payout_id).is('bank_txn_id', null);
+      if(error) throw new Error(error.message);
+      const { error: e2 } = await sb.from('treasury_bank_txns').update({ classification: 'stripe_payout', classification_note: 'Payout ' + po.payout_id }).eq('id', b.id);
+      if(e2) throw new Error('El payout quedó vinculado pero no se pudo clasificar el depósito: ' + e2.message);
+      await trAudit('payout_matched', 'payout', po.payout_id, { bank_txn_id: b.id, amount_cents: po.amount_cents, allocation_complete: al.complete });
+      await trLoad(); trRender(); trToast('Payout conciliado con el depósito de Bluevine.');
+    } }] : [{ label: 'Cerrar' }]);
+}
+
+// ---------- Clasificación de movimientos del banco ----------
+function trOpenClassify(bankId){
+  const b = (TR.d.bankTxns || []).find(x => x.id === bankId); if(!b) return;
+  const opts = b.amount_cents > 0 ? [['other_credit', 'Otro ingreso (no es de Stripe)'], ['opening_carryover', 'Arrastre de la apertura (dinero previo al corte)']]
+    : [['carrier_debit', 'Retiro de una aseguradora (se asigna a pólizas)'], ['other_debit', 'Otro egreso (comisión bancaria, etc.)'], ['opening_carryover', 'Arrastre de la apertura']];
+  trModal('Clasificar movimiento', `
+    <p class="sub" style="margin-top:0;">${formatDateUS(b.posted_at)} — ${trE(b.description)} — <strong>${trFmt(b.amount_cents)}</strong></p>
+    <div class="form-row"><label>¿Qué es?</label><select id="trc-class">${opts.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select></div>
+    <div class="form-row"><label>Nota (obligatoria)</label><input type="text" id="trc-note" placeholder="Ej.: ACH Progressive de la semana"></div>
+    <p class="sub">Los depósitos de Stripe se concilian desde “Depósitos Stripe → Conciliar”, y las transferencias a Checking desde “Propuestas de transferencia”.</p>`,
+    [{ label: 'Cancelar' }, { label: 'Guardar', primary: true, onClick: async () => {
+      const cls = trVal('trc-class'), note = trVal('trc-note').trim(); if(note.length < 3) throw new Error('Escribe una nota breve.');
+      const { error } = await sb.from('treasury_bank_txns').update({ classification: cls, classification_note: note }).eq('id', b.id);
+      if(error) throw new Error(error.message);
+      await trLoad(); trRender(); trToast('Movimiento clasificado.');
+    } }]);
+}
+
+// ---------- RETIROS DE ASEGURADORAS ----------
+function trAllocSum(bankId){ return (TR.d.allocations || []).filter(a => a.bank_txn_id === bankId).reduce((s, a) => s + a.allocated_cents, 0); }
+function trViewRetiros(){
+  const d = TR.d;
+  const debits = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents < 0);
+  const tag = b => {
+    if(b.classification === 'unclassified') return trChip('Sin clasificar', 'red');
+    if(b.classification === 'carrier_debit'){ const a = trAllocSum(b.id), t = -b.amount_cents; return a === t ? trChip('Asignado completo ✓', 'green') : trChip(`Asignado ${trFmt(a)} de ${trFmt(t)}`, 'red'); }
+    return trChip(TR_CLASS_LABELS[b.classification] || b.classification, 'gray');
+  };
+  return `<div class="dash-card"><div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;"><h4 style="margin:0;">Retiros de Agency Sweep</h4>
+    <button class="btn-ghost" style="width:auto; padding:7px 14px;" onclick="trOpenImport('sweep')">📥 Importar CSV de Bluevine</button></div>
+    <p class="sub">Cada retiro de una aseguradora se reparte entre las pólizas que cubre (puede ser uno solo, varios o parcial). Un retiro sin asignar por completo bloquea el monto transferible.</p>
+    <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right;">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${debits.length ? debits.slice(0, 300).map(b => `<tr><td>${formatDateUS(b.posted_at)}</td><td>${trE(b.description)}${b.classification_note ? `<div class="sub">${trE(b.classification_note)}</div>` : ''}</td><td style="text-align:right;">${trFmt(b.amount_cents)}</td><td>${tag(b)}</td>
+      <td style="white-space:nowrap;">${b.classification === 'unclassified' ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenClassify('${trE(b.id)}')">Clasificar</button>` : ''}
+      ${b.classification === 'carrier_debit' ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenAllocate('${trE(b.id)}')">${trAllocSum(b.id) === -b.amount_cents ? 'Ver' : 'Asignar'}</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5">No hay retiros importados. Importa el CSV de Bluevine.</td></tr>'}
+    </tbody></table></div></div>`;
+}
+function trOutstanding(o){ return Math.max(0, o.payable_cents - o.paid_cents - o.refunded_cents); }
+function trOpenAllocate(bankId){
+  const b = (TR.d.bankTxns || []).find(x => x.id === bankId); if(!b) return;
+  const debit = -b.amount_cents; const done = trAllocSum(b.id);
+  const mine = (TR.d.allocations || []).filter(a => a.bank_txn_id === b.id);
+  const obById = {}; (TR.d.obligations || []).forEach(o => { obById[o.id] = o; });
+  const lockedCarrier = mine.length ? (obById[mine[0].obligation_id] || {}).carrier_name : null;
+  const open = (TR.d.obligations || []).filter(o => o.status !== 'cancelled' && trOutstanding(o) > 0);
+  const carriers = Array.from(new Set(open.map(o => o.carrier_name))).sort();
+  const payById = {}; (TR.d.payments || []).forEach(p => { payById[p.id] = p; });
+  const rev = {}; mine.filter(a => a.reverses_id).forEach(a => { rev[a.reverses_id] = (rev[a.reverses_id] || 0) + a.allocated_cents; });
+  const history = mine.filter(a => a.allocated_cents > 0).map(a => {
+    const o = obById[a.obligation_id] || {}; const p = payById[o.payment_id] || {}; const remaining = a.allocated_cents + (rev[a.id] || 0);
+    return `<tr><td>${trE(o.carrier_name || '')} — ${trE(p.client_name || (o.source === 'opening' ? 'saldo inicial' : ''))}</td><td style="text-align:right;">${trFmt(a.allocated_cents)}${remaining !== a.allocated_cents ? ` <span class="sub">(vigente ${trFmt(remaining)})</span>` : ''}</td><td>${remaining > 0 ? `<button class="btn-ghost" style="width:auto; padding:3px 9px; font-size:12px;" onclick="trReverseAllocation('${trE(a.id)}')">Reversar</button>` : '<span class="sub">reversada</span>'}</td></tr>`;
+  }).join('');
+  TR.alloc = { bank: b, debit, done, lockedCarrier };
+  trModal('Asignar retiro a pólizas', `
+    <p class="sub" style="margin-top:0;">${formatDateUS(b.posted_at)} — ${trE(b.description)}<br>Retiro <strong>${trFmt(debit)}</strong> · ya asignado <strong>${trFmt(done)}</strong> · falta <strong>${trFmt(debit - done)}</strong></p>
+    ${history ? `<table class="dash-table"><tbody>${history}</tbody></table>` : ''}
+    ${debit - done > 0 ? `
+    <div class="form-row"><label>Aseguradora</label><select id="tra-carrier" ${lockedCarrier ? 'disabled' : ''} onchange="trAllocLines()">${lockedCarrier ? `<option>${trE(lockedCarrier)}</option>` : '<option value="">— elige —</option>' + carriers.map(c => `<option>${trE(c)}</option>`).join('')}</select></div>
+    <div id="tra-lines"></div>
+    <div id="tra-sum" class="sub" style="margin-top:6px;"></div>` : '<p class="msg success" style="display:block;">Este retiro ya está asignado por completo.</p>'}`,
+    debit - done > 0 ? [{ label: 'Cerrar' }, { label: 'Guardar asignación', primary: true, onClick: trSaveAllocation }] : [{ label: 'Cerrar' }]);
+  if(lockedCarrier) trAllocLines();
+}
+function trAllocLines(){
+  const A = TR.alloc; const c = A.lockedCarrier || trVal('tra-carrier'); const el = document.getElementById('tra-lines'); if(!el) return;
+  if(!c){ el.innerHTML = '<p class="sub">Elige la aseguradora para ver sus pólizas pendientes.</p>'; return; }
+  const payById = {}; (TR.d.payments || []).forEach(p => { payById[p.id] = p; });
+  const obs = (TR.d.obligations || []).filter(o => o.status !== 'cancelled' && o.carrier_name.toLowerCase() === c.toLowerCase() && trOutstanding(o) > 0).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  A.obs = obs;
+  el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong>Pólizas pendientes de ${trE(c)}</strong><button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="trAllocAuto()">Repartir automático (más antiguas primero)</button></div>
+    <table class="dash-table"><thead><tr><th>Cliente</th><th style="text-align:right;">Se debe</th><th style="text-align:right;">Asignar (USD)</th></tr></thead><tbody>
+    ${obs.map((o, i) => { const p = payById[o.payment_id] || {}; return `<tr><td>${trE(p.client_name || (o.source === 'opening' ? 'Saldo inicial' : '—'))}<div class="sub">${p.created_at ? formatDateUS(p.created_at.slice(0, 10)) : ''}</div></td><td style="text-align:right;">${trFmt(trOutstanding(o))}</td><td style="text-align:right;"><input type="text" inputmode="decimal" class="tra-in" data-i="${i}" placeholder="0.00" style="width:110px; text-align:right;" oninput="trAllocSumUpdate()"></td></tr>`; }).join('')}
+    </tbody></table>`;
+  trAllocSumUpdate();
+}
+function trAllocCollect(){
+  const A = TR.alloc; const lines = []; const bad = [];
+  document.querySelectorAll('.tra-in').forEach(inp => {
+    const v = inp.value.trim(); if(!v) return; const c = trParseMoney(v);
+    if(c === null || c < 0) { bad.push(v); return; } if(c === 0) return;
+    lines.push({ obligation_id: A.obs[+inp.dataset.i].id, cents: c });
+  });
+  return { lines, bad };
+}
+function trAllocSumUpdate(){
+  const A = TR.alloc; const { lines, bad } = trAllocCollect(); const el = document.getElementById('tra-sum'); if(!el) return;
+  const obMap = {}; (TR.d.obligations || []).forEach(o => { obMap[o.id] = o; });
+  const r = trValidateAllocation(A.debit, A.done, lines, obMap);
+  el.innerHTML = (bad.length ? `<span style="color:#C23B3B;">Importe inválido: ${trE(bad.join(', '))}. </span>` : '') + `Asignando ahora: <strong>${trFmt(r.total)}</strong> · quedaría sin asignar: <strong>${trFmt(r.remainder)}</strong>` + (r.errors.length ? `<br><span style="color:#C23B3B;">${r.errors.map(trE).join('<br>')}</span>` : (r.remainder === 0 ? ' <span style="color:#1E8E5A;">✓ cuadra exacto</span>' : ' <span class="sub">(queda parcial: seguirá como excepción hasta completarlo)</span>'));
+}
+function trAllocAuto(){
+  const A = TR.alloc; let left = A.debit - A.done;
+  document.querySelectorAll('.tra-in').forEach(inp => { const o = A.obs[+inp.dataset.i]; const take = Math.min(left, trOutstanding(o)); inp.value = take > 0 ? (take / 100).toFixed(2) : ''; left -= take; });
+  trAllocSumUpdate();
+}
+async function trSaveAllocation(){
+  const A = TR.alloc; const { lines, bad } = trAllocCollect();
+  if(bad.length) throw new Error('Hay importes inválidos.'); if(!lines.length) throw new Error('Indica cuánto asignar a al menos una póliza.');
+  const obMap = {}; (TR.d.obligations || []).forEach(o => { obMap[o.id] = o; });
+  const r = trValidateAllocation(A.debit, A.done, lines, obMap); if(!r.ok) throw new Error(r.errors[0]);
+  const rows = lines.map(l => ({ bank_txn_id: A.bank.id, obligation_id: l.obligation_id, allocated_cents: l.cents }));
+  for(const row of rows){                                           // uno por uno: el trigger de la base valida cada línea
+    const { error } = await sb.from('treasury_allocations').insert(row);
+    if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+  }
+  await trAudit('allocation', 'bank_txn', A.bank.id, { lines: rows.map(x => ({ obligation_id: x.obligation_id, cents: x.allocated_cents })), remainder: r.remainder });
+  await trLoad(); trRender(); trToast(r.remainder === 0 ? 'Retiro asignado por completo.' : 'Asignación parcial guardada; faltan ' + trFmt(r.remainder) + '.');
+}
+function trReverseAllocation(allocId){
+  const a = (TR.d.allocations || []).find(x => x.id === allocId); if(!a) return;
+  const already = (TR.d.allocations || []).filter(x => x.reverses_id === a.id).reduce((s, x) => s + x.allocated_cents, 0);
+  const remaining = a.allocated_cents + already;
+  trModal('Reversar asignación', `<p>Se reversarán <strong>${trFmt(remaining)}</strong>. La asignación original <strong>no se borra</strong>: se agrega un asiento contrario y la póliza vuelve a quedar pendiente.</p>
+    <div class="form-row"><label>Motivo (obligatorio)</label><input type="text" id="trr-note"></div>`,
+    [{ label: 'Cancelar' }, { label: 'Reversar', primary: true, onClick: async () => {
+      const note = trVal('trr-note').trim(); if(note.length < 5) throw new Error('Escribe el motivo.');
+      const { error } = await sb.from('treasury_allocations').insert({ bank_txn_id: a.bank_txn_id, obligation_id: a.obligation_id, allocated_cents: -remaining, reverses_id: a.id, note });
+      if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trAudit('allocation_reversed', 'allocation', a.id, { cents: remaining, note });
+      trModalClose(); await trLoad(); trRender(); trToast('Asignación reversada.'); return false;
+    } }]);
+}
+
+// ---------- TRANSFERENCIAS (siempre manuales) ----------
+function trViewTransfer(){
+  const P = TR.pos, d = TR.d;
+  const st = { proposed: ['Propuesta', 'amber'], approved: ['Aprobada · pendiente de hacerse en Bluevine', 'amber'], executed: ['Hecha en Bluevine · falta ver en el banco', 'amber'], posted: ['Conciliada con el banco ✓', 'green'], cancelled: ['Cancelada', 'gray'] };
+  const proposedSum = (d.transfers || []).filter(t => t.status === 'proposed').reduce((s, t) => s + t.proposed_cents, 0);
+  const room = P.blocked ? 0 : Math.max(0, P.maxTransferable - proposedSum);
+  return `<div class="dash-card"><div class="msg" style="display:block; background:#EEF3FB; border:1px solid #C9D8F0; color:#2B4A7A;">🔒 Este módulo <strong>no mueve dinero</strong>. Calcula cuánto es seguro transferir y documenta el proceso; la transferencia de Agency Sweep a Checking la haces tú, a mano, en Bluevine.</div>
+    <h4>Nueva propuesta</h4>
+    ${P.blocked ? `<div class="tr-hero tr-hero-block" style="padding:14px;"><div class="tr-hero-main" style="font-size:20px;">Bloqueado: pendiente de conciliación</div><ul class="tr-blockers">${P.blockers.map(b => `<li>${trE(b.message)}</li>`).join('')}</ul></div>`
+      : `<p>Máximo transferible ahora: <strong>${trFmt(P.maxTransferable)}</strong>${proposedSum ? ` · ya propuesto sin aprobar: ${trFmt(proposedSum)} · disponible para proponer: <strong>${trFmt(room)}</strong>` : ''}</p>
+      <div class="form-row-2"><div class="form-row"><label>Monto a transferir (USD)</label><input type="text" id="trt-amount" inputmode="decimal" placeholder="0.00"></div>
+      <div class="form-row"><label>Motivo / nota</label><input type="text" id="trt-note" placeholder="Ej.: pago de nómina de la semana"></div></div>
+      <button class="btn-primary" style="width:auto; padding:9px 20px;" onclick="trPropose()">Proponer transferencia</button>`}
+  </div>
+  <div class="dash-card"><h4 style="margin-top:0;">Historial de transferencias</h4>
+    <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Propuesta</th><th style="text-align:right;">Monto</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody>
+    ${(d.transfers || []).length ? d.transfers.map(t => `<tr><td>${new Date(t.proposed_at).toLocaleDateString()}</td><td style="text-align:right;">${trFmt(t.proposed_cents)}</td><td>${trChip(st[t.status][0], st[t.status][1])}</td>
+      <td class="sub">${trE(t.justification || '')}${t.executed_reference ? `<br>Ref. Bluevine: ${trE(t.executed_reference)}` : ''}${t.cancel_reason ? `<br>Cancelada: ${trE(t.cancel_reason)}` : ''}${t.status === 'posted' ? `<br>Conciliada por ${trFmt(t.posted_cents)}` : ''}</td>
+      <td style="white-space:nowrap;">
+        ${t.status === 'proposed' ? `<button class="btn-primary" style="width:auto; padding:5px 12px; font-size:12px;" onclick="trApproveTransfer('${trE(t.id)}')">Aprobar</button>` : ''}
+        ${t.status === 'approved' ? `<button class="btn-primary" style="width:auto; padding:5px 12px; font-size:12px;" onclick="trMarkExecuted('${trE(t.id)}')">Ya la hice en Bluevine</button>` : ''}
+        ${t.status === 'executed' ? `<button class="btn-primary" style="width:auto; padding:5px 12px; font-size:12px;" onclick="trPostTransfer('${trE(t.id)}')">Conciliar con el banco</button>` : ''}
+        ${['proposed', 'approved'].includes(t.status) ? `<button class="btn-ghost" style="width:auto; padding:5px 12px; font-size:12px;" onclick="trCancelTransfer('${trE(t.id)}')">Cancelar</button>` : ''}
+      </td></tr>`).join('') : '<tr><td colspan="5">Aún no hay transferencias.</td></tr>'}
+    </tbody></table></div>
+    <button class="btn-ghost" style="width:auto; padding:7px 14px; margin-top:8px;" onclick="trExportTransfers()">⬇ Exportar soporte (CSV)</button>
+  </div>`;
+}
+function trSnapshot(){ const P = TR.pos; return { B: P.B, O: P.O, R: P.R, U: P.U, C: P.C, X: P.X, F: P.F, capacity: P.capacity, own_available: P.ownAvailable, max: P.maxTransferable, blocked: P.blocked, at: new Date().toISOString() }; }
+async function trPropose(){
+  try {
+    await trLoad(); trRecompute(); const P = TR.pos;
+    if(P.blocked) throw new Error('Bloqueado: pendiente de conciliación. No se puede proponer.');
+    const cents = trParseMoney(trVal('trt-amount')); const note = trVal('trt-note').trim();
+    if(!cents || cents <= 0) throw new Error('Escribe un monto mayor a cero.');
+    const proposedSum = (TR.d.transfers || []).filter(t => t.status === 'proposed').reduce((s, t) => s + t.proposed_cents, 0);
+    if(cents + proposedSum > P.maxTransferable) throw new Error(`El monto supera lo transferible (${trFmt(P.maxTransferable - proposedSum)} disponibles para proponer).`);
+    if(note.length < 3) throw new Error('Escribe el motivo de la transferencia.');
+    const { data, error } = await sb.from('treasury_transfers').insert({ proposed_cents: cents, justification: note, snapshot: trSnapshot() }).select().single();
+    if(error) throw new Error(error.message);
+    await trAudit('transfer_proposed', 'transfer', data.id, { cents, note });
+    await trLoad(); trRender(); trToast('Propuesta creada. Falta aprobarla.');
+  } catch(e){ trToast(e.message, 'error'); }
+}
+function trApproveTransfer(id){
+  const t = (TR.d.transfers || []).find(x => x.id === id); if(!t) return;
+  trModal('Aprobar transferencia', `<p>Vas a aprobar <strong>${trFmt(t.proposed_cents)}</strong> de Agency Sweep a Checking. Se volverá a verificar el cálculo con los datos actuales. Aprobar <strong>no mueve dinero</strong>: después haces la transferencia a mano en Bluevine y la marcas como hecha.</p>`,
+    [{ label: 'Cancelar' }, { label: 'Aprobar', primary: true, onClick: async () => {
+      await trLoad(); trRecompute(); const P = TR.pos;
+      if(P.blocked) throw new Error('Ahora el cálculo está bloqueado: ' + P.blockers.map(b => b.message).join(' '));
+      if(t.proposed_cents > P.maxTransferable) throw new Error(`Ya no hay tanto disponible: el máximo actual es ${trFmt(P.maxTransferable)}.`);
+      const { error } = await sb.from('treasury_transfers').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: (await sb.auth.getUser()).data.user.id, approval_snapshot: trSnapshot() }).eq('id', id).eq('status', 'proposed');
+      if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trLoad(); trRender(); trToast('Transferencia aprobada. Ahora hazla a mano en Bluevine.');
+    } }]);
+}
+function trMarkExecuted(id){
+  const t = (TR.d.transfers || []).find(x => x.id === id); if(!t) return;
+  trModal('Marcar como hecha en Bluevine', `<p>Confirma que ya hiciste la transferencia de <strong>${trFmt(t.proposed_cents)}</strong> de Sweep a Checking en Bluevine.</p>
+    <div class="form-row"><label>Número de confirmación o nota (opcional)</label><input type="text" id="trx-ref"></div>`,
+    [{ label: 'Todavía no' }, { label: 'Sí, ya la hice', primary: true, onClick: async () => {
+      const { error } = await sb.from('treasury_transfers').update({ status: 'executed', executed_at: new Date().toISOString(), executed_by: (await sb.auth.getUser()).data.user.id, executed_reference: trVal('trx-ref').trim() || null }).eq('id', id).eq('status', 'approved');
+      if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trLoad(); trRender(); trToast('Marcada como hecha. Cuando importes el CSV del banco, concílala.');
+    } }]);
+}
+function trPostTransfer(id){
+  const t = (TR.d.transfers || []).find(x => x.id === id); if(!t) return;
+  const outs = (TR.d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents === -t.proposed_cents && ['unclassified', 'transfer_out'].includes(b.classification) && !(TR.d.transfers || []).some(x => x.bank_txn_out_id === b.id));
+  const ins = (TR.d.bankTxns || []).filter(b => b.account === 'checking' && b.amount_cents === t.proposed_cents && !(TR.d.transfers || []).some(x => x.bank_txn_in_id === b.id));
+  trModal('Conciliar transferencia con el banco', outs.length ? `
+    <p class="sub" style="margin-top:0;">Salida en Agency Sweep por exactamente <strong>${trFmt(t.proposed_cents)}</strong>:</p>
+    ${outs.map((b, i) => `<label style="display:flex; gap:8px; padding:5px 0;"><input type="radio" name="trpo" value="${trE(b.id)}" ${i === 0 && outs.length === 1 ? 'checked' : ''}> ${formatDateUS(b.posted_at)} — ${trE(b.description)} — ${trFmt(b.amount_cents)}</label>`).join('')}
+    ${ins.length ? `<p class="sub">Entrada en Checking (opcional, como comprobante):</p><select id="trpi"><option value="">— no vincular —</option>${ins.map(b => `<option value="${trE(b.id)}">${formatDateUS(b.posted_at)} ${trE(b.description)} ${trFmt(b.amount_cents)}</option>`).join('')}</select>` : '<p class="sub">No hay entrada importada de Checking; es opcional.</p>'}`
+    : '<p class="msg error" style="display:block;">No aparece en Sweep una salida por exactamente ese monto. Importa el CSV más reciente de Bluevine. (El monto debe coincidir al centavo.)</p>',
+    outs.length ? [{ label: 'Cancelar' }, { label: 'Conciliar', primary: true, onClick: async () => {
+      const pick = document.querySelector('input[name="trpo"]:checked'); if(!pick) throw new Error('Elige la salida del banco.');
+      const b = (TR.d.bankTxns || []).find(x => x.id === pick.value);
+      if(b.classification === 'unclassified'){
+        const { error: e1 } = await sb.from('treasury_bank_txns').update({ classification: 'transfer_out', classification_note: 'Transferencia a Checking ' + t.id }).eq('id', b.id);
+        if(e1) throw new Error(e1.message);
+      }
+      const inId = trVal('trpi') || null;
+      if(inId) await sb.from('treasury_bank_txns').update({ classification: 'transfer_in', classification_note: 'Transferencia desde Sweep ' + t.id }).eq('id', inId);
+      const { error } = await sb.from('treasury_transfers').update({ status: 'posted', posted_cents: -b.amount_cents, posted_at: new Date().toISOString(), bank_txn_out_id: b.id, bank_txn_in_id: inId }).eq('id', id).eq('status', 'executed');
+      if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trLoad(); trRender(); trToast('Transferencia conciliada. Registra el nuevo saldo verificado de Sweep.');
+    } }] : [{ label: 'Cerrar' }]);
+}
+function trCancelTransfer(id){
+  trModal('Cancelar transferencia', `<div class="form-row"><label>Motivo (obligatorio)</label><input type="text" id="trcx-note"></div>`,
+    [{ label: 'Volver' }, { label: 'Cancelar transferencia', primary: true, onClick: async () => {
+      const note = trVal('trcx-note').trim(); if(note.length < 5) throw new Error('Escribe el motivo.');
+      const { error } = await sb.from('treasury_transfers').update({ status: 'cancelled', cancelled_at: new Date().toISOString(), cancelled_by: (await sb.auth.getUser()).data.user.id, cancel_reason: note }).eq('id', id);
+      if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trLoad(); trRender(); trToast('Transferencia cancelada.');
+    } }]);
+}
+function trExportTransfers(){
+  const lines = [trCsvLine(['id', 'propuesta', 'monto', 'estado', 'motivo', 'aprobada', 'hecha', 'referencia_bluevine', 'conciliada_monto', 'saldo_B', 'primas_O', 'retenciones_R', 'sin_identificar_U', 'colchon_C', 'ingreso_propio_F', 'maximo_al_aprobar'])];
+  (TR.d.transfers || []).forEach(t => { const s = t.approval_snapshot || t.snapshot || {}; lines.push(trCsvLine([t.id, t.proposed_at, (t.proposed_cents / 100).toFixed(2), t.status, t.justification, t.approved_at, t.executed_at, t.executed_reference, t.posted_cents === null || t.posted_cents === undefined ? '' : (t.posted_cents / 100).toFixed(2), s.B === undefined ? '' : (s.B / 100).toFixed(2), s.O === undefined ? '' : (s.O / 100).toFixed(2), s.R === undefined ? '' : (s.R / 100).toFixed(2), s.U === undefined ? '' : (s.U / 100).toFixed(2), s.C === undefined ? '' : (s.C / 100).toFixed(2), s.F === undefined ? '' : (s.F / 100).toFixed(2), s.max === null || s.max === undefined ? '' : (s.max / 100).toFixed(2)])); });
+  trDownload('tesoreria_transferencias_soporte.csv', lines.join('\n'));
+}
+
+// ---------- EXCEPCIONES Y AUDITORÍA ----------
+function trViewExcepciones(){
+  const ex = TR.pos.exceptions; const d = TR.d;
+  const sev = { critical: ['Crítica', 'red'], warning: ['Aviso', 'amber'] };
+  return `<div class="dash-card"><h4 style="margin-top:0;">Excepciones abiertas (${ex.length})</h4>
+    ${ex.length ? `<div class="dash-table-wrap"><table class="dash-table"><tbody>${ex.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1)).map(e => `<tr><td>${trChip(sev[e.severity][0], sev[e.severity][1])}</td><td><strong>${trE(e.title)}</strong><div class="sub">${trE(e.detail)}</div></td><td style="text-align:right;">${e.amount_cents ? trFmt(e.amount_cents) : ''}</td><td>${e.resolvable ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenResolve('${trE(e.key)}')">Resolver con justificación</button>` : '<span class="sub">se resuelve con datos</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sub">✓ No hay excepciones abiertas.</p>'}
+  </div>
+  <div class="dash-card"><div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><h4 style="margin:0;">Bitácora de auditoría</h4>
+    <div style="display:flex; gap:8px;"><button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="trExportAudit()">⬇ Bitácora CSV</button><button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="trBackup()">⬇ Descargar respaldo completo</button></div></div>
+    <p class="sub">Todo queda registrado y no se puede borrar ni editar. Las correcciones se hacen con reversos.</p>
+    <div class="dash-table-wrap" style="max-height:340px; overflow:auto;"><table class="dash-table"><thead><tr><th>Cuándo</th><th>Acción</th><th>Detalle</th></tr></thead><tbody>
+    ${(d.audit || []).slice(0, 150).map(a => `<tr><td style="white-space:nowrap;">${new Date(a.at).toLocaleString()}</td><td>${trE(a.action)}</td><td class="sub" style="max-width:420px; word-break:break-word;">${trE(a.entity || '')} ${trE(a.entity_id || '')} ${a.detail ? trE(JSON.stringify(a.detail).slice(0, 220)) : ''}</td></tr>`).join('') || '<tr><td colspan="3">Sin registros.</td></tr>'}
+    </tbody></table></div></div>
+  <div class="dash-card"><h4 style="margin-top:0;">Excepciones ya resueltas (${(d.resolutions || []).length})</h4>
+    ${(d.resolutions || []).length ? `<table class="dash-table"><tbody>${d.resolutions.slice(0, 50).map(r => `<tr><td><code>${trE(r.exception_key)}</code></td><td>${trE(r.justification)}</td><td class="sub">${new Date(r.resolved_at).toLocaleDateString()}</td></tr>`).join('')}</tbody></table>` : '<p class="sub">Ninguna todavía.</p>'}</div>`;
+}
+function trOpenResolve(key){
+  const e = TR.pos.exceptions.find(x => x.key === key); if(!e) return;
+  trModal('Resolver excepción', `<p><strong>${trE(e.title)}</strong><br><span class="sub">${trE(e.detail)}</span></p>
+    <p class="sub">Resolver significa que una persona revisó y aceptó la situación. Queda guardado con tu justificación y no se puede deshacer.</p>
+    <div class="form-row"><label>Justificación (mínimo 10 caracteres)</label><textarea id="trres-just" rows="3" style="width:100%;"></textarea></div>`,
+    [{ label: 'Cancelar' }, { label: 'Marcar como resuelta', primary: true, onClick: async () => {
+      const j = trVal('trres-just').trim(); if(j.length < 10) throw new Error('Escribe una justificación de al menos 10 caracteres.');
+      const { error } = await sb.from('treasury_exception_resolutions').insert({ exception_key: key, justification: j });
+      if(error) throw new Error(/duplicate key/i.test(error.message) ? 'Esta excepción ya fue resuelta.' : error.message);
+      await trAudit('exception_resolved', 'exception', key, { justification: j, title: e.title, amount_cents: e.amount_cents });
+      await trLoad(); trRender(); trToast('Excepción resuelta y registrada.');
+    } }]);
+}
+function trExportAudit(){
+  const lines = [trCsvLine(['cuando', 'usuario', 'accion', 'entidad', 'id', 'detalle'])];
+  (TR.d.audit || []).forEach(a => lines.push(trCsvLine([a.at, a.actor, a.action, a.entity, a.entity_id, a.detail ? JSON.stringify(a.detail) : ''])));
+  trDownload('tesoreria_bitacora.csv', lines.join('\n'));
+}
+async function trBackup(){
+  const d = TR.d; const out = { generado: new Date().toISOString(), nota: 'Respaldo de la Conciliación Agency Sweep. Guárdalo en un lugar seguro.' };
+  ['settings', 'payments', 'obligations', 'stripeTxns', 'payouts', 'bankTxns', 'allocations', 'holds', 'transfers', 'openings', 'closes', 'resolutions', 'balances', 'imports', 'audit'].forEach(k => { out[k] = d[k]; });
+  trDownload('respaldo_tesoreria_' + toISODateLocal(new Date()) + '.json', JSON.stringify(out, null, 1), 'application/json');
+  await trAudit('backup_downloaded', 'backup', null, {});
+}
+
+// ---------- CONFIGURACIÓN, SALDO INICIAL, CIERRES, ACTIVACIÓN ----------
+function trViewConfig(){
+  const d = TR.d, s = d.settings || {}, P = TR.pos;
+  const opening = TR.opening; const draft = (d.openings || []).find(o => o.status === 'draft');
+  const check = (ok, text) => `<li style="list-style:none; margin:4px 0;">${ok ? '✅' : '⬜'} ${text}</li>`;
+  const balFresh = TR.latestBalance && (Date.now() - Date.parse(TR.latestBalance.as_of)) <= (s.max_balance_age_hours || 48) * TR_HOUR_MS;
+  const canActivate = !!opening && TR.closesCount >= 2 && !s.activated;
+  return `<div class="dash-card"><h4 style="margin-top:0;">Activación del monto transferible</h4>
+    <p class="sub">El monto transferible no se muestra hasta completar este procedimiento. Así se evita confiar en un cálculo que nadie ha comparado contra el banco real.</p>
+    <ul style="padding:0; margin:0 0 10px;">
+      ${check(!!opening, 'Saldo inicial (apertura) conciliado y aprobado')}
+      ${check(TR.closesCount >= 2, `Al menos 2 cierres diarios de prueba que cuadran con Bluevine y Stripe (${TR.closesCount}/2)`)}
+      ${check(!!balFresh, 'Saldo verificado de Agency Sweep al día')}
+      ${check(!!s.activated, 'Cálculo activado por la administración' + (s.activated_at ? ' (' + new Date(s.activated_at).toLocaleDateString() + ')' : ''))}
+    </ul>
+    ${s.activated ? '<button class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="trSetActivated(false)">Desactivar</button>' : `<button class="btn-primary" style="width:auto; padding:8px 18px;" ${canActivate ? '' : 'disabled'} onclick="trSetActivated(true)">Activar cálculo</button>`}
+  </div>
+  <div class="dash-card"><h4 style="margin-top:0;">Parámetros</h4>
+    <div class="form-row-2">
+      <div class="form-row"><label>Colchón mínimo que siempre queda en Sweep (USD)</label><input type="text" id="trs-buffer" inputmode="decimal" value="${((s.buffer_cents || 0) / 100).toFixed(2)}"></div>
+      <div class="form-row"><label>Antigüedad máxima del saldo / del CSV (horas)</label><input type="text" id="trs-age" inputmode="numeric" value="${s.max_balance_age_hours || 48}"></div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-row"><label>Fecha de corte (solo se concilian cobros desde aquí)</label><input type="text" id="trs-cutoff" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)" value="${s.cutoff_date ? isoToMMDDYYYYDisplay(s.cutoff_date) : ''}" ${opening ? 'disabled' : ''}>${opening ? '<p class="sub">Fijada por la apertura aprobada.</p>' : ''}</div>
+      <div class="form-row"><label>Cuentas (solo referencia)</label><input type="text" disabled value="Sweep ••${trE(s.sweep_last4 || '7770')} · Checking P&C ••${trE(s.checking_last4 || '9139')}"></div>
+    </div>
+    <button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trSaveSettings()">Guardar parámetros</button>
+  </div>
+  <div class="dash-card"><h4 style="margin-top:0;">Saldo inicial (apertura)</h4>
+    ${opening ? `<p>✅ Apertura aprobada el ${new Date(opening.approved_at).toLocaleDateString()}: corte ${formatDateUS(opening.cutoff_date)}, Sweep ${trFmt(opening.sweep_balance_cents)}, primas pendientes ${trFmt(opening.carrier_obligations_cents)}, fees propios ${trFmt(opening.own_fees_pending_cents)}${opening.unreconciled_cents ? `, sin conciliar ${trFmt(opening.unreconciled_cents)} (retenido)` : ''}.</p>`
+      : draft ? `<p>📝 Hay un borrador (corte ${formatDateUS(draft.cutoff_date)}): Sweep ${trFmt(draft.sweep_balance_cents)}, primas ${trFmt(draft.carrier_obligations_cents)}, fees propios ${trFmt(draft.own_fees_pending_cents)}, diferencia ${trFmt(draft.unreconciled_cents)}.</p>
+        <button class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="trOpenOpening()">Editar borrador</button> <button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trApproveOpening('${trE(draft.id)}')">Aprobar apertura</button>`
+      : `<p class="sub">Todavía no hay apertura. Registra con qué dinero parte el sistema: saldo real de Sweep al corte, cuánto de eso es de aseguradoras y cuánto es ingreso propio.</p><button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trOpenOpening()">Crear apertura</button>`}
+  </div>
+  <div class="dash-card"><h4 style="margin-top:0;">Historial</h4>
+    <div class="tr-cols">
+      <div><strong>Saldos verificados</strong><table class="dash-table"><tbody>${(d.balances || []).slice(0, 8).map(b => `<tr><td>${b.account === 'sweep' ? 'Sweep' : 'Checking'}</td><td>${new Date(b.as_of).toLocaleString()}</td><td style="text-align:right;">${trFmt(b.balance_cents)}</td></tr>`).join('') || '<tr><td>—</td></tr>'}</tbody></table></div>
+      <div><strong>Cierres diarios</strong><table class="dash-table"><tbody>${(d.closes || []).slice(0, 8).map(c => `<tr><td>${formatDateUS(c.close_date)}</td><td>${c.matches ? trChip('Cuadra', 'green') : trChip('Con diferencia', 'red')}</td><td style="text-align:right;">${c.bank_balance_cents === null ? '' : trFmt(c.bank_balance_cents)}</td></tr>`).join('') || '<tr><td>—</td></tr>'}</tbody></table></div>
+    </div>
+    <p style="margin:12px 0 4px;"><strong>Importaciones de CSV</strong></p>
+    <table class="dash-table"><tbody>${(d.imports || []).slice(0, 8).map(i => `<tr><td>${new Date(i.imported_at).toLocaleString()}</td><td>${i.account === 'sweep' ? 'Sweep' : 'Checking'}</td><td>${trE(i.file_name || '')}</td><td class="sub">${i.new_count} nuevas · ${i.duplicate_count} repetidas</td></tr>`).join('') || '<tr><td>—</td></tr>'}</tbody></table>
+  </div>`;
+}
+async function trSaveSettings(){
+  try {
+    const buf = trParseMoney(trVal('trs-buffer')); const age = parseInt(trVal('trs-age'), 10);
+    if(buf === null || buf < 0) throw new Error('El colchón debe ser un importe válido (0 o más).');
+    if(!(age >= 1 && age <= 720)) throw new Error('La antigüedad máxima debe estar entre 1 y 720 horas.');
+    const patch = { buffer_cents: buf, max_balance_age_hours: age, updated_at: new Date().toISOString() };
+    const el = document.getElementById('trs-cutoff');
+    if(el && !el.disabled && el.value){ const iso = mmddyyyyToISO(el.value); if(!iso) throw new Error('La fecha de corte no es válida.'); patch.cutoff_date = iso; }
+    const { error } = await sb.from('treasury_settings').update(patch).eq('id', true);
+    if(error) throw new Error(error.message);
+    await trAudit('settings_saved', 'settings', '1', patch);
+    await trLoad(); trRender(); trToast('Parámetros guardados.');
+  } catch(e){ trToast(e.message, 'error'); }
+}
+function trSetActivated(on){
+  trModal(on ? 'Activar el monto transferible' : 'Desactivar', on
+    ? `<p>Al activar, el Resumen mostrará el monto máximo transferible cuando todo esté conciliado. Confirma que ya comparaste al menos 2 cierres contra Bluevine y Stripe y que el saldo inicial es correcto.</p><p class="sub">Revisión con tu contador/a recomendada antes de operar con esta cifra. Las transferencias siguen siendo manuales.</p>`
+    : '<p>El Resumen volverá a mostrar “pendiente de activación” y no habrá monto transferible.</p>',
+    [{ label: 'Cancelar' }, { label: on ? 'Activar' : 'Desactivar', primary: true, onClick: async () => {
+      if(on && (!TR.opening || TR.closesCount < 2)) throw new Error('Faltan requisitos: apertura aprobada y 2 cierres que cuadren.');
+      const patch = on ? { activated: true, activated_at: new Date().toISOString(), activated_by: (await sb.auth.getUser()).data.user.id } : { activated: false };
+      const { error } = await sb.from('treasury_settings').update(patch).eq('id', true);
+      if(error) throw new Error(error.message);
+      await trLoad(); trRender(); trToast(on ? 'Cálculo activado.' : 'Cálculo desactivado.');
+    } }]);
+}
+function trOpenBalance(){
+  const now = new Date(); const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  trModal('Registrar saldo verificado de Agency Sweep', `
+    <p class="sub" style="margin-top:0;">Escribe el saldo que muestra <strong>Bluevine</strong> para Agency Sweep ••${trE(TR.d.settings.sweep_last4 || '7770')}. Nunca se usa el saldo de Stripe como si fuera del banco. Se guarda como historial (no se edita).</p>
+    <div class="form-row-2"><div class="form-row"><label>Saldo (USD)</label><input type="text" id="trb-amount" inputmode="decimal" placeholder="0.00"></div>
+    <div class="form-row"><label>Saldo al momento de</label><input type="datetime-local" id="trb-asof" value="${local}"></div></div>
+    <div class="form-row"><label>Nota (opcional)</label><input type="text" id="trb-note"></div>`,
+    [{ label: 'Cancelar' }, { label: 'Guardar saldo', primary: true, onClick: async () => {
+      const cents = trParseMoney(trVal('trb-amount')); if(cents === null) throw new Error('Escribe un saldo válido (por ejemplo 12,345.67).');
+      const asOf = new Date(trVal('trb-asof')); if(isNaN(asOf)) throw new Error('Fecha y hora inválidas.');
+      if(asOf.getTime() > Date.now() + 5 * 60000) throw new Error('El saldo no puede ser de una fecha futura.');
+      const { error } = await sb.from('treasury_balances').insert({ account: 'sweep', balance_cents: cents, as_of: asOf.toISOString(), source: 'manual', note: trVal('trb-note').trim() || null });
+      if(error) throw new Error(error.message);
+      await trAudit('balance_recorded', 'balance', null, { account: 'sweep', cents, as_of: asOf.toISOString() });
+      await trLoad(); trRender(); trToast('Saldo verificado registrado.');
+    } }]);
+}
+function trOpenClose(){
+  const P = TR.pos, s = TR.d.settings || {}; const sb_ = s.stripe_balance || {};
+  const today = toISODateLocal(new Date());
+  const already = (TR.d.closes || []).some(c => c.close_date === today && c.matches);
+  trModal('Cierre diario', `
+    <p class="sub" style="margin-top:0;">Compara lo que calcula el sistema con lo que ves en Bluevine y Stripe <strong>hoy</strong>. Se necesitan 2 cierres que cuadren antes de activar el monto transferible.</p>
+    <table class="dash-table"><tbody>
+      <tr><td>Saldo de Agency Sweep (sistema)</td><td style="text-align:right;">${P.B === null ? '—' : trFmt(P.B)}</td></tr>
+      <tr><td>Primas pendientes con aseguradoras</td><td style="text-align:right;">${trFmt(P.O)}</td></tr>
+      <tr><td>Ingreso propio conciliado</td><td style="text-align:right;">${trFmt(P.F)}</td></tr>
+      <tr><td>Cálculo de referencia (máx. transferible)</td><td style="text-align:right;">${P.calculatedMax === null ? '—' : trFmt(P.calculatedMax)}</td></tr>
+    </tbody></table>
+    <div class="form-row-2" style="margin-top:10px;"><div class="form-row"><label>Saldo que ves hoy en Bluevine (USD)</label><input type="text" id="trcl-bank" inputmode="decimal" value="${P.B === null ? '' : (P.B / 100).toFixed(2)}"></div>
+    <div class="form-row"><label>Saldo total de Stripe hoy (disponible + pendiente, USD)</label><input type="text" id="trcl-stripe" inputmode="decimal" value="${sb_.available_cents === undefined ? '' : ((sb_.available_cents + sb_.pending_cents) / 100).toFixed(2)}"></div></div>
+    <label style="display:flex; gap:8px; align-items:flex-start;"><input type="checkbox" id="trcl-ok"> <span>Confirmo que el saldo del sistema coincide con Bluevine (al centavo) y que no hay diferencias sin explicar.</span></label>
+    <div class="form-row" style="margin-top:8px;"><label>Notas / diferencias encontradas</label><input type="text" id="trcl-note"></div>
+    ${already ? '<p class="sub">Ya hay un cierre de hoy que cuadra; este se guardará también como historial.</p>' : ''}`,
+    [{ label: 'Cancelar' }, { label: 'Guardar cierre', primary: true, onClick: async () => {
+      const bank = trParseMoney(trVal('trcl-bank')); const stripe = trVal('trcl-stripe').trim() === '' ? null : trParseMoney(trVal('trcl-stripe'));
+      if(bank === null) throw new Error('Escribe el saldo de Bluevine.');
+      const ok = document.getElementById('trcl-ok').checked;
+      if(ok && P.B !== null && bank !== P.B) throw new Error(`No puedes marcar “cuadra”: el saldo del sistema es ${trFmt(P.B)} y escribiste ${trFmt(bank)}. Registra primero un saldo verificado actualizado o explica la diferencia en la nota (sin marcar la casilla).`);
+      const { error } = await sb.from('treasury_closes').insert({ close_date: today, bank_balance_cents: bank, stripe_pending_cents: stripe, position: { B: P.B, O: P.O, R: P.R, U: P.U, C: P.C, X: P.X, F: P.F, capacity: P.capacity, calculatedMax: P.calculatedMax, blockers: P.blockers.map(b => b.code), exceptions: P.exceptions.length }, difference_note: trVal('trcl-note').trim() || null, matches: ok });
+      if(error) throw new Error(error.message);
+      await trAudit('daily_close', 'close', today, { matches: ok, bank_cents: bank });
+      await trLoad(); trRender(); trToast(ok ? 'Cierre guardado (cuadra).' : 'Cierre guardado con diferencia anotada.');
+    } }]);
+}
+
+// ---------- Apertura ----------
+function trOpenOpening(){
+  const s = TR.d.settings || {}; const draft = (TR.d.openings || []).find(o => o.status === 'draft');
+  const det = (draft && draft.detail && draft.detail.carriers) || [];
+  const row = (c, v) => `<div class="tro-row" style="display:flex; gap:8px; margin-bottom:6px;"><input type="text" class="tro-c" placeholder="Aseguradora" value="${trE(c || '')}"><input type="text" class="tro-v" inputmode="decimal" placeholder="0.00" value="${v ? (v / 100).toFixed(2) : ''}" style="max-width:130px; text-align:right;" oninput="trOpeningCalc()"></div>`;
+  TR.openRows = det.length;
+  trModal('Saldo inicial (apertura)', `
+    <p class="sub" style="margin-top:0;">Hazlo con el <strong>estado de cuenta</strong> de Bluevine a la fecha de corte. Recomendado: corta cuando Stripe no tenga dinero pendiente de pago hacia Sweep (o tenlo anotado). Desde esa fecha el sistema sigue solo.</p>
+    <div class="form-row-2"><div class="form-row"><label>Fecha de corte</label><input type="text" id="tro-cut" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)" value="${draft ? isoToMMDDYYYYDisplay(draft.cutoff_date) : (s.cutoff_date ? isoToMMDDYYYYDisplay(s.cutoff_date) : '')}"></div>
+    <div class="form-row"><label>Saldo REAL de Agency Sweep al corte (USD)</label><input type="text" id="tro-sweep" inputmode="decimal" value="${draft ? (draft.sweep_balance_cents / 100).toFixed(2) : ''}" oninput="trOpeningCalc()"></div></div>
+    <div class="form-row"><label>Saldo de Stripe al corte (USD, informativo)</label><input type="text" id="tro-stripe" inputmode="decimal" value="${draft ? (draft.stripe_balance_cents / 100).toFixed(2) : '0.00'}"></div>
+    <p style="margin:6px 0;"><strong>Primas que ya estaban en Sweep y todavía se deben a aseguradoras</strong></p>
+    <div id="tro-rows">${det.length ? det.map(c => row(c.carrier, c.cents)).join('') : row('', 0)}</div>
+    <button type="button" class="btn-ghost" style="width:auto; padding:4px 12px; font-size:12px;" onclick="document.getElementById('tro-rows').insertAdjacentHTML('beforeend', trOpeningRow()); ">+ Agregar aseguradora</button>
+    <div class="form-row" style="margin-top:10px;"><label>Fees propios de la agencia ya en Sweep y NO transferidos (USD)</label><input type="text" id="tro-own" inputmode="decimal" value="${draft ? (draft.own_fees_pending_cents / 100).toFixed(2) : '0.00'}" oninput="trOpeningCalc()"></div>
+    <div id="tro-calc" class="msg" style="display:block;"></div>
+    <div class="form-row"><label>Notas</label><input type="text" id="tro-notes" value="${trE(draft ? draft.notes || '' : '')}"></div>
+    <label style="display:flex; gap:8px; align-items:flex-start;"><input type="checkbox" id="tro-backup" ${draft && draft.backup_confirmed ? 'checked' : ''}> <span>Descargué un respaldo antes de empezar. <a href="#" onclick="event.preventDefault(); trBackup();">Descargar respaldo ahora</a></span></label>`,
+    [{ label: 'Cancelar' }, { label: 'Guardar borrador', primary: true, onClick: trSaveOpeningDraft }]);
+  trOpeningCalc();
+}
+function trOpeningRow(){ return `<div class="tro-row" style="display:flex; gap:8px; margin-bottom:6px;"><input type="text" class="tro-c" placeholder="Aseguradora"><input type="text" class="tro-v" inputmode="decimal" placeholder="0.00" style="max-width:130px; text-align:right;" oninput="trOpeningCalc()"></div>`; }
+function trOpeningRead(){
+  const carriers = []; let total = 0, bad = false;
+  document.querySelectorAll('#tro-rows .tro-row').forEach(r => {
+    const c = r.querySelector('.tro-c').value.trim(); const vtxt = r.querySelector('.tro-v').value.trim(); if(!c && !vtxt) return;
+    const v = vtxt === '' ? 0 : trParseMoney(vtxt); if(v === null || v < 0 || !c){ bad = true; return; } if(v > 0){ carriers.push({ carrier: c, cents: v }); total += v; }
+  });
+  const sweep = trParseMoney(trVal('tro-sweep')); const own = trParseMoney(trVal('tro-own') || '0');
+  return { carriers, total, bad, sweep, own, unrec: (sweep === null || own === null) ? null : sweep - total - own };
+}
+function trOpeningCalc(){
+  const el = document.getElementById('tro-calc'); if(!el) return; const r = trOpeningRead();
+  if(r.unrec === null){ el.className = 'msg'; el.textContent = 'Escribe el saldo de Sweep para ver el cuadre.'; return; }
+  if(r.unrec < 0){ el.className = 'msg error'; el.textContent = `Faltan ${trFmt(-r.unrec)}: las primas + fees propios superan el saldo real de Sweep. Corrige las cifras antes de aprobar (posible sobregiro o error de captura).`; }
+  else if(r.unrec === 0){ el.className = 'msg success'; el.textContent = '✓ Cuadra exacto: saldo = primas pendientes + fees propios.'; }
+  else { el.className = 'msg'; el.style.background = '#FFF6E5'; el.textContent = `Quedan ${trFmt(r.unrec)} sin explicar. Si apruebas así, se retienen como “sin conciliar” (no se podrán transferir) hasta que los expliques.`; }
+}
+async function trSaveOpeningDraft(){
+  const r = trOpeningRead(); const iso = mmddyyyyToISO(trVal('tro-cut'));
+  if(!iso) throw new Error('La fecha de corte no es válida.'); if(r.bad) throw new Error('Revisa las aseguradoras: nombre e importe válidos.');
+  if(r.sweep === null || r.sweep < 0) throw new Error('Escribe el saldo real de Sweep.'); if(r.own === null || r.own < 0) throw new Error('Los fees propios deben ser 0 o más.');
+  const stripe = trParseMoney(trVal('tro-stripe') || '0'); if(stripe === null) throw new Error('Saldo de Stripe inválido.');
+  const row = { cutoff_date: iso, sweep_balance_cents: r.sweep, stripe_balance_cents: stripe, carrier_obligations_cents: r.total, own_fees_pending_cents: r.own, unreconciled_cents: Math.max(0, r.unrec), backup_confirmed: document.getElementById('tro-backup').checked, notes: trVal('tro-notes').trim() || null, detail: { carriers: r.carriers } };
+  const draft = (TR.d.openings || []).find(o => o.status === 'draft');
+  const q = draft ? sb.from('treasury_opening').update(row).eq('id', draft.id) : sb.from('treasury_opening').insert(row);
+  const { error } = await q; if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+  await trAudit('opening_draft_saved', 'opening', draft ? draft.id : null, row);
+  await trLoad(); trRender(); trToast('Borrador de apertura guardado. Falta aprobarlo.');
+}
+function trApproveOpening(id){
+  const o = (TR.d.openings || []).find(x => x.id === id); if(!o) return;
+  const ok = o.sweep_balance_cents - o.carrier_obligations_cents - o.own_fees_pending_cents >= 0;
+  trModal('Aprobar apertura', `<p>Corte <strong>${formatDateUS(o.cutoff_date)}</strong> · Sweep <strong>${trFmt(o.sweep_balance_cents)}</strong> · primas pendientes <strong>${trFmt(o.carrier_obligations_cents)}</strong> · fees propios <strong>${trFmt(o.own_fees_pending_cents)}</strong> · sin conciliar <strong>${trFmt(o.unreconciled_cents)}</strong>.</p>
+    ${!ok ? '<div class="msg error" style="display:block;">Las cifras no cuadran (faltante). Edita el borrador.</div>' : ''}
+    ${!o.backup_confirmed ? '<div class="msg error" style="display:block;">Falta confirmar el respaldo previo (edita el borrador y marca la casilla).</div>' : ''}
+    <p class="sub">Al aprobar se crean las obligaciones iniciales con aseguradoras, el saldo verificado inicial y la fecha de corte. Una apertura aprobada ya no se edita.</p>`,
+    ok && o.backup_confirmed ? [{ label: 'Cancelar' }, { label: 'Aprobar apertura', primary: true, onClick: async () => {
+      const marker = 'opening:' + o.id;
+      const have = (TR.d.obligations || []).filter(x => x.note === marker).length;
+      if(!have){
+        const rows = ((o.detail && o.detail.carriers) || []).map(c => ({ carrier_name: c.carrier, payable_cents: c.cents, source: 'opening', note: marker }));
+        if(rows.length){ const { error } = await sb.from('treasury_obligations').insert(rows); if(error) throw new Error('Creando obligaciones: ' + error.message); }
+        if(o.unreconciled_cents > 0){ const { error } = await sb.from('treasury_holds').insert({ kind: 'unreconciled', amount_cents: o.unreconciled_cents, note: 'Apertura: diferencia sin conciliar (' + marker + ')' }); if(error) throw new Error('Creando retención: ' + error.message); }
+        const { error: eb } = await sb.from('treasury_balances').insert({ account: 'sweep', balance_cents: o.sweep_balance_cents, as_of: new Date(Math.min(Date.parse(o.cutoff_date + 'T23:59:59'), Date.now())).toISOString(), source: 'manual', note: 'Saldo de apertura (corte ' + o.cutoff_date + ')' });
+        if(eb) throw new Error('Guardando saldo: ' + eb.message);
+      }
+      const { error: es } = await sb.from('treasury_settings').update({ cutoff_date: o.cutoff_date, updated_at: new Date().toISOString() }).eq('id', true); if(es) throw new Error(es.message);
+      const { error } = await sb.from('treasury_opening').update({ status: 'approved', approved_at: new Date().toISOString(), approved_by: (await sb.auth.getUser()).data.user.id }).eq('id', o.id);
+      if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trLoad(); trRender(); trToast('Apertura aprobada. Siguiente: 2 cierres diarios de prueba.');
+    } }] : [{ label: 'Cerrar' }]);
+}
+
+// Entrada desde la pestaña Tesorería
+function trInitUi(){
+  const isSA = isSuperAdminUser();
+  const nav = document.getElementById('tr-subnav'); if(nav) nav.style.display = isSA ? 'flex' : 'none';
+}
+// ===== TREASURY-UI-END =====
+
   // =================== FIN TESORERÍA ===================
 
   async function goToClientFromUnderwriting(clientId){
