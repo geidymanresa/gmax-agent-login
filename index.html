@@ -889,6 +889,47 @@
       </div>
     </div>
 
+    <div id="renewalOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(13,20,36,0.6); z-index:999; align-items:center; justify-content:center; overflow-y:auto;">
+      <div style="background:#fff; border-radius:14px; padding:26px; max-width:480px; width:92%; margin:20px 0;">
+        <input type="hidden" id="rn-policy-id">
+        <p style="font-weight:800; font-size:17px; margin:0 0 4px; color:var(--navy);" id="rn-title">Renovación</p>
+        <p class="sub" style="margin:0 0 14px;" id="rn-subtitle"></p>
+        <div class="msg" id="rn-msg"></div>
+
+        <div id="rn-renewBox" style="display:none;">
+          <div class="form-row-2">
+            <div class="form-row"><label>Nueva fecha efectiva</label><input type="date" id="rn-neweff" oninput="updateRenewalNewExpiration()"></div>
+            <div class="form-row"><label>Término (meses)</label><input type="number" min="1" max="36" id="rn-term" oninput="updateRenewalNewExpiration()"></div>
+          </div>
+          <div class="form-row"><label>Nueva fecha de expiración (automática)</label><input type="date" id="rn-newexp"></div>
+          <div class="form-row-2">
+            <div class="form-row"><label>Nuevo número de póliza <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="text" id="rn-newnumber" placeholder="Dejar vacío = el mismo"></div>
+            <div class="form-row"><label>Nueva mensualidad ($) <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="number" min="0" step="0.01" id="rn-newpay" placeholder="Dejar vacío = la misma"></div>
+          </div>
+          <p class="sub" style="margin-top:0;">La nueva fecha efectiva empieza igual que la fecha de expiración anterior (puedes cambiarla). La póliza sigue activa y vuelve a entrar a los recordatorios de pago y de revisión.</p>
+          <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
+            <button type="button" class="btn-primary" style="width:auto; padding:11px 20px;" onclick="confirmPolicyRenewed()">✅ Confirmar renovación</button>
+            <button type="button" class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="closeRenewalDialog()">Cancelar</button>
+          </div>
+        </div>
+
+        <div id="rn-notBox" style="display:none;">
+          <p style="font-weight:700; margin:0 0 8px;">¿Qué pasó con esta póliza?</p>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:12px;">
+            <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;"><input type="radio" name="rn-reason" value="Venció sin renovar — cancelada por la aseguradora"> <span>La canceló la compañía</span></label>
+            <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;"><input type="radio" name="rn-reason" value="Venció sin renovar — cancelada por el cliente"> <span>La canceló el cliente</span></label>
+            <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;"><input type="radio" name="rn-reason" value="Sustituida por una póliza nueva (cambio de compañía o póliza nueva)"> <span>Se sustituyó por una póliza nueva (cambio de compañía u otra póliza)</span></label>
+            <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;"><input type="radio" name="rn-reason" value="Otro"> <span>Otro motivo</span></label>
+          </div>
+          <p class="sub" style="margin-top:0;">Al continuar te lleva al cliente para marcarla como cancelada. Si fue una sustitución, después puedes crear la póliza nueva con "Vender póliza".</p>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="button" class="btn-primary" style="width:auto; padding:11px 20px; background:#C23B3B;" onclick="continueRenewalNotRenewed()">Continuar</button>
+            <button type="button" class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="closeRenewalDialog()">Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div id="paymentSuccessOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(13,20,36,0.6); z-index:999; align-items:center; justify-content:center;">
       <div style="background:#fff; border-radius:14px; padding:28px; max-width:440px; width:90%;">
         <p style="color:#177A54; font-weight:700; font-size:18px; margin-top:0;">✓ El pago se realizó correctamente</p>
@@ -991,6 +1032,25 @@
             <h4 style="margin-top:0; color:#9a5518;">📅 Recordatorio de pago mensual</h4>
             <p class="sub" style="margin:0 0 8px;">A estos clientes les toca el pago mensual de su póliza por estos días.</p>
             <div id="ventureEftList"></div>
+          </div>
+
+          <!-- Pólizas que ya vencieron y falta confirmar si se renovaron (solo admin):
+               sale desde el día de la expiración y se queda hasta que Geidy marque
+               "Se renovó", "No se renovó" o "No mostrar más". -->
+          <div class="dash-card" id="renewalFollowupCard" style="display:none; margin:0; background:#FDEAEA; border:1.5px solid #E39C9C;">
+            <div style="display:inline-block; background:#C23B3B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔴 Urgente</div>
+            <h4 style="margin-top:0; color:#8a3030;">🔄 Pólizas que vencieron — ¿se renovaron?</h4>
+            <p class="sub" style="margin:0 0 8px;">Confirma qué pasó con cada una. Si se renovó, las fechas se actualizan solas.</p>
+            <div id="renewalFollowupList"></div>
+          </div>
+
+          <!-- Revisión del pago mensual: el día que le toca pagar al cliente y 10
+               días después, hasta que se marque "Al día". -->
+          <div class="dash-card" id="paymentCheckCard" style="display:none; margin:0; background:#FDF0E4; border:1.5px solid #F0B87F;">
+            <div style="display:inline-block; background:#C97A2E; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🟠 Importante</div>
+            <h4 style="margin-top:0; color:#9a5518;">💳 Revisar pagos del mes</h4>
+            <p class="sub" style="margin:0 0 8px;">A estos clientes les tocó el pago mensual. Revisa que lo hayan hecho; si no, llámalos. El aviso sale el día del pago y hasta 10 días después, o hasta que lo marques al día.</p>
+            <div id="paymentCheckList"></div>
           </div>
 
           <!-- Revisión periódica de estatus: cada ~2.5 meses desde que empezó
@@ -1900,6 +1960,9 @@
                   <option value="Falta de pago">Falta de pago</option>
                   <option value="Cancelada por la aseguradora">Cancelada por la aseguradora</option>
                   <option value="Información faltante / no enviada a tiempo">Información faltante / no enviada a tiempo</option>
+                  <option value="Venció sin renovar — cancelada por la aseguradora">Venció sin renovar — cancelada por la aseguradora</option>
+                  <option value="Venció sin renovar — cancelada por el cliente">Venció sin renovar — cancelada por el cliente</option>
+                  <option value="Sustituida por una póliza nueva (cambio de compañía o póliza nueva)">Sustituida por una póliza nueva (cambio de compañía o póliza nueva)</option>
                   <option value="Otro">Otro</option>
                 </select>
               </div>
@@ -4451,6 +4514,8 @@
     await safeLoad(loadRenewals, 'Próximas renovaciones');
     await safeLoad(loadStatusReviewAlerts, 'Revisar estatus de pólizas');
     await safeLoad(loadVentureEftAlerts, 'Pagos automáticos Venture');
+    await safeLoad(loadRenewalFollowups, 'Pólizas vencidas por confirmar');
+    await safeLoad(loadPaymentChecks, 'Revisar pagos del mes');
     await safeLoad(loadAutoChargeAlerts, 'Cobros automáticos Venture');
     await safeLoad(loadLeads, 'Leads');
     await safeLoad(() => setBookOfBusinessRange('today'), 'Libro de negocio');
@@ -4492,6 +4557,8 @@
       await safeAutoRefresh(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
       await safeAutoRefresh(loadDashboardFollowups, 'Recordatorios de seguimiento');
       await safeAutoRefresh(loadAutoChargeAlerts, 'Cobros automáticos Venture');
+      await safeAutoRefresh(loadRenewalFollowups, 'Pólizas vencidas por confirmar');
+      await safeAutoRefresh(loadPaymentChecks, 'Revisar pagos del mes');
     }
 
     // Perfil de un cliente abierto: refresca sus pólizas (por si cambió el
@@ -5837,6 +5904,15 @@
     }).eq('id', policyId);
     if(error){
       showMsg('markCancelledMsg','error','No se pudo marcar como cancelada: ' + error.message);
+      return;
+    }
+
+    // Si la póliza se sustituyó por una nueva, no hay "evidencia de cancelación"
+    // que pedir: la prueba es la póliza nueva que se va a crear.
+    if(motivo.startsWith('Sustituida')){
+      showMsg('markCancelledMsg','success','Póliza marcada como sustituida. Ahora puedes crear la póliza nueva con "Vender póliza".');
+      if(currentClientId) await loadClientPolicies(currentClientId);
+      setTimeout(() => { document.getElementById('cd-markCancelledCard').style.display = 'none'; }, 1500);
       return;
     }
 
@@ -10104,13 +10180,289 @@
   // cancelada directo" que ya existe (motivo + evidencia obligatoria) — no es
   // un flujo nuevo, es el mismo de siempre, solo que se llega aquí desde el
   // aviso del dashboard en vez de desde el perfil del cliente.
-  async function goToMarkPolicyCancelledFromDashboard(clientId, policyId, evt){
+  async function goToMarkPolicyCancelledFromDashboard(clientId, policyId, evt, motivo){
     if(evt) evt.stopPropagation();
     switchTab('clientes');
     await openClient(clientId);
     openMarkPolicyCancelled(policyId);
+    if(motivo){
+      const sel = document.getElementById('mc-motivo');
+      if(sel) sel.value = motivo;
+    }
   }
   // =================== FIN REVISAR ESTATUS DE PÓLIZAS ===================
+
+  // ===================== PÓLIZAS VENCIDAS (¿SE RENOVÓ?) + REVISIÓN DE PAGOS MENSUALES =====================
+  // 1) Renovaciones: desde el día que vence una póliza (y hasta que Geidy lo
+  //    resuelva) sale un aviso en el dashboard para confirmar qué pasó:
+  //    - "Se renovó": pone las fechas nuevas solas (efectiva = fecha de
+  //      expiración anterior, expiración = efectiva + término, normalmente 6 meses).
+  //    - "No se renovó": la manda a marcar cancelada con el motivo
+  //      (compañía / cliente / sustituida por una póliza nueva / otro).
+  //    - "No mostrar más": quita el aviso de esa renovación.
+  //    Solo sale si venció hace 60 días o menos, para que pólizas viejas que
+  //    nunca se cerraron en el sistema no llenen el tablero de golpe.
+  // 2) Pagos mensuales: para toda póliza activa con mensualidad (sin importar
+  //    el tipo de seguro), el día del mes en que le toca pagar al cliente (el
+  //    mismo día de su fecha efectiva) sale un aviso, y se queda 10 días o
+  //    hasta que se marque "Al día". Las pólizas de pago completo (sin
+  //    mensualidad) solo tienen el aviso de renovación.
+  //    Se excluyen las que ya tienen cobro automático por tarjeta o el aviso
+  //    propio de Venture (para no duplicar avisos).
+  // Lo que se resolvió se guarda en policy_reminder_acks (migracion_renovaciones_y_pagos.sql).
+  const RENEWAL_FOLLOWUP_WINDOW_DAYS = 60;
+  const PAYMENT_CHECK_WINDOW_DAYS = 10;
+  const DEFAULT_RENEWAL_TERM_MONTHS = 6;
+  let renewalFollowupCache = {};
+
+  function isoToLocalDate(iso){ return new Date(iso + 'T00:00:00'); }
+
+  function addMonthsISO(iso, months){
+    const [y, m, d] = iso.split('-').map(Number);
+    const target = new Date(y, (m - 1) + months, 1);
+    const dim = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(d, dim));
+    return toISODateLocal(target);
+  }
+
+  function lastMonthlyCycleDate(targetDay, hoy){
+    let best = null;
+    [0, -1].forEach(offset => {
+      const base = new Date(hoy.getFullYear(), hoy.getMonth() + offset, 1);
+      const dim = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+      base.setDate(Math.min(targetDay, dim));
+      if(base <= hoy && (!best || base > best)) best = base;
+    });
+    return best;
+  }
+
+  async function fetchReminderAcks(kind, sinceISO){
+    const { data, error } = await sb.from('policy_reminder_acks')
+      .select('policy_id, cycle_date, result')
+      .eq('kind', kind)
+      .gte('cycle_date', sinceISO);
+    const set = new Set();
+    (data || []).forEach(a => set.add(a.policy_id + '|' + a.cycle_date));
+    return { set, error };
+  }
+
+  async function saveReminderAck(policyId, kind, cycleDate, result, details){
+    const { data: { session } } = await sb.auth.getSession();
+    return await sb.from('policy_reminder_acks').upsert({
+      policy_id: policyId, kind, cycle_date: cycleDate, result,
+      details: details || null, acked_by: session ? session.user.id : null,
+      acked_at: new Date().toISOString()
+    }, { onConflict: 'policy_id,kind,cycle_date' });
+  }
+
+  const ACK_MIGRATION_WARNING = '<p class="sub" style="color:#C23B3B; margin:0 0 8px;">⚠️ Falta correr <strong>migracion_renovaciones_y_pagos.sql</strong> en Supabase para que "Quitar" y "Al día" se guarden.</p>';
+
+  async function loadRenewalFollowups(){
+    const card = document.getElementById('renewalFollowupCard');
+    const list = document.getElementById('renewalFollowupList');
+    if(!card || !list) return;
+    if(!isAdminUser()){ card.style.display = 'none'; return; }
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const desde = new Date(hoy); desde.setDate(desde.getDate() - RENEWAL_FOLLOWUP_WINDOW_DAYS);
+    const { data, error } = await sb.from('client_policies')
+      .select('*, client:client_id(full_name)')
+      .neq('status', 'cancelled')
+      .lte('expiration_date', toISODateLocal(hoy))
+      .gte('expiration_date', toISODateLocal(desde))
+      .order('expiration_date', { ascending: true });
+    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+
+    const { set: acked, error: ackError } = await fetchReminderAcks('renewal', toISODateLocal(desde));
+    const pending = data.filter(p => !acked.has(p.id + '|' + p.expiration_date));
+    if(pending.length === 0){ card.style.display = 'none'; return; }
+
+    renewalFollowupCache = {};
+    pending.forEach(p => { renewalFollowupCache[p.id] = p; });
+    card.style.display = 'block';
+    list.innerHTML = (ackError ? ACK_MIGRATION_WARNING : '') + pending.map(p => {
+      const dias = Math.round((hoy - isoToLocalDate(p.expiration_date)) / 86400000);
+      const cuando = dias <= 0 ? 'venció hoy' : dias === 1 ? 'venció ayer' : `venció hace ${dias} días`;
+      return `
+      <div style="padding:10px 0; border-bottom:1px solid #E39C9C;">
+        <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')">
+          <strong>${escapeHtml(p.client ? p.client.full_name : 'Cliente')}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
+          con ${escapeHtml(p.company || '—')} ${p.policy_number ? '(#' + escapeHtml(p.policy_number) + ')' : ''}
+          <span style="font-weight:700; color:#8a3030;">— ${cuando} (${formatDateUS(p.expiration_date)})</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#177A54; border-color:#A9DFC4;" onclick="openRenewalDialog('${p.id}', 'renewed')">✅ Se renovó</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#8a3030; border-color:#E3B8B8;" onclick="openRenewalDialog('${p.id}', 'not')">❌ No se renovó</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="dismissRenewalFollowup('${p.id}', '${p.expiration_date}')">🙈 No mostrar más</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function dismissRenewalFollowup(policyId, cycleDate){
+    const { error } = await saveReminderAck(policyId, 'renewal', cycleDate, 'hidden', null);
+    if(error){ alert('No se pudo quitar el aviso: ' + error.message); return; }
+    await loadRenewalFollowups();
+  }
+
+  function openRenewalDialog(policyId, mode){
+    const p = renewalFollowupCache[policyId];
+    if(!p) return;
+    document.getElementById('rn-policy-id').value = policyId;
+    const msg = document.getElementById('rn-msg'); msg.className = 'msg'; msg.textContent = '';
+    document.getElementById('rn-subtitle').textContent =
+      `${p.client ? p.client.full_name : 'Cliente'} — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''} con ${p.company || '—'}${p.policy_number ? ' (#' + p.policy_number + ')' : ''} — vencía el ${formatDateUS(p.expiration_date)}`;
+    document.getElementById('rn-renewBox').style.display = mode === 'renewed' ? 'block' : 'none';
+    document.getElementById('rn-notBox').style.display = mode === 'not' ? 'block' : 'none';
+    document.getElementById('rn-title').textContent = mode === 'renewed' ? '✅ Renovar póliza' : '❌ La póliza no se renovó';
+    if(mode === 'renewed'){
+      // Término por defecto: el que ya tenía la póliza; si no, 6 meses.
+      let term = parseInt(p.term_months, 10);
+      if(!term && p.effective_date && p.expiration_date){
+        const a = isoToLocalDate(p.effective_date), b = isoToLocalDate(p.expiration_date);
+        term = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+      }
+      if(!term || term < 1 || term > 36) term = DEFAULT_RENEWAL_TERM_MONTHS;
+      document.getElementById('rn-neweff').value = p.expiration_date;
+      document.getElementById('rn-term').value = term;
+      document.getElementById('rn-newnumber').value = '';
+      document.getElementById('rn-newpay').value = '';
+      updateRenewalNewExpiration();
+    } else {
+      document.querySelectorAll('input[name="rn-reason"]').forEach(r => { r.checked = false; });
+    }
+    document.getElementById('renewalOverlay').style.display = 'flex';
+  }
+
+  function closeRenewalDialog(){
+    document.getElementById('renewalOverlay').style.display = 'none';
+  }
+
+  function updateRenewalNewExpiration(){
+    const eff = document.getElementById('rn-neweff').value;
+    const term = parseInt(document.getElementById('rn-term').value, 10);
+    if(!eff || !term) return;
+    document.getElementById('rn-newexp').value = addMonthsISO(eff, term);
+  }
+
+  async function confirmPolicyRenewed(){
+    const policyId = document.getElementById('rn-policy-id').value;
+    const p = renewalFollowupCache[policyId];
+    if(!p) return;
+    const newEff = document.getElementById('rn-neweff').value;
+    const newExp = document.getElementById('rn-newexp').value;
+    const term = parseInt(document.getElementById('rn-term').value, 10);
+    const newNumber = document.getElementById('rn-newnumber').value.trim();
+    const newPayRaw = document.getElementById('rn-newpay').value;
+    if(!newEff || !newExp || !term){ showMsg('rn-msg', 'error', 'Completa la fecha efectiva, el término y la fecha de expiración.'); return; }
+    if(newExp <= newEff){ showMsg('rn-msg', 'error', 'La fecha de expiración tiene que ser después de la fecha efectiva.'); return; }
+
+    const payload = {
+      effective_date: newEff,
+      expiration_date: newExp,
+      term_months: term,
+      status: 'active',
+      // Reinicia el conteo de "Revisar estatus" (cada ~2.5 meses) desde la nueva vigencia.
+      last_status_review_at: new Date(newEff + 'T12:00:00').toISOString()
+    };
+    if(newNumber) payload.policy_number = newNumber;
+    if(newPayRaw !== '') payload.monthly_payment = parseFloat(newPayRaw);
+
+    const { error } = await sb.from('client_policies').update(payload).eq('id', policyId);
+    if(error){ showMsg('rn-msg', 'error', 'No se pudo renovar: ' + error.message); return; }
+
+    // Constancia de la renovación (fechas viejas y nuevas) — si falla, la póliza
+    // ya quedó renovada igual, solo se avisa.
+    const { error: ackErr } = await saveReminderAck(policyId, 'renewal', p.expiration_date, 'renewed', {
+      old_effective: p.effective_date, old_expiration: p.expiration_date,
+      new_effective: newEff, new_expiration: newExp, term_months: term,
+      old_policy_number: p.policy_number || null, new_policy_number: newNumber || null,
+      old_monthly_payment: p.monthly_payment ?? null, new_monthly_payment: newPayRaw !== '' ? parseFloat(newPayRaw) : null
+    });
+    if(ackErr) console.error('No se pudo guardar la constancia de renovación:', ackErr);
+
+    closeRenewalDialog();
+    await loadRenewalFollowups();
+    await loadRenewals();
+    await loadPaymentChecks();
+    await loadStatusReviewAlerts();
+    if(currentClientId && currentClientId === p.client_id) await loadClientPolicies(currentClientId);
+  }
+
+  async function continueRenewalNotRenewed(){
+    const policyId = document.getElementById('rn-policy-id').value;
+    const p = renewalFollowupCache[policyId];
+    const chosen = document.querySelector('input[name="rn-reason"]:checked');
+    if(!p) return;
+    if(!chosen){ showMsg('rn-msg', 'error', 'Elige qué pasó con la póliza.'); return; }
+    closeRenewalDialog();
+    await goToMarkPolicyCancelledFromDashboard(p.client_id, p.id, null, chosen.value);
+  }
+
+  // ---- Revisar pagos del mes ----
+  async function loadPaymentChecks(){
+    const card = document.getElementById('paymentCheckCard');
+    const list = document.getElementById('paymentCheckList');
+    if(!card || !list) return;
+
+    const { data, error } = await sb.from('client_policies')
+      .select('*, client:client_id(full_name, assigned_agent_id)')
+      .neq('status', 'cancelled')
+      .gt('monthly_payment', 0);
+    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const desdeAck = new Date(hoy); desdeAck.setDate(desdeAck.getDate() - (PAYMENT_CHECK_WINDOW_DAYS + 5));
+    const { set: acked, error: ackError } = await fetchReminderAcks('payment', toISODateLocal(desdeAck));
+
+    const admin = isAdminUser();
+    const items = [];
+    data.forEach(p => {
+      if(!p.effective_date || !p.client) return;
+      if(!admin && (!currentProfile || p.client.assigned_agent_id !== currentProfile.id)) return;
+      if(p.auto_pay_enabled) return;                                                   // lo cobra el sistema
+      const isVenture = (p.company || '').toLowerCase().includes('venture');
+      if(isVenture && !p.eft_enrolled) return;                                         // ya tiene su propio aviso
+      const day = parseInt(p.effective_date.slice(8, 10), 10);
+      const cycle = lastMonthlyCycleDate(day, hoy);
+      if(!cycle) return;
+      const cycleISO = toISODateLocal(cycle);
+      if(cycleISO <= p.effective_date) return;                                         // el primer pago ya se hizo al vender
+      if(p.expiration_date && cycleISO >= p.expiration_date) return;                   // ahí manda el aviso de renovación
+      const diff = Math.round((hoy - cycle) / 86400000);
+      if(diff < 0 || diff > PAYMENT_CHECK_WINDOW_DAYS) return;
+      if(acked.has(p.id + '|' + cycleISO)) return;
+      items.push({ p, cycleISO, diff });
+    });
+
+    if(items.length === 0){ card.style.display = 'none'; return; }
+    items.sort((a, b) => b.diff - a.diff);
+    card.style.display = 'block';
+    list.innerHTML = (ackError ? ACK_MIGRATION_WARNING : '') + items.map(({ p, cycleISO, diff }) => {
+      const cuando = diff === 0 ? 'le toca hoy' : diff === 1 ? 'le tocó ayer' : `le tocó hace ${diff} días`;
+      return `
+      <div style="padding:10px 0; border-bottom:1px solid #F0B87F;">
+        <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')">
+          <strong>${escapeHtml(p.client.full_name || 'Cliente')}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
+          con ${escapeHtml(p.company || '—')} ${p.policy_number ? '(#' + escapeHtml(p.policy_number) + ')' : ''}
+          <span class="sub">— $${Number(p.monthly_payment).toFixed(2)} mensual</span>
+          <span style="font-weight:700; color:#9a5518;">— ${cuando} (${formatDateUS(cycleISO)})</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#177A54; border-color:#A9DFC4;" onclick="markPaymentChecked('${p.id}', '${cycleISO}', 'paid')">✅ Al día</button>
+          ${admin ? `<button class="btn-ghost" style="width:auto; padding:6px 12px; color:#8a3030; border-color:#E3B8B8;" onclick="goToMarkPolicyCancelledFromDashboard('${p.client_id}', '${p.id}', event, 'Falta de pago')">🚫 Cancelar (falta de pago)</button>` : ''}
+          <button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="markPaymentChecked('${p.id}', '${cycleISO}', 'hidden')">Quitar</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  async function markPaymentChecked(policyId, cycleISO, result){
+    const { error } = await saveReminderAck(policyId, 'payment', cycleISO, result, null);
+    if(error){ alert('No se pudo guardar: ' + error.message); return; }
+    await loadPaymentChecks();
+  }
+  // =================== FIN PÓLIZAS VENCIDAS + REVISIÓN DE PAGOS MENSUALES ===================
 
   // ===================== VENTURE: AVISO DE PAGO AUTOMÁTICO (EFT) PENDIENTE =====================
   // Venture cobra mes a mes directo al cliente (no en un solo pago como otras
