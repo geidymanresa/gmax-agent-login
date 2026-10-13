@@ -5796,16 +5796,7 @@
                editar, restaurar, marcar cancelada directo, eliminar) vive en el
                menú de "⋯" para que la fila no se vea tan cargada de botones. -->
           ${!cancelled ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" title="Iniciar transacción sobre esta póliza (endorsement, pago asistido, cancelación o reinstalación)" onclick="quickTransactionFromPolicy('${p.id}')">⚡</button>` : ''}
-          <div class="dropdown" style="position:relative; display:inline-block;">
-            <button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" title="Más opciones" onclick="togglePolicyMoreMenu(event, '${p.id}')">⋯</button>
-            <div id="policy-more-menu-${p.id}" style="display:none; position:absolute; right:0; top:100%; z-index:20; background:#fff; border:1.5px solid var(--line); border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); min-width:210px; padding:6px;">
-              <button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px;" title="Ver el historial de esta póliza: cada transacción con su recibo y los documentos de la aseguradora" onclick="togglePolicyHistory('${p.id}')">📜 Historial de la póliza</button>
-              ${isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px;" onclick="openEditPolicy('${p.id}')">✏️ Editar póliza</button>` : ''}
-              ${cancelled && isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px; color:#177A54;" onclick="restorePolicy('${p.id}')">↩️ Restaurar póliza</button>` : ''}
-              ${!cancelled && isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px; color:#8a3030;" title="Marcar esta póliza como cancelada, sin pasar por el flujo de firma del cliente" onclick="openMarkPolicyCancelled('${p.id}')">🚫 Marcar cancelada</button>` : ''}
-              ${isAdmin ? `<button type="button" class="btn-ghost" style="width:100%; text-align:left; padding:8px 10px; color:#C23B3B;" onclick="deletePolicy('${p.id}')">🗑️ Eliminar póliza</button>` : ''}
-            </div>
-          </div>
+          <button type="button" class="btn-ghost" style="width:auto; padding:6px 12px; font-weight:800; letter-spacing:1px;" title="Más opciones" onclick="togglePolicyMoreMenu(event, '${p.id}')">⋯</button>
         </td>
       </tr>
     `;
@@ -5954,42 +5945,64 @@
   // base de datos puede rechazar el borrado por integridad referencial; en ese
   // caso se le avisa a la administradora en vez de forzarlo (no se borra nada
   // en cascada automáticamente, para no perder registros financieros sin querer).
+  // Menú desplegable chiquito de los "⋯" de cada póliza. Se crea al momento y
+  // se pega directo al <body> (fuera de la tabla y de cualquier tarjeta), así
+  // nada lo puede recortar ni tapar, y no se pierde cuando el sistema refresca
+  // la lista solo cada 20 segundos.
   let openPolicyMoreMenuId = null;
+  let policyMenuEl = null;
   function closePolicyMoreMenu(){
-    if(openPolicyMoreMenuId){
-      const menu = document.getElementById('policy-more-menu-' + openPolicyMoreMenuId);
-      if(menu) menu.style.display = 'none';
-      openPolicyMoreMenuId = null;
-    }
+    if(policyMenuEl){ policyMenuEl.remove(); policyMenuEl = null; }
+    openPolicyMoreMenuId = null;
   }
-  // El menú se posiciona con "fixed" (pegado a la ventana, no a la tabla) porque
-  // la tabla de pólizas tiene overflow:auto y recortaba el menú — por eso no se
-  // veía completo. Así siempre se ve entero, y si no cabe hacia abajo se abre
-  // hacia arriba.
   function togglePolicyMoreMenu(evt, policyId){
     evt.stopPropagation();
-    const menu = document.getElementById('policy-more-menu-' + policyId);
-    if(!menu) return;
-    const isOpen = menu.style.display === 'block';
+    evt.preventDefault();
+    const wasOpen = openPolicyMoreMenuId === policyId;
     closePolicyMoreMenu();
-    if(isOpen) return;
+    if(wasOpen) return;
+    const p = (currentClientPolicies || []).find(x => x.id === policyId);
+    if(!p) return;
+    const admin = isAdminUser();
+    const cancelled = p.status === 'cancelled';
+    const items = [{ label: '📜 Historial', run: () => togglePolicyHistory(policyId) }];
+    if(admin){
+      items.push({ label: '✏️ Editar póliza', run: () => openEditPolicy(policyId) });
+      items.push(cancelled
+        ? { label: '↩️ Restaurar póliza', color: '#177A54', run: () => restorePolicy(policyId) }
+        : { label: '🚫 Marcar cancelada', color: '#8a3030', run: () => openMarkPolicyCancelled(policyId) });
+      items.push({ label: '🗑️ Eliminar póliza', color: '#C23B3B', run: () => deletePolicy(policyId) });
+    }
+
+    const menu = document.createElement('div');
+    menu.id = 'policyMoreMenuPopover';
+    menu.style.cssText = 'position:fixed; z-index:3000; background:#fff; border:1px solid #D9DEEA; border-radius:10px; box-shadow:0 8px 24px rgba(13,20,36,0.18); padding:4px; min-width:178px; visibility:hidden; top:0; left:0;';
+    items.forEach(it => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = it.label;
+      b.style.cssText = 'display:block; width:100%; text-align:left; background:none; border:none; border-radius:7px; padding:8px 10px; font-size:13.5px; font-family:inherit; cursor:pointer; white-space:nowrap; color:' + (it.color || '#2A3045') + ';';
+      b.onmouseenter = () => { b.style.background = '#F1F4FA'; };
+      b.onmouseleave = () => { b.style.background = 'none'; };
+      b.onclick = (e) => { e.stopPropagation(); closePolicyMoreMenu(); it.run(); };
+      menu.appendChild(b);
+    });
+    menu.addEventListener('click', e => e.stopPropagation());
+    document.body.appendChild(menu);
+    policyMenuEl = menu;
+    openPolicyMoreMenuId = policyId;
+
     const btn = evt.currentTarget || evt.target;
     const r = btn.getBoundingClientRect();
-    menu.style.position = 'fixed';
-    menu.style.display = 'block';
-    menu.style.visibility = 'hidden';
     const h = menu.offsetHeight, w = menu.offsetWidth;
-    const spaceBelow = window.innerHeight - r.bottom;
-    const top = (spaceBelow >= h + 8) ? r.bottom + 4 : Math.max(8, r.top - h - 4);
+    const top = (window.innerHeight - r.bottom >= h + 8) ? r.bottom + 4 : Math.max(8, r.top - h - 4);
     const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
     menu.style.top = top + 'px';
     menu.style.left = left + 'px';
-    menu.style.right = 'auto';
-    menu.style.zIndex = '500';
     menu.style.visibility = 'visible';
-    openPolicyMoreMenuId = policyId;
   }
   document.addEventListener('click', closePolicyMoreMenu);
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') closePolicyMoreMenu(); });
   window.addEventListener('resize', closePolicyMoreMenu);
   document.addEventListener('scroll', closePolicyMoreMenu, true);
 
