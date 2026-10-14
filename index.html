@@ -12135,9 +12135,9 @@ function trDetectColumns(header){
   return {
     date: find(/^(posted|post|transaction|trans\.?)\s*date$/, /^date$/, /date/),
     description: find(/^description$/, /memo|details|payee|name|narrative/),
-    amount: find(/^amount$/, /^(net\s*)?amount/),
-    debit: find(/debit|withdrawal|money out|outflow|paid out/),
-    credit: find(/credit|deposit|money in|inflow|paid in/),
+    amount: find(/^amount$/, /^(net\s*)?amount/, /(debit\s*[\/&|-]\s*credit|credit\s*[\/&|-]\s*debit)/),
+    debit: find(/^(?!.*(debit\s*[\/&|-]\s*credit|credit\s*[\/&|-]\s*debit)).*(debit|withdrawal|money out|outflow|paid out)/),
+    credit: find(/^(?!.*(debit\s*[\/&|-]\s*credit|credit\s*[\/&|-]\s*debit)).*(credit|deposit|money in|inflow|paid in)/),
     balance: find(/running\s*balance|^balance$|balance/)
   };
 }
