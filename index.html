@@ -12351,6 +12351,8 @@ function trBuildExceptions(s){
     ex.push({ key: type + ':' + entity_id, type, severity, title, detail, entity_type, entity_id, amount_cents: amount_cents || 0, resolvable: !!resolvable });
   const res = s.resolutions || new Set();
   const links = trAttachPayouts(s.payments, s.stripeTxns || [], s.payouts || []);
+  // Lo anterior a la fecha de corte ya está cubierto por el saldo inicial: no genera excepciones.
+  const cutoffMs = s.settings && s.settings.cutoff_date ? Date.parse(s.settings.cutoff_date + 'T00:00:00Z') : null;
 
   (s.payments || []).forEach(p => {
     if(p.voided_at) return;
@@ -12370,7 +12372,8 @@ function trBuildExceptions(s){
   });
 
   (s.stripeTxns || []).forEach(t => {
-    if((t.type === 'charge' || t.type === 'payment') && !t.payment_id && !res.has('stripe_charge_unlinked:' + t.stripe_id))
+    const beforeCutoff = cutoffMs !== null && t.created_at_stripe && Date.parse(t.created_at_stripe) < cutoffMs;
+    if((t.type === 'charge' || t.type === 'payment') && !t.payment_id && !beforeCutoff && !res.has('stripe_charge_unlinked:' + t.stripe_id))
       add('stripe_charge_unlinked', 'critical', 'Cobro en Stripe sin registro en el CRM', `${t.stripe_id} por ${trFmt(t.amount_cents)}. No se sabe a qué póliza/aseguradora pertenece (¿se borró la transacción en el CRM o se cobró directo en Stripe?). Mientras tanto no se cuenta como ganancia.`, 'stripe_txn', t.stripe_id, t.amount_cents, true);
   });
 
@@ -12381,6 +12384,7 @@ function trBuildExceptions(s){
       return;
     }
     if(po.status === 'paid'){
+      if(cutoffMs !== null && po.arrival_date && Date.parse(po.arrival_date + 'T00:00:00Z') <= cutoffMs) return;   // llegó antes/el día del corte: lo cubre la apertura
       if(po.allocation_status === 'difference')
         add('payout_difference', 'critical', 'Payout con diferencia de asignación', `${po.payout_id}: las partidas no suman exactamente ${trFmt(po.amount_cents)}. Vuelve a sincronizar; si persiste, es una diferencia por investigar.`, 'payout', po.payout_id, 0, false);
       if(!po.bank_txn_id){
@@ -12623,7 +12627,7 @@ function trRecompute(){
   TR.closesCount = closeDays.size;
   TR.pos = trComputePosition({
     nowMs: Date.now(),
-    settings: { buffer_cents: d.settings.buffer_cents || 0, max_balance_age_hours: d.settings.max_balance_age_hours || 48, activated: !!d.settings.activated },
+    settings: { buffer_cents: d.settings.buffer_cents || 0, max_balance_age_hours: d.settings.max_balance_age_hours || 48, activated: !!d.settings.activated, cutoff_date: d.settings.cutoff_date || null },
     opening: opening ? { status: 'approved', own_fees_pending_cents: opening.own_fees_pending_cents || 0 } : null,
     closesCount: closeDays.size,
     balance: latest ? { balance_cents: latest.balance_cents, as_of: latest.as_of } : null,
@@ -13446,11 +13450,11 @@ function trOpenOpening(){
     <p class="sub" style="margin-top:0;">Hazlo con el <strong>estado de cuenta</strong> de Bluevine a la fecha de corte. Recomendado: corta cuando Stripe no tenga dinero pendiente de pago hacia Sweep (o tenlo anotado). Desde esa fecha el sistema sigue solo.</p>
     <div class="form-row-2"><div class="form-row"><label>Fecha de corte</label><input type="text" id="tro-cut" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)" value="${draft ? isoToMMDDYYYYDisplay(draft.cutoff_date) : (s.cutoff_date ? isoToMMDDYYYYDisplay(s.cutoff_date) : '')}"></div>
     <div class="form-row"><label>Saldo REAL de Agency Sweep al corte (USD)</label><input type="text" id="tro-sweep" inputmode="decimal" value="${draft ? (draft.sweep_balance_cents / 100).toFixed(2) : ''}" oninput="trOpeningCalc()"></div></div>
-    <div class="form-row"><label>Saldo de Stripe al corte (USD, informativo)</label><input type="text" id="tro-stripe" inputmode="decimal" value="${draft ? (draft.stripe_balance_cents / 100).toFixed(2) : '0.00'}"></div>
-    <p style="margin:6px 0;"><strong>Primas que ya estaban en Sweep y todavía se deben a aseguradoras</strong></p>
+    <div class="form-row"><label>Dinero que Stripe tenía pendiente de pagarte al corte (USD: «Entrante» + «Disponible» de cobros ANTERIORES al corte)</label><input type="text" id="tro-stripe" inputmode="decimal" value="${draft ? (draft.stripe_balance_cents / 100).toFixed(2) : '0.00'}" oninput="trOpeningCalc()"><p class="sub">Si ese dinero ya incluye primas de aseguradoras, inclúyelas también abajo en «primas pendientes». No incluyas cobros hechos el día del corte o después: esos los sigue el sistema.</p></div>
+    <p style="margin:6px 0;"><strong>Primas que todavía se deben a aseguradoras</strong> <span class="sub">(las que ya están en Sweep + las que vienen en camino desde Stripe)</span></p>
     <div id="tro-rows">${det.length ? det.map(c => row(c.carrier, c.cents)).join('') : row('', 0)}</div>
     <button type="button" class="btn-ghost" style="width:auto; padding:4px 12px; font-size:12px;" onclick="document.getElementById('tro-rows').insertAdjacentHTML('beforeend', trOpeningRow()); ">+ Agregar aseguradora</button>
-    <div class="form-row" style="margin-top:10px;"><label>Fees propios de la agencia ya en Sweep y NO transferidos (USD)</label><input type="text" id="tro-own" inputmode="decimal" value="${draft ? (draft.own_fees_pending_cents / 100).toFixed(2) : '0.00'}" oninput="trOpeningCalc()"></div>
+    <div class="form-row" style="margin-top:10px;"><label>Fees propios de la agencia (en Sweep o en camino desde Stripe) que NO has transferido (USD)</label><input type="text" id="tro-own" inputmode="decimal" value="${draft ? (draft.own_fees_pending_cents / 100).toFixed(2) : '0.00'}" oninput="trOpeningCalc()"></div>
     <div id="tro-calc" class="msg" style="display:block;"></div>
     <div class="form-row"><label>Notas</label><input type="text" id="tro-notes" value="${trE(draft ? draft.notes || '' : '')}"></div>
     <label style="display:flex; gap:8px; align-items:flex-start;"><input type="checkbox" id="tro-backup" ${draft && draft.backup_confirmed ? 'checked' : ''}> <span>Descargué un respaldo antes de empezar. <a href="#" onclick="event.preventDefault(); trBackup();">Descargar respaldo ahora</a></span></label>`,
@@ -13464,12 +13468,12 @@ function trOpeningRead(){
     const c = r.querySelector('.tro-c').value.trim(); const vtxt = r.querySelector('.tro-v').value.trim(); if(!c && !vtxt) return;
     const v = vtxt === '' ? 0 : trParseMoney(vtxt); if(v === null || v < 0 || !c){ bad = true; return; } if(v > 0){ carriers.push({ carrier: c, cents: v }); total += v; }
   });
-  const sweep = trParseMoney(trVal('tro-sweep')); const own = trParseMoney(trVal('tro-own') || '0');
-  return { carriers, total, bad, sweep, own, unrec: (sweep === null || own === null) ? null : sweep - total - own };
+  const sweep = trParseMoney(trVal('tro-sweep')); const own = trParseMoney(trVal('tro-own') || '0'); const stripe = trParseMoney(trVal('tro-stripe') || '0');
+  return { carriers, total, bad, sweep, own, stripe, unrec: (sweep === null || own === null || stripe === null) ? null : sweep + stripe - total - own };
 }
 function trOpeningCalc(){
   const el = document.getElementById('tro-calc'); if(!el) return; const r = trOpeningRead();
-  if(r.unrec === null){ el.className = 'msg'; el.textContent = 'Escribe el saldo de Sweep para ver el cuadre.'; return; }
+  if(r.unrec === null){ el.className = 'msg'; el.textContent = 'Escribe el saldo de Sweep (y revisa los demás importes) para ver el cuadre: Sweep + Stripe pendiente = primas + fees propios.'; return; }
   if(r.unrec < 0){ el.className = 'msg error'; el.textContent = `Faltan ${trFmt(-r.unrec)}: las primas + fees propios superan el saldo real de Sweep. Corrige las cifras antes de aprobar (posible sobregiro o error de captura).`; }
   else if(r.unrec === 0){ el.className = 'msg success'; el.textContent = '✓ Cuadra exacto: saldo = primas pendientes + fees propios.'; }
   else { el.className = 'msg'; el.style.background = '#FFF6E5'; el.textContent = `Quedan ${trFmt(r.unrec)} sin explicar. Si apruebas así, se retienen como “sin conciliar” (no se podrán transferir) hasta que los expliques.`; }
@@ -13478,7 +13482,7 @@ async function trSaveOpeningDraft(){
   const r = trOpeningRead(); const iso = mmddyyyyToISO(trVal('tro-cut'));
   if(!iso) throw new Error('La fecha de corte no es válida.'); if(r.bad) throw new Error('Revisa las aseguradoras: nombre e importe válidos.');
   if(r.sweep === null || r.sweep < 0) throw new Error('Escribe el saldo real de Sweep.'); if(r.own === null || r.own < 0) throw new Error('Los fees propios deben ser 0 o más.');
-  const stripe = trParseMoney(trVal('tro-stripe') || '0'); if(stripe === null) throw new Error('Saldo de Stripe inválido.');
+  const stripe = r.stripe; if(stripe === null || stripe < 0) throw new Error('El dinero pendiente de Stripe debe ser 0 o más.');
   const row = { cutoff_date: iso, sweep_balance_cents: r.sweep, stripe_balance_cents: stripe, carrier_obligations_cents: r.total, own_fees_pending_cents: r.own, unreconciled_cents: Math.max(0, r.unrec), backup_confirmed: document.getElementById('tro-backup').checked, notes: trVal('tro-notes').trim() || null, detail: { carriers: r.carriers } };
   const draft = (TR.d.openings || []).find(o => o.status === 'draft');
   const q = draft ? sb.from('treasury_opening').update(row).eq('id', draft.id) : sb.from('treasury_opening').insert(row);
@@ -13488,7 +13492,7 @@ async function trSaveOpeningDraft(){
 }
 function trApproveOpening(id){
   const o = (TR.d.openings || []).find(x => x.id === id); if(!o) return;
-  const ok = o.sweep_balance_cents - o.carrier_obligations_cents - o.own_fees_pending_cents >= 0;
+  const ok = o.sweep_balance_cents + o.stripe_balance_cents - o.carrier_obligations_cents - o.own_fees_pending_cents >= 0;
   trModal('Aprobar apertura', `<p>Corte <strong>${formatDateUS(o.cutoff_date)}</strong> · Sweep <strong>${trFmt(o.sweep_balance_cents)}</strong> · primas pendientes <strong>${trFmt(o.carrier_obligations_cents)}</strong> · fees propios <strong>${trFmt(o.own_fees_pending_cents)}</strong> · sin conciliar <strong>${trFmt(o.unreconciled_cents)}</strong>.</p>
     ${!ok ? '<div class="msg error" style="display:block;">Las cifras no cuadran (faltante). Edita el borrador.</div>' : ''}
     ${!o.backup_confirmed ? '<div class="msg error" style="display:block;">Falta confirmar el respaldo previo (edita el borrador y marca la casilla).</div>' : ''}
