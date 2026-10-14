@@ -12398,6 +12398,7 @@ function trBuildExceptions(s){
 
   (s.bankTxns || []).forEach(b => {
     if(b.account !== 'sweep') return;
+    if(b.classification === 'unclassified' && s.settings && s.settings.cutoff_date && b.posted_at <= s.settings.cutoff_date) return;   // fecha de corte o antes: lo cubre la apertura
     if(b.classification === 'unclassified'){
       if(b.amount_cents < 0) add('unassigned_debit', 'critical', 'Retiro sin asignar', `${b.posted_at}: ${trFmt(b.amount_cents)} — ${b.description}`, 'bank_txn', b.id, -b.amount_cents, false);
       else add('unclassified_credit', 'critical', 'Depósito sin clasificar', `${b.posted_at}: ${trFmt(b.amount_cents)} — ${b.description}. No cuenta como ganancia: queda bloqueado como "sin identificar".`, 'bank_txn', b.id, b.amount_cents, false);
@@ -12451,7 +12452,7 @@ function trComputePosition(s){
     else { R += h.amount_cents; bd.R.push({ label: h.kind, detail: h.note || '', cents: h.amount_cents }); }
   });
   (s.bankTxns || []).forEach(b => {
-    if(b.account === 'sweep' && b.classification === 'unclassified' && b.amount_cents > 0){
+    if(b.account === 'sweep' && b.classification === 'unclassified' && b.amount_cents > 0 && !(settings.cutoff_date && b.posted_at <= settings.cutoff_date)){
       U += b.amount_cents; bd.U.push({ label: 'Depósito sin clasificar', detail: b.posted_at + ' — ' + b.description, cents: b.amount_cents });
     }
   });
@@ -12623,7 +12624,7 @@ function trRecompute(){
   const opening = (d.openings || []).find(o => o.status === 'approved') || null;
   const sweepImports = (d.imports || []).filter(i => i.account === 'sweep');
   const lastImport = sweepImports.length ? Math.max(...sweepImports.map(i => Date.parse(i.imported_at))) : null;
-  const closeDays = new Set((d.closes || []).filter(c => c.matches).map(c => c.close_date));
+  const closeDays = new Set((d.closes || []).filter(c => c.matches && (!opening || !opening.approved_at || Date.parse(c.created_at || 0) >= Date.parse(opening.approved_at))).map(c => c.close_date));  // solo cuentan los cierres hechos con la apertura vigente
   TR.closesCount = closeDays.size;
   TR.pos = trComputePosition({
     nowMs: Date.now(),
@@ -13354,7 +13355,7 @@ function trViewConfig(){
     <button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trSaveSettings()">Guardar parámetros</button>
   </div>
   <div class="dash-card"><h4 style="margin-top:0;">Saldo inicial (apertura)</h4>
-    ${opening ? `<p>✅ Apertura aprobada el ${new Date(opening.approved_at).toLocaleDateString()}: corte ${formatDateUS(opening.cutoff_date)}, Sweep ${trFmt(opening.sweep_balance_cents)}, primas pendientes ${trFmt(opening.carrier_obligations_cents)}, fees propios ${trFmt(opening.own_fees_pending_cents)}${opening.unreconciled_cents ? `, sin conciliar ${trFmt(opening.unreconciled_cents)} (retenido)` : ''}.</p>`
+    ${opening ? `<p>✅ Apertura aprobada el ${new Date(opening.approved_at).toLocaleDateString()}: corte ${formatDateUS(opening.cutoff_date)}, Sweep ${trFmt(opening.sweep_balance_cents)}, primas pendientes ${trFmt(opening.carrier_obligations_cents)}, fees propios ${trFmt(opening.own_fees_pending_cents)}${opening.unreconciled_cents ? `, sin conciliar ${trFmt(opening.unreconciled_cents)} (retenido)` : ''}.</p><button class="btn-ghost" style="width:auto; padding:7px 14px; font-size:12.5px;" onclick="trRedoOpening()">Me equivoqué: rehacer apertura</button>`
       : draft ? `<p>📝 Hay un borrador (corte ${formatDateUS(draft.cutoff_date)}): Sweep ${trFmt(draft.sweep_balance_cents)}, primas ${trFmt(draft.carrier_obligations_cents)}, fees propios ${trFmt(draft.own_fees_pending_cents)}, diferencia ${trFmt(draft.unreconciled_cents)}.</p>
         <button class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="trOpenOpening()">Editar borrador</button> <button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trApproveOpening('${trE(draft.id)}')">Aprobar apertura</button>`
       : `<p class="sub">Todavía no hay apertura. Registra con qué dinero parte el sistema: saldo real de Sweep al corte, cuánto de eso es de aseguradoras y cuánto es ingreso propio.</p><button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trOpenOpening()">Crear apertura</button>`}
@@ -13442,7 +13443,7 @@ function trOpenClose(){
 
 // ---------- Apertura ----------
 function trOpenOpening(){
-  const s = TR.d.settings || {}; const draft = (TR.d.openings || []).find(o => o.status === 'draft');
+  const s = TR.d.settings || {}; const draft = (TR.d.openings || []).find(o => o.status === 'draft') || TR.openingBase || null;
   const det = (draft && draft.detail && draft.detail.carriers) || [];
   const row = (c, v) => `<div class="tro-row" style="display:flex; gap:8px; margin-bottom:6px;"><input type="text" class="tro-c" placeholder="Aseguradora" value="${trE(c || '')}"><input type="text" class="tro-v" inputmode="decimal" placeholder="0.00" value="${v ? (v / 100).toFixed(2) : ''}" style="max-width:130px; text-align:right;" oninput="trOpeningCalc()"></div>`;
   TR.openRows = det.length;
@@ -13458,7 +13459,7 @@ function trOpenOpening(){
     <div id="tro-calc" class="msg" style="display:block;"></div>
     <div class="form-row"><label>Notas</label><input type="text" id="tro-notes" value="${trE(draft ? draft.notes || '' : '')}"></div>
     <label style="display:flex; gap:8px; align-items:flex-start;"><input type="checkbox" id="tro-backup" ${draft && draft.backup_confirmed ? 'checked' : ''}> <span>Descargué un respaldo antes de empezar. <a href="#" onclick="event.preventDefault(); trBackup();">Descargar respaldo ahora</a></span></label>`,
-    [{ label: 'Cancelar' }, { label: 'Guardar borrador', primary: true, onClick: trSaveOpeningDraft }]);
+    [{ label: 'Cancelar', onClick: () => { TR.openingBase = null; } }, { label: 'Guardar borrador', primary: true, onClick: trSaveOpeningDraft }]);
   trOpeningCalc();
 }
 function trOpeningRow(){ return `<div class="tro-row" style="display:flex; gap:8px; margin-bottom:6px;"><input type="text" class="tro-c" placeholder="Aseguradora"><input type="text" class="tro-v" inputmode="decimal" placeholder="0.00" style="max-width:130px; text-align:right;" oninput="trOpeningCalc()"></div>`; }
@@ -13488,7 +13489,7 @@ async function trSaveOpeningDraft(){
   const q = draft ? sb.from('treasury_opening').update(row).eq('id', draft.id) : sb.from('treasury_opening').insert(row);
   const { error } = await q; if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
   await trAudit('opening_draft_saved', 'opening', draft ? draft.id : null, row);
-  await trLoad(); trRender(); trToast('Borrador de apertura guardado. Falta aprobarlo.');
+  TR.openingBase = null; await trLoad(); trRender(); trToast('Borrador de apertura guardado. Falta aprobarlo.');
 }
 function trApproveOpening(id){
   const o = (TR.d.openings || []).find(x => x.id === id); if(!o) return;
@@ -13512,6 +13513,25 @@ function trApproveOpening(id){
       if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
       await trLoad(); trRender(); trToast('Apertura aprobada. Siguiente: 2 cierres diarios de prueba.');
     } }] : [{ label: 'Cerrar' }]);
+}
+
+// Rehacer una apertura ya aprobada (por un error de captura). La anterior NO se borra: queda como "reemplazada" en el historial.
+function trRedoOpening(){
+  const o = TR.opening; if(!o) return;
+  const marker = 'opening:' + o.id;
+  const mine = (TR.d.obligations || []).filter(x => x.note === marker);
+  const used = mine.some(x => x.paid_cents > 0 || x.refunded_cents > 0) || (TR.d.allocations || []).some(a => mine.some(x => x.id === a.obligation_id));
+  trModal('Rehacer la apertura', used
+    ? '<p class="msg error" style="display:block;">Ya se asignaron retiros de aseguradoras contra las primas de esta apertura, así que no se puede rehacer sin descuadrar el historial. Escríbeme y lo corregimos con un ajuste.</p>'
+    : `<p>La apertura actual (corte ${formatDateUS(o.cutoff_date)}) pasará a <strong>«reemplazada»</strong> (queda en el historial y la bitácora; no se borra). Se anulan sus primas iniciales y su retención, y se abre un formulario <strong>con tus cifras anteriores ya escritas</strong> para que las corrijas y apruebes la nueva.</p><p class="sub">Mientras tanto el monto transferible queda bloqueado. Si ya hiciste cierres diarios con la apertura equivocada, no cuentan: repítelos.</p>`,
+    used ? [{ label: 'Cerrar' }] : [{ label: 'Cancelar' }, { label: 'Rehacer', primary: true, onClick: async () => {
+      const now = new Date().toISOString();
+      for(const ob of mine.filter(x => x.status !== 'cancelled')){ const { error } = await sb.from('treasury_obligations').update({ status: 'cancelled', updated_at: now }).eq('id', ob.id); if(error) throw new Error('Anulando primas iniciales: ' + error.message); }
+      for(const h of (TR.d.holds || []).filter(x => x.status === 'open' && x.kind === 'unreconciled' && String(x.note || '').includes(marker))){ const { error } = await sb.from('treasury_holds').update({ status: 'released', released_at: now, release_note: 'Apertura reemplazada' }).eq('id', h.id); if(error) throw new Error('Liberando retención: ' + error.message); }
+      const { error } = await sb.from('treasury_opening').update({ status: 'superseded' }).eq('id', o.id); if(error) throw new Error(error.message.replace(/^Tesorería: /, ''));
+      await trAudit('opening_redo', 'opening', o.id, { previous: { sweep: o.sweep_balance_cents, stripe: o.stripe_balance_cents, obligations: o.carrier_obligations_cents, own: o.own_fees_pending_cents } });
+      TR.openingBase = o; await trLoad(); trRender(); trModalClose(); trOpenOpening(); return false;
+    } }]);
 }
 
 // Entrada desde la pestaña Tesorería
