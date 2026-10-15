@@ -13911,20 +13911,24 @@ function trInitUi(){
 // Agency Sweep (service fees / processing fees de la agencia, NO es comisión) · other_income.
 // Egresos (−): expense = gasto operativo · other_debit. Las aseguradoras no cobran contracargos al banco
 // (los descuentan de comisiones futuras), por eso no existe esa categoría.
-const CM_CREDIT_CATS = ['commission', 'agency_fees', 'other_income'];
-const CM_DEBIT_CATS = ['expense', 'other_debit'];
+// Movimientos entre tus propias cuentas NO son ingreso ni gasto: internal_in (llega desde Salud o tu cuenta
+// personal), owner_draw (retiro a tu cuenta personal), internal_out (devuelto a Agency Sweep).
+const CM_CREDIT_CATS = ['commission', 'agency_fees', 'other_income', 'internal_in'];
+const CM_DEBIT_CATS = ['expense', 'owner_draw', 'internal_out', 'other_debit'];
 const CM_CAT_LABELS = {
   unclassified: 'Sin clasificar', commission: 'Comisión', agency_fees: 'Transferencia desde Agency Sweep (service/processing fees)',
-  other_income: 'Otro ingreso', expense: 'Gasto operativo', other_debit: 'Otro retiro'
+  other_income: 'Otro ingreso', internal_in: 'Transferencia entre tus cuentas (recibida de Salud o cuenta personal)',
+  expense: 'Gasto operativo', owner_draw: 'Retiro a tu cuenta personal', internal_out: 'Transferencia a Agency Sweep (devuelto)', other_debit: 'Otro retiro'
 };
 const CM_CAT_SHORT = {
   unclassified: 'Sin clasificar', commission: 'Comisión', agency_fees: 'Desde Agency Sweep',
-  other_income: 'Otro ingreso', expense: 'Gasto operativo', other_debit: 'Otro retiro'
+  other_income: 'Otro ingreso', internal_in: 'Transf. entre tus cuentas', expense: 'Gasto operativo', owner_draw: 'A cuenta personal',
+  internal_out: 'A Agency Sweep', other_debit: 'Otro retiro'
 };
 // Palabras del banco que no identifican a nadie; se ignoran al armar la "clave" de un pagador.
 const CM_GENERIC = new Set(['ach', 'credit', 'debit', 'deposit', 'dep', 'payment', 'payments', 'pmt', 'pymt', 'from', 'to', 'the', 'and', 'of',
   'inc', 'llc', 'co', 'corp', 'ltd', 'id', 'ppd', 'ccd', 'web', 'eft', 'wire', 'online', 'mobile', 'trn', 'ref', 'tran', 'xfer', 'transfer',
-  'bill', 'com', 'comm', 'commission', 'commissions', 'comms', 'incoming', 'outgoing', 'external', 'internal', 'card', 'pos', 'purchase', 'des', 'indn', 'co', 'name', 'orig', 'trace', 'sec']);
+  'bill', 'com', 'comm', 'commission', 'commissions', 'comms', 'incoming', 'outgoing', 'external', 'internal', 'card', 'pos', 'purchase', 'des', 'indn', 'co', 'name', 'orig', 'trace', 'sec', 'payroll', 'commis', 'edi', 'pymnts', 'pymnt']);
 
 function cmTokens(desc){
   return String(desc || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
@@ -13943,7 +13947,15 @@ function cmMatchesKey(desc, key){
   return kw.every(w => set.has(w));
 }
 function cmTitle(key){ return String(key || '').split(' ').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '); }
-function cmGuessPayer(desc){ return cmTitle(cmNormalizeKey(desc)) || null; }
+// Nombre probable del pagador. Los ACH de Bluevine vienen como "NOMBRE, TIPO" (ej. "VENTURE GENERAL, INSURANCE"): se usa lo de antes de la coma.
+function cmGuessPayer(desc){
+  const d = String(desc || '');
+  if(d.includes(',')){
+    const w = d.split(',')[0].toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(x => x && x !== 'ach' && x !== 'credit');
+    if(w.length) return cmTitle(w.slice(0, 4).join(' '));
+  }
+  return cmTitle(cmNormalizeKey(d)) || null;
+}
 function cmIsCreditCat(c){ return CM_CREDIT_CATS.includes(c); }
 function cmIsDebitCat(c){ return CM_DEBIT_CATS.includes(c); }
 // Una categoría solo es válida con el signo correcto (igual que la restricción de la base de datos).
@@ -13952,6 +13964,24 @@ function cmCategoryAllowed(amountCents, category){
   return amountCents > 0 ? cmIsCreditCat(category) : amountCents < 0 ? cmIsDebitCat(category) : false;
 }
 function cmCategoriesFor(amountCents){ return amountCents > 0 ? CM_CREDIT_CATS : CM_DEBIT_CATS; }
+
+// Reconoce por el texto del banco lo que casi siempre es de cierto tipo. Nunca se aplica solo: la persona lo confirma.
+// kind 'commission_like' = "parece un pago de aseguradora" (se omite si la cuenta ya marca sus ingresos sola, como Salud).
+function cmHeuristic(desc, amt){
+  const d = String(desc || '');
+  const after = re => { const m = re.exec(d); return m ? m[1].replace(/[()]/g, ' ').replace(/\s+/g, ' ').trim() : ''; };
+  if(amt > 0){
+    if(/^\s*transfer\s+from\b.*(sweep|7770)|\bagency\s*sweep\b|\b7770\b/i.test(d)) return { category: 'agency_fees', payer: 'Agency Sweep' };
+    if(/^\s*transfer\s+from\b/i.test(d)) return { category: 'internal_in', payer: after(/^\s*transfer\s+from\s+(.*)$/i) || null };
+    if(/interest\s+earned/i.test(d)) return { category: 'other_income', payer: 'Intereses' };
+    if(/^\s*rbt-|cash\s*back|rebate/i.test(d)) return { category: 'other_income', payer: 'Reembolso / cashback' };
+    if(/payroll|\bcomm\w*|edi\s+pymnt|ach\s+pmt|underwri|insuran|casualty|\bmga\b|\bgeneral\b/i.test(d)) return { category: 'commission', payer: cmGuessPayer(d), kind: 'commission_like' };
+  } else {
+    if(/^\s*transfer\s+to\b.*(sweep|7770)|\bagency\s*sweep\b|\b7770\b/i.test(d)) return { category: 'internal_out', payer: 'Agency Sweep' };
+    if(/^\s*transfer\s+to\b/i.test(d)) return { category: 'owner_draw', payer: after(/^\s*transfer\s+to\s+(.*)$/i) || null };
+  }
+  return null;
+}
 
 // Sugerencia para un movimiento. source: 'rule' | 'account' (se aplican solas al importar) · 'heuristic' (solo sugerida, requiere confirmación) · 'none'.
 function cmSuggest(txn, rules, account){
@@ -13963,8 +13993,9 @@ function cmSuggest(txn, rules, account){
     const r = allowed[0];
     return { category: r.category, payer: r.payer || null, source: 'rule', rule_id: r.id || null, confirm: false };
   }
-  if(amt > 0 && /sweep|\b7770\b/i.test(desc)){
-    return { category: 'agency_fees', payer: 'Agency Sweep', source: 'heuristic', rule_id: null, confirm: true };
+  const h = cmHeuristic(desc, amt);
+  if(h && !(h.kind === 'commission_like' && account && account.auto_credit_category)){
+    return { category: h.category, payer: h.payer, source: 'heuristic', rule_id: null, confirm: true };
   }
   if(account){
     if(amt > 0 && account.auto_credit_category && cmIsCreditCat(account.auto_credit_category)){
@@ -13975,6 +14006,18 @@ function cmSuggest(txn, rules, account){
     }
   }
   return { category: 'unclassified', payer: null, source: 'none', rule_id: null, confirm: false };
+}
+
+// Movimientos que se clasificaron SOLOS al importar (por el tipo de cuenta, sin regla ni intervención) pero que el texto
+// del banco indica otra cosa (ej.: "Transfer to Bank of Tex" marcado como gasto). Para que la persona los revise.
+function cmRecheck(txns, rules){
+  const out = [];
+  (txns || []).forEach(t => {
+    if(t.category === 'unclassified' || t.classified_at || t.rule_id) return;
+    const s = cmSuggest(t, rules, null);
+    if((s.source === 'heuristic' || s.source === 'rule') && s.category !== t.category && cmCategoryAllowed(t.amount_cents, s.category)) out.push({ txn: t, sugg: s });
+  });
+  return out;
 }
 
 // Movimientos sin clasificar que coinciden con una clave (para "aplicar a los parecidos").
@@ -14015,14 +14058,14 @@ function cmSummarize(txns, opts){
   const list = (txns || []).filter(t => cmInRange(t, opts.from, opts.to) && (!opts.accountId || t.account_id === opts.accountId));
   const S = {
     from: opts.from || null, to: opts.to || null, count: list.length,
-    commission: 0, commissionCount: 0, agencyFees: 0, agencyFeesCount: 0, otherIncome: 0, expenses: 0, otherDebits: 0,
+    commission: 0, commissionCount: 0, agencyFees: 0, agencyFeesCount: 0, otherIncome: 0, internalIn: 0, expenses: 0, ownerDraws: 0, internalOut: 0, otherDebits: 0,
     unclassifiedIn: 0, unclassifiedOut: 0, unclassifiedCount: 0, totalIn: 0, totalOut: 0, net: 0,
     byPayer: [], byAccount: {}, monthly: []
   };
   const payers = new Map(); const months = new Map();
   list.forEach(t => {
     const a = Number(t.amount_cents); const abs = Math.abs(a);
-    const acc = S.byAccount[t.account_id] || (S.byAccount[t.account_id] = { commission: 0, agencyFees: 0, otherIncome: 0, expenses: 0, otherDebits: 0, unclassifiedIn: 0, unclassifiedOut: 0, totalIn: 0, totalOut: 0, count: 0 });
+    const acc = S.byAccount[t.account_id] || (S.byAccount[t.account_id] = { commission: 0, agencyFees: 0, otherIncome: 0, internalIn: 0, expenses: 0, ownerDraws: 0, internalOut: 0, otherDebits: 0, unclassifiedIn: 0, unclassifiedOut: 0, totalIn: 0, totalOut: 0, count: 0 });
     acc.count++;
     if(a > 0){ S.totalIn += a; acc.totalIn += a; } else { S.totalOut += abs; acc.totalOut += abs; }
     const mk = String(t.posted_at).slice(0, 7);
@@ -14037,7 +14080,10 @@ function cmSummarize(txns, opts){
       }
       case 'agency_fees': S.agencyFees += a; S.agencyFeesCount++; acc.agencyFees += a; mo.agencyFees += a; break;
       case 'other_income': S.otherIncome += a; acc.otherIncome += a; break;
+      case 'internal_in': S.internalIn += a; acc.internalIn += a; break;
       case 'expense': S.expenses += abs; acc.expenses += abs; break;
+      case 'owner_draw': S.ownerDraws += abs; acc.ownerDraws += abs; break;
+      case 'internal_out': S.internalOut += abs; acc.internalOut += abs; break;
       case 'other_debit': S.otherDebits += abs; acc.otherDebits += abs; break;
       default:
         S.unclassifiedCount++;
@@ -14071,7 +14117,7 @@ function cmToast(msg, kind){
 function cmAccount(id){ return CM.accounts.find(a => a.id === id) || null; }
 function cmAccName(id){ const a = cmAccount(id); return a ? a.name + (a.last4 ? ' ••' + a.last4 : '') : '—'; }
 function cmChip(cat){
-  const kind = { commission: 'green', agency_fees: 'amber', other_income: 'gray', expense: 'red', other_debit: 'red', unclassified: 'gray' }[cat] || 'gray';
+  const kind = { commission: 'green', agency_fees: 'amber', other_income: 'gray', internal_in: 'gray', expense: 'red', owner_draw: 'amber', internal_out: 'gray', other_debit: 'red', unclassified: 'gray' }[cat] || 'gray';
   return `<span class="tr-chip tr-chip-${kind}">${trE(CM_CAT_SHORT[cat] || cat)}</span>`;
 }
 async function cmSelectAll(table, orderCol, asc){
@@ -14149,30 +14195,36 @@ function cmHtmlResumen(){
   const r = cmCurrentRange(); const S = cmSummarize(CM.txns, { from: r.from, to: r.to, accountId: CM.accountId });
   const quick = [['5', 'Últimos 5 días'], ['15', 'Últimos 15 días'], ['month', 'Este mes'], ['lastmonth', 'Mes pasado'], ['year', 'Este año'], ['all', 'Todo']].map(([k, l]) => {
     const q = r2 => cmSummarize(CM.txns, { from: r2.from, to: r2.to, accountId: CM.accountId });
-    const s = q(cmRangeDates(k, cmToday())); return `<tr><td>${l}</td><td style="text-align:right;"><strong>${trFmt(s.commission)}</strong></td><td style="text-align:right;">${trFmt(s.agencyFees)}</td><td style="text-align:right;">${trFmt(s.otherIncome)}</td><td style="text-align:right;">${trFmt(s.expenses + s.otherDebits)}</td><td style="text-align:right;">${trFmt(s.totalIn)}</td></tr>`;
+    const s = q(cmRangeDates(k, cmToday())); return `<tr><td>${l}</td><td style="text-align:right;"><strong>${trFmt(s.commission)}</strong></td><td style="text-align:right;">${trFmt(s.agencyFees)}</td><td style="text-align:right;">${trFmt(s.otherIncome + s.internalIn)}</td><td style="text-align:right;">${trFmt(s.expenses + s.otherDebits)}</td><td style="text-align:right;">${trFmt(s.totalIn)}</td></tr>`;
   }).join('');
-  const accRows = Object.keys(S.byAccount).map(id => { const a = S.byAccount[id]; return `<tr><td>${trE(cmAccName(id))}</td><td style="text-align:right;">${trFmt(a.commission)}</td><td style="text-align:right;">${trFmt(a.agencyFees)}</td><td style="text-align:right;">${trFmt(a.otherIncome)}</td><td style="text-align:right;">${trFmt(a.expenses + a.otherDebits)}</td><td style="text-align:right;">${trFmt(a.unclassifiedIn + a.unclassifiedOut)}</td><td style="text-align:right;">${trFmt(a.totalIn)}</td></tr>`; }).join('');
+  const accRows = Object.keys(S.byAccount).map(id => { const a = S.byAccount[id]; return `<tr><td>${trE(cmAccName(id))}</td><td style="text-align:right;">${trFmt(a.commission)}</td><td style="text-align:right;">${trFmt(a.agencyFees)}</td><td style="text-align:right;">${trFmt(a.otherIncome + a.internalIn)}</td><td style="text-align:right;">${trFmt(a.expenses + a.otherDebits)}</td><td style="text-align:right;">${trFmt(a.ownerDraws + a.internalOut)}</td><td style="text-align:right;">${trFmt(a.unclassifiedIn + a.unclassifiedOut)}</td><td style="text-align:right;">${trFmt(a.totalIn)}</td></tr>`; }).join('');
   const payerRows = S.byPayer.map(p => `<tr><td>${trE(p.payer)}</td><td style="text-align:right;">${p.count}</td><td style="text-align:right;"><strong>${trFmt(p.cents)}</strong></td><td style="text-align:right;">${S.commission ? (p.cents * 100 / S.commission).toFixed(1) + '%' : '—'}</td><td>${formatDateUS(p.first)}${p.first !== p.last ? ' – ' + formatDateUS(p.last) : ''}</td></tr>`).join('');
   const monthly = S.monthly.length > 1 ? `<div class="dash-card"><h3 style="margin:0 0 8px;">Por mes</h3><div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Mes</th><th style="text-align:right;">Comisiones</th><th style="text-align:right;">Desde Agency Sweep</th></tr></thead><tbody>${S.monthly.map(m => `<tr><td>${trE(m.month)}</td><td style="text-align:right;">${trFmt(m.commission)}</td><td style="text-align:right;">${trFmt(m.agencyFees)}</td></tr>`).join('')}</tbody></table></div></div>` : '';
   const pendBanner = S.unclassifiedCount ? `<div class="msg error" id="cm-pend-banner" style="display:block; margin:10px 0;">Hay ${S.unclassifiedCount} movimiento(s) sin clasificar en este periodo (entradas ${trFmt(S.unclassifiedIn)}, salidas ${trFmt(S.unclassifiedOut)}). Mientras no los clasifiques no cuentan como comisión ni como gasto. <a href="#" onclick="cmSetView('pendientes'); return false;">Clasificar ahora</a></div>` : '';
+  const rc = cmRecheck(CM.txns.filter(t => !CM.accountId || t.account_id === CM.accountId), CM.rules);
+  const recheckBanner = rc.length ? `<div class="msg error" id="cm-recheck-banner" style="display:block; margin:10px 0;">${rc.length} movimiento(s) se clasificaron solos pero el texto del banco indica otra cosa (por ejemplo, transferencias a tu cuenta personal marcadas como gasto operativo). <a href="#" onclick="cmOpenRecheck(); return false;">Revisar y corregir</a></div>` : '';
   return `
     <p class="sub" id="cm-range-label">${trE(cmRangeLabel(r))}${CM.accountId ? ' · ' + trE(cmAccName(CM.accountId)) : ' · todas las cuentas'}</p>
+    ${recheckBanner}
     ${pendBanner}
     <div class="grid tr-figs" style="display:grid; gap:12px;">
-      ${cmFig('Comisiones reales (aseguradoras)', trFmt(S.commission), S.commissionCount + ' pago(s)', 'id="cm-t-commission"')}
+      ${cmFig('Comisiones reales (aseguradoras)', trFmt(S.commission), S.commissionCount + ' pago(s)' + (S.unclassifiedIn ? ' · faltan ' + trFmt(S.unclassifiedIn) + ' de entradas por clasificar' : ''), 'id="cm-t-commission"')}
       ${cmFig('Transferido desde Agency Sweep', trFmt(S.agencyFees), 'Service fees / processing fees de la agencia · ' + S.agencyFeesCount + ' transferencia(s). No es comisión.', 'id="cm-t-agency"')}
-      ${cmFig('Otros ingresos', trFmt(S.otherIncome), 'Reembolsos, intereses, etc.', 'id="cm-t-other"')}
-      ${cmFig('Total entrado', trFmt(S.totalIn), 'Comisiones + Sweep + otros' + (S.unclassifiedIn ? ' + ' + trFmt(S.unclassifiedIn) + ' sin clasificar' : ''), 'id="cm-t-in"')}
+      ${cmFig('Otros ingresos', trFmt(S.otherIncome), 'Intereses, cashback, etc.', 'id="cm-t-other"')}
+      ${cmFig('Entre tus cuentas (recibido)', trFmt(S.internalIn), 'Desde Salud o tu cuenta personal. No es ingreso nuevo.', 'id="cm-t-internal"')}
+      ${cmFig('Total entrado al banco', trFmt(S.totalIn), 'Suma de todo lo que entró' + (S.unclassifiedIn ? ' (incluye ' + trFmt(S.unclassifiedIn) + ' sin clasificar)' : ''), 'id="cm-t-in"')}
       ${cmFig('Gastos operativos', trFmt(S.expenses), S.otherDebits ? '+ otros retiros ' + trFmt(S.otherDebits) : 'Gasolina, errores y omisiones, etc.', 'id="cm-t-exp"')}
-      ${cmFig('Total salido', trFmt(S.totalOut), 'Neto del periodo: ' + trFmt(S.net), 'id="cm-t-out"')}
+      ${cmFig('Retirado a tu cuenta personal', trFmt(S.ownerDraws), 'No es gasto de la agencia', 'id="cm-t-draw"')}
+      ${cmFig('Devuelto a Agency Sweep', trFmt(S.internalOut), 'Transferencias a Sweep', 'id="cm-t-sweepback"')}
+      ${cmFig('Total salido del banco', trFmt(S.totalOut), 'Neto del periodo: ' + trFmt(S.net), 'id="cm-t-out"')}
     </div>
     <div class="dash-card"><h3 style="margin:0 0 4px;">Qué compañías te pagaron</h3><p class="sub">Solo comisiones reales; las transferencias de Agency Sweep no aparecen aquí.</p>
       <div class="dash-table-wrap"><table class="dash-table" id="cm-payers"><thead><tr><th>Compañía</th><th style="text-align:right;">Pagos</th><th style="text-align:right;">Total</th><th style="text-align:right;">% de comisiones</th><th>Fechas</th></tr></thead><tbody>${payerRows || '<tr><td colspan="5">No hay comisiones clasificadas en este periodo.</td></tr>'}</tbody>
       ${S.byPayer.length ? `<tfoot><tr><td><strong>Total comisiones</strong></td><td style="text-align:right;">${S.commissionCount}</td><td style="text-align:right;"><strong>${trFmt(S.commission)}</strong></td><td></td><td></td></tr></tfoot>` : ''}</table></div></div>
     <div class="dash-card"><h3 style="margin:0 0 4px;">Por cuenta</h3>
-      <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cuenta</th><th style="text-align:right;">Comisiones</th><th style="text-align:right;">Desde Sweep</th><th style="text-align:right;">Otros ingresos</th><th style="text-align:right;">Gastos</th><th style="text-align:right;">Sin clasificar</th><th style="text-align:right;">Total entrado</th></tr></thead><tbody>${accRows || '<tr><td colspan="7">Sin movimientos en este periodo.</td></tr>'}</tbody></table></div></div>
+      <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cuenta</th><th style="text-align:right;">Comisiones</th><th style="text-align:right;">Desde Sweep</th><th style="text-align:right;">Otros ingresos y transf. entre tus cuentas</th><th style="text-align:right;">Gastos operativos</th><th style="text-align:right;">A tu cuenta personal / Sweep</th><th style="text-align:right;">Sin clasificar</th><th style="text-align:right;">Total entrado</th></tr></thead><tbody>${accRows || '<tr><td colspan="8">Sin movimientos en este periodo.</td></tr>'}</tbody></table></div></div>
     <div class="dash-card"><h3 style="margin:0 0 4px;">Resumen rápido por periodos</h3><p class="sub">Siempre hasta hoy; respeta el filtro de cuenta.</p>
-      <div class="dash-table-wrap"><table class="dash-table" id="cm-quick"><thead><tr><th>Periodo</th><th style="text-align:right;">Comisiones</th><th style="text-align:right;">Desde Agency Sweep</th><th style="text-align:right;">Otros ingresos</th><th style="text-align:right;">Gastos</th><th style="text-align:right;">Total entrado</th></tr></thead><tbody>${quick}</tbody></table></div></div>
+      <div class="dash-table-wrap"><table class="dash-table" id="cm-quick"><thead><tr><th>Periodo</th><th style="text-align:right;">Comisiones</th><th style="text-align:right;">Desde Agency Sweep</th><th style="text-align:right;">Otros ingresos y transf. entre tus cuentas</th><th style="text-align:right;">Gastos operativos</th><th style="text-align:right;">Total entrado</th></tr></thead><tbody>${quick}</tbody></table></div></div>
     ${monthly}`;
 }
 
@@ -14195,10 +14247,10 @@ function cmHtmlPend(){
   const groups = cmPendingGroups(); CM.groups = groups;
   if(!groups.length) return '<div class="tr-box">No hay movimientos por clasificar. Todo está al día.</div>';
   const sw = groups.filter(g => g.sugg.source === 'heuristic');
-  const swIds = sw.reduce((n, g) => n + g.ids.length, 0), swTotal = sw.reduce((n, g) => n + g.total, 0);
+  const swIds = sw.reduce((n, g) => n + g.ids.length, 0);
   return `
     <p class="sub">Agrupé los movimientos por pagador. Clasifica cada grupo una vez y marca «Recordar»: la próxima vez que importes, se clasifica solo.</p>
-    ${sw.length ? `<div class="tr-box"><strong>${swIds} movimiento(s) parecen transferencias desde Agency Sweep</strong> (${trFmt(swTotal)}). Son service/processing fees de la agencia, no comisiones. <button type="button" class="btn-primary" style="width:auto; padding:7px 16px; margin-left:8px;" id="cm-confirm-sweep" onclick="cmConfirmSweep()">Revisar y confirmar</button></div>` : ''}
+    ${sw.length ? `<div class="tr-box"><strong>${swIds} movimiento(s) tienen una sugerencia automática</strong> (pagos de aseguradoras, transferencias desde Agency Sweep, transferencias entre tus cuentas o a tu cuenta personal, intereses). Revísalas y confírmalas de una vez, o cámbialas grupo por grupo. <button type="button" class="btn-primary" style="width:auto; padding:7px 16px; margin-left:8px;" id="cm-confirm-sugg" onclick="cmConfirmSuggested()">Revisar y confirmar sugeridas</button></div>` : ''}
     <div class="dash-table-wrap"><table class="dash-table" id="cm-groups"><thead><tr><th>Pagador / descripción</th><th>Cuenta</th><th style="text-align:right;">Movimientos</th><th style="text-align:right;">Total</th><th>Fechas</th><th>Sugerencia</th><th></th></tr></thead><tbody>
     ${groups.map((g, i) => `<tr><td>${trE(g.sample)}${g.key ? `<div class="sub">clave: ${trE(g.key)}</div>` : ''}</td><td>${trE(Array.from(g.accounts).map(cmAccName).join(', '))}</td><td style="text-align:right;">${g.ids.length}</td><td style="text-align:right;">${trFmt(g.total)}</td><td>${formatDateUS(g.first)}${g.first !== g.last ? ' – ' + formatDateUS(g.last) : ''}</td><td>${g.sugg.source === 'none' ? '<span class="sub">—</span>' : cmChip(g.sugg.category) + (g.sugg.confirm ? ' <span class="sub">por confirmar</span>' : '')}</td><td><button type="button" class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="cmClassifyGroup(${i})">Clasificar</button></td></tr>`).join('')}
     </tbody></table></div>`;
@@ -14209,16 +14261,30 @@ function cmClassifyGroup(i){
   cmOpenClassify({ ids: g.ids.slice(), sign: g.sign, key: g.key, sample: g.sample, total: g.total, title: 'Clasificar ' + g.ids.length + ' movimiento(s)',
     defCategory: s.source !== 'none' ? s.category : null, defPayer: s.payer || (g.sign > 0 ? cmGuessPayer(g.sample) : '') || '' });
 }
-function cmConfirmSweep(){
+function cmConfirmSuggested(){
   const sw = cmPendingGroups().filter(g => g.sugg.source === 'heuristic');
   if(!sw.length) return;
-  const n = sw.reduce((a, g) => a + g.ids.length, 0), tot = sw.reduce((a, g) => a + g.total, 0);
-  trModal('Confirmar transferencias desde Agency Sweep', `<p>Se marcarán <strong>${n}</strong> ingreso(s) por <strong>${trFmt(tot)}</strong> como <em>transferencia desde Agency Sweep</em> (service/processing fees de la agencia). No contarán como comisión.</p>
-    <div class="dash-table-wrap" style="max-height:220px; overflow:auto;"><table class="dash-table"><tbody>${sw.map(g => `<tr><td>${trE(g.sample)}</td><td style="text-align:right;">${g.ids.length}</td><td style="text-align:right;">${trFmt(g.total)}</td></tr>`).join('')}</tbody></table></div>
-    <p class="sub">Revisa que de verdad vengan de Agency Sweep. Se guardará una regla por cada descripción para que la próxima vez se clasifiquen solas.</p>`,
+  const n = sw.reduce((a, g) => a + g.ids.length, 0);
+  trModal('Confirmar clasificaciones sugeridas', `<p>Se clasificarán <strong>${n}</strong> movimiento(s) así. Revisa cada línea; si alguna está mal, cancela y usa «Clasificar» en ese grupo.</p>
+    <div class="dash-table-wrap" style="max-height:300px; overflow:auto;"><table class="dash-table" id="cm-sugg-table"><thead><tr><th>Descripción</th><th style="text-align:right;">Mov.</th><th style="text-align:right;">Total</th><th>Quedará como</th><th>Compañía / concepto</th></tr></thead><tbody>${sw.map(g => `<tr><td>${trE(g.sample)}</td><td style="text-align:right;">${g.ids.length}</td><td style="text-align:right;">${trFmt(g.total)}</td><td>${cmChip(g.sugg.category)}</td><td>${trE(g.sugg.payer || '')}</td></tr>`).join('')}</tbody></table></div>
+    <p class="sub">Se guarda una regla por cada grupo para que la próxima vez se clasifiquen solos.</p>`,
     [{ label: 'Cancelar' }, { label: 'Confirmar', primary: true, onClick: async () => {
-      for(const g of sw){ await cmApplyClassification({ ids: g.ids, category: 'agency_fees', payer: 'Agency Sweep', rememberKey: g.key || null, audit: 'sweep_confirm' }); }
-      await cmReloadAfter(`${n} transferencia(s) desde Agency Sweep confirmadas.`);
+      for(const g of sw){ await cmApplyClassification({ ids: g.ids, category: g.sugg.category, payer: g.sugg.payer, rememberKey: g.key || null, audit: 'confirm_suggested' }); }
+      await cmReloadAfter(`${n} movimiento(s) clasificados.`);
+    } }]);
+}
+// Corrige clasificaciones automáticas que el texto del banco contradice (ver cmRecheck).
+function cmOpenRecheck(){
+  const rc = cmRecheck(CM.txns, CM.rules);
+  if(!rc.length){ cmToast('No hay nada que corregir.'); return; }
+  const map = new Map();
+  rc.forEach(({ txn, sugg }) => { const k = sugg.category + '|' + (sugg.payer || '') + '|' + txn.category; const g = map.get(k) || { sugg, from: txn.category, ids: [], total: 0, sample: txn.description }; g.ids.push(txn.id); g.total += txn.amount_cents; map.set(k, g); });
+  const groups = Array.from(map.values());
+  trModal('Corregir clasificaciones automáticas', `<p><strong>${rc.length}</strong> movimiento(s) cambiarán de categoría:</p>
+    <div class="dash-table-wrap" style="max-height:300px; overflow:auto;"><table class="dash-table" id="cm-recheck-table"><thead><tr><th>Ejemplo</th><th style="text-align:right;">Mov.</th><th style="text-align:right;">Total</th><th>Ahora</th><th>Pasará a</th></tr></thead><tbody>${groups.map(g => `<tr><td>${trE(g.sample)}</td><td style="text-align:right;">${g.ids.length}</td><td style="text-align:right;">${trFmt(g.total)}</td><td>${cmChip(g.from)}</td><td>${cmChip(g.sugg.category)} ${trE(g.sugg.payer || '')}</td></tr>`).join('')}</tbody></table></div>`,
+    [{ label: 'Cancelar' }, { label: 'Aplicar cambios', primary: true, onClick: async () => {
+      for(const g of groups){ await cmApplyClassification({ ids: g.ids, category: g.sugg.category, payer: g.sugg.payer, rememberKey: null, audit: 'recheck' }); }
+      await cmReloadAfter(`${rc.length} movimiento(s) corregidos.`);
     } }]);
 }
 
@@ -14243,7 +14309,8 @@ function cmOpenClassify(o){
     [{ label: 'Cancelar' }, { label: 'Guardar', primary: true, onClick: cmSaveClassify }]);
   const hint = () => {
     const c = trVal('cmc-cat'); const h = document.getElementById('cmc-hint');
-    h.textContent = c === 'agency_fees' ? 'Es dinero que la agencia se transfirió desde Agency Sweep (service/processing fees). No cuenta como comisión.' : c === 'commission' ? 'Comisión real pagada por una aseguradora o broker.' : '';
+    h.textContent = ({ agency_fees: 'Es dinero que la agencia se transfirió desde Agency Sweep (service/processing fees). No cuenta como comisión.', commission: 'Comisión real pagada por una aseguradora o broker.',
+      internal_in: 'Dinero que moviste entre tus propias cuentas (ej. desde Salud). No es ingreso nuevo: la comisión ya se contó en la otra cuenta.', owner_draw: 'Dinero que pasaste a tu cuenta personal. No es gasto de la agencia.', internal_out: 'Dinero que devolviste a Agency Sweep.' })[c] || '';
     if(c === 'agency_fees' && !trVal('cmc-payer').trim()) document.getElementById('cmc-payer').value = 'Agency Sweep';
   };
   const similar = () => {
@@ -14351,8 +14418,8 @@ function cmOpenAccount(id){
     <div class="form-row"><label>Últimos 4 dígitos</label><input type="text" id="cma-last4" maxlength="4" inputmode="numeric" value="${trE(a ? a.last4 || '' : '')}" placeholder="9139"></div></div>
     <p class="sub">Solo los últimos 4 dígitos: nunca guardes el número completo de la cuenta.</p>
     <div class="form-row"><label>Tipo</label><select id="cma-kind">${[['checking', 'Checking'], ['health', 'Salud'], ['other', 'Otra']].map(([v, l]) => `<option value="${v}" ${a && a.kind === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-    <div class="form-row-2"><div class="form-row"><label>Los ingresos se marcan solos como</label><select id="cma-credit">${opt(CM_CREDIT_CATS, a && a.auto_credit_category)}</select></div>
-    <div class="form-row"><label>Los retiros se marcan solos como</label><select id="cma-debit">${opt(CM_DEBIT_CATS, a && a.auto_debit_category)}</select></div></div>
+    <div class="form-row-2"><div class="form-row"><label>Los ingresos se marcan solos como</label><select id="cma-credit">${opt(['commission', 'agency_fees', 'other_income'], a && a.auto_credit_category)}</select></div>
+    <div class="form-row"><label>Los retiros se marcan solos como</label><select id="cma-debit">${opt(['expense', 'other_debit'], a && a.auto_debit_category)}</select></div></div>
     <p class="sub">Salud: solo entran comisiones, así que sus ingresos pueden marcarse solos como «Comisión». Checking: entran comisiones y transferencias de Sweep, así que los ingresos los clasificas una vez por pagador; los retiros son gastos operativos.</p>
     ${a ? `<label style="display:flex; gap:8px; align-items:center; font-size:13px;"><input type="checkbox" id="cma-active" ${a.active ? 'checked' : ''}> Cuenta activa</label>` : ''}`,
     [{ label: 'Cancelar' }, { label: 'Guardar', primary: true, onClick: () => cmSaveAccount(id) }]);
@@ -14416,7 +14483,7 @@ function cmImportRenderPreview(){
       <label style="display:flex; gap:8px; align-items:center; font-size:13px;"><input type="checkbox" id="cmm-invert" ${I.invert ? 'checked' : ''}> El banco muestra los retiros como números positivos (invertir signo)</label></div>
     ${I.fileDup ? '<div class="msg error" style="display:block;">Este mismo archivo ya fue importado antes en esta cuenta. No se volverá a importar.</div>' : ''}
     <p style="margin:10px 0 4px;" id="cmi-summary"><strong>${built.rows.length}</strong> filas válidas · <strong>${I.split.fresh.length}</strong> nuevas · <strong>${I.split.dup.length}</strong> repetidas (se omiten) · <strong>${built.errors.length}</strong> con error. Entradas ${trFmt(credits)} · Salidas ${trFmt(debits)}.</p>
-    <p class="sub" id="cmi-forecast">De las nuevas: ${cnt.auto} se clasifican solas (regla o tipo de cuenta) · ${cnt.sweep} parecen transferencias desde Agency Sweep (las confirmas después) · ${cnt.review} quedan por clasificar.</p>
+    <p class="sub" id="cmi-forecast">De las nuevas: ${cnt.auto} se clasifican solas (regla o tipo de cuenta) · ${cnt.sweep} tienen una sugerencia automática (transferencias, pagos de aseguradoras…) que confirmas después · ${cnt.review} quedan por clasificar.</p>
     ${built.errors.length ? `<details><summary class="sub">Ver filas con error</summary><div class="sub">${built.errors.slice(0, 15).map(e => `Línea ${e.line}: ${trE(e.msg)}`).join('<br>')}</div></details>` : ''}
     <div class="dash-table-wrap" style="max-height:220px; overflow:auto;"><table class="dash-table"><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th>Se pondrá como</th></tr></thead><tbody>
       ${built.rows.slice(0, 12).map((r, i) => `<tr><td>${formatDateUS(r.posted_at)}</td><td>${trE(r.description)}</td><td style="text-align:right;">${trFmt(r.amount_cents)}</td><td>${I.split.dup.includes(i) ? '<span class="sub">repetida</span>' : (I.sugg[i].source === 'rule' || I.sugg[i].source === 'account') ? cmChip(I.sugg[i].category) : '<span class="sub">por clasificar</span>'}</td></tr>`).join('')}
