@@ -658,6 +658,7 @@
       <nav class="dash-nav">
         <button class="dash-nav-btn active" data-tab="inicio" onclick="switchTab('inicio')">Inicio</button>
         <button class="dash-nav-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
+        <button class="dash-nav-btn" data-tab="libro" onclick="switchTab('libro')">📖 Libro de negocio</button>
         <button class="dash-nav-btn" data-tab="aseguradoras" id="navAseguradoras" onclick="switchTab('aseguradoras')">🏢 Aseguradoras</button>
         <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
         <button class="dash-nav-btn" data-tab="companias" id="navCompanias" onclick="switchTab('companias')" style="display:none;">Compañías</button>
@@ -1115,6 +1116,8 @@
           <div id="leadsPager" style="display:flex; align-items:center; margin-top:10px; flex-wrap:wrap;"></div>
         </div>
 
+        <div id="libroSlotInicio"></div>
+        <div id="libroWrap">
         <div class="dash-card" style="margin-top:20px;">
           <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
             <h4 style="margin:0;">📖 Libro de negocio</h4>
@@ -1178,7 +1181,7 @@
             <div>
               <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Total en primas</div>
               <div id="bon-total-primas" style="font-size:22px; font-weight:800; color:var(--navy);">$0.00</div>
-              <div class="sub" style="margin:2px 0 0;">Suma del depósito + mensualidades × término de cada póliza (campo "Prima" de la póliza), no el service fee cobrado.</div>
+              <div class="sub" style="margin:2px 0 0;">Lo que recibe la aseguradora: depósito + (término − 1) mensualidades. 1 mes = solo el depósito · 6 meses = depósito + 5 · 12 meses = depósito + 11. No incluye service fee ni processing fee.</div>
             </div>
           </div>
 
@@ -1189,6 +1192,75 @@
             </table>
           </div>
         </div>
+
+        <!-- Conversión de cotizaciones: de las cotizaciones guardadas en el rango, cuántas
+             se vendieron (client_quotes.sold), por producto. -->
+        <div class="dash-card" id="conversionCard" style="margin-top:20px;">
+          <h4 style="margin:0;">🎯 Conversión de cotizaciones</h4>
+          <p class="sub">De las cotizaciones que guardaste en el rango, cuántas terminaron en póliza vendida. Solo cuentan las cotizaciones guardadas con "Guardar como cotización" (o al registrar un lead con cotización); una póliza vendida sin cotización guardada no entra a este porcentaje.</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+            <button class="btn-ghost cv-range-btn" data-range="today" onclick="setConversionRange('today')" style="width:auto; padding:8px 16px;">Hoy</button>
+            <button class="btn-ghost cv-range-btn" data-range="5" onclick="setConversionRange('5')" style="width:auto; padding:8px 16px;">Últimos 5 días</button>
+            <button class="btn-ghost cv-range-btn" data-range="7" onclick="setConversionRange('7')" style="width:auto; padding:8px 16px;">Últimos 7 días</button>
+            <button class="btn-ghost cv-range-btn active" data-range="month" onclick="setConversionRange('month')" style="width:auto; padding:8px 16px;">Último mes</button>
+            <button class="btn-ghost cv-range-btn" data-range="year" onclick="setConversionRange('year')" style="width:auto; padding:8px 16px;">Último año</button>
+          </div>
+          <div class="form-row-2" style="margin-top:14px;">
+            <div class="form-row">
+              <label>Desde</label>
+              <input type="text" id="cv-desde" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); setConversionRangeCustom();">
+            </div>
+            <div class="form-row">
+              <label>Hasta</label>
+              <input type="text" id="cv-hasta" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); setConversionRangeCustom();">
+            </div>
+          </div>
+          <div class="form-row" style="max-width:260px; margin-top:4px;">
+            <label>Tipo</label>
+            <select id="cv-tipo" onchange="renderConversion()">
+              <option value="todos">Todos</option>
+              <option value="personal">Personal</option>
+              <option value="comercial">Comercial</option>
+            </select>
+          </div>
+
+          <div style="margin-top:6px; padding:16px 18px; background:#F7F9FC; border-radius:12px; display:flex; gap:28px; flex-wrap:wrap;">
+            <div>
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Cotizadas</div>
+              <div id="cv-total" style="font-size:22px; font-weight:800; color:var(--navy);">0</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Vendidas</div>
+              <div id="cv-sold" style="font-size:22px; font-weight:800; color:var(--navy);">0</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">% de cierre</div>
+              <div id="cv-pct" style="font-size:22px; font-weight:800; color:var(--navy);">—</div>
+            </div>
+            <div>
+              <div style="font-size:12px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.5px;">Cierras 1 de cada</div>
+              <div id="cv-ratio" style="font-size:22px; font-weight:800; color:var(--navy);">—</div>
+              <div class="sub" style="margin:2px 0 0;">cotizaciones</div>
+            </div>
+          </div>
+
+          <div class="dash-table-wrap">
+            <table class="dash-table">
+              <thead><tr><th>Producto</th><th>Tipo</th><th>Cotizadas</th><th>Vendidas</th><th>Sin vender</th><th>% de cierre</th><th>1 de cada</th></tr></thead>
+              <tbody id="cv-body"><tr><td colspan="7">Selecciona un rango.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <!-- TAB: LIBRO DE NEGOCIO — las tarjetas "Libro de negocio" y "Conversión" son las MISMAS
+           que se ven en Inicio: se mueven de un lugar a otro al cambiar de pestaña (así no hay
+           ids duplicados ni dos versiones que se desfasen). -->
+      <section class="dash-tab" id="tab-libro" style="display:none;">
+        <h2>📖 Libro de negocio</h2>
+        <p class="sub">Pólizas nuevas y primas del período, y qué tanto de lo que cotizas se está cerrando.</p>
+        <div id="libroSlotTab"></div>
       </section>
 
       <!-- TAB: CLIENTES -->
@@ -4052,6 +4124,16 @@
     document.querySelectorAll('.dash-tab').forEach(el => el.style.display = 'none');
     document.getElementById('tab-' + tab).style.display = 'block';
     document.querySelectorAll('.dash-nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+    placeLibroWrap(tab);
+  }
+
+  // Libro de negocio + Conversión viven en un solo bloque (#libroWrap) que se muestra en
+  // Inicio y también en su propia pestaña del menú: se mueve al lugar de la pestaña activa.
+  function placeLibroWrap(tab){
+    const wrap = document.getElementById('libroWrap');
+    if(!wrap) return;
+    const slot = document.getElementById(tab === 'libro' ? 'libroSlotTab' : 'libroSlotInicio');
+    if(slot && wrap.previousElementSibling !== slot) slot.insertAdjacentElement('afterend', wrap);
   }
 
   function toggleAddUser(){
@@ -4075,6 +4157,30 @@
     window.scrollTo(0, 0);
   }
 
+  // ===== PRIMA DE UNA PÓLIZA (regla de la administradora, 15 oct 2026) =====
+  // Prima = lo que la ASEGURADORA realmente recibe: el depósito (que cuenta como el
+  // primer pago) + las mensualidades restantes, o sea (término − 1) mensualidades.
+  // Ej.: 1 mes = solo el depósito · 6 meses = depósito + 5 pagos · 12 meses = depósito + 11.
+  // Pago en full = solo ese monto. NUNCA incluye service fee ni processing fee.
+  // Si no hay depósito pero sí mensualidad, se cuentan las `término` mensualidades.
+  // Si faltan datos para calcular, se usa el total_premium guardado (pólizas viejas).
+  // Se calcula al LEER (no solo al guardar) para que las pólizas ya existentes también
+  // queden corregidas sin tener que migrar la base de datos.
+  function calcPolicyPremium(deposit, monthly, termMonths, fallback){
+    const dep = Number(deposit) || 0, mon = Number(monthly) || 0, term = parseInt(termMonths, 10) || 0;
+    const r2 = n => Math.round(n * 100) / 100;
+    if(mon > 0){
+      if(term <= 0) return r2(Number(fallback) || 0);
+      return r2(dep > 0 ? dep + mon * Math.max(0, term - 1) : mon * term);
+    }
+    if(dep > 0) return r2(dep);
+    return r2(Number(fallback) || 0);
+  }
+  function policyPremium(p){
+    if(!p) return 0;
+    return calcPolicyPremium(p.deposit_amount, p.monthly_payment, p.term_months, p.total_premium);
+  }
+
   // Suma la "prima" (depósito + mensualidades × término) de las pólizas
   // activas de un agente, dentro de un rango de fechas opcional — misma
   // fórmula que se usa al crear la póliza (ver guardarNuevaPolizaTotalPremium
@@ -4083,14 +4189,14 @@
   // de control.
   async function sumAgentPremium(agentId, desdeISO, hastaISO){
     let query = sb.from('client_policies')
-      .select('total_premium, status, created_by, created_at')
+      .select('total_premium, deposit_amount, monthly_payment, term_months, status, created_by, created_at')
       .eq('created_by', agentId)
       .neq('status', 'cancelled');
     if(desdeISO) query = query.gte('created_at', desdeISO);
     if(hastaISO) query = query.lte('created_at', hastaISO);
     const { data, error } = await query;
     if(error) return 0;
-    return (data || []).reduce((sum, p) => sum + (Number(p.total_premium) || 0), 0);
+    return (data || []).reduce((sum, p) => sum + policyPremium(p), 0);
   }
 
   async function loadMiContrato(){
@@ -4147,7 +4253,7 @@
     const agentes = agentProfiles || [];
     if(agentes.length === 0){ card.style.display = 'none'; return; }
 
-    const { data: allPolicies } = await sb.from('client_policies').select('id, insurance_type, status, created_by, created_at, total_premium');
+    const { data: allPolicies } = await sb.from('client_policies').select('id, insurance_type, status, created_by, created_at, total_premium, deposit_amount, monthly_payment, term_months');
     const policies = allPolicies || [];
 
     const cumplieronComision = [];
@@ -4162,7 +4268,7 @@
           p.status !== 'cancelled' &&
           (p.created_at || '').slice(0, 10) >= hireISO &&
           (p.created_at || '').slice(0, 10) <= windowEnd
-        ).reduce((sum, p) => sum + (Number(p.total_premium) || 0), 0);
+        ).reduce((sum, p) => sum + policyPremium(p), 0);
         if(total >= 60000){
           cumplieronComision.push({ ...a, total });
         }
@@ -4595,6 +4701,7 @@
     await safeLoad(loadAutoChargeAlerts, 'Cobros automáticos Venture');
     await safeLoad(loadLeads, 'Leads');
     await safeLoad(() => setBookOfBusinessRange('today'), 'Libro de negocio');
+    await safeLoad(() => setConversionRange('month'), 'Conversión de cotizaciones');
     await safeLoad(loadUnderwriting, 'Underwriting');
     await safeLoad(loadResources, 'Recursos');
     startRealtime();
@@ -4784,6 +4891,12 @@
       if(has('client_alerts')) await q(loadDashboardFollowups, 'Recordatorios de seguimiento');
       if(has('client_auto_charges')) await q(loadAutoChargeAlerts, 'Cobros automáticos Venture');
       if(has('clients', 'client_policies')) await q(loadLeads, 'Leads');
+    }
+
+    // 2b) Libro de negocio y Conversión (viven en Inicio y en su propia pestaña).
+    if(isTabVisible('tab-inicio') || isTabVisible('tab-libro')){
+      if(has('client_policies')) await q(refreshBookOfBusinessQuiet, 'Libro de negocio');
+      if(has('client_quotes', 'client_policies')) await q(refreshConversionQuiet, 'Conversión de cotizaciones');
     }
 
     // 3) Perfil de cliente abierto: solo si el cambio es de ESE cliente
@@ -5754,7 +5867,7 @@
         term_months: polTerminoMeses || null,
         monthly_payment: polPagoMensual,
         deposit_amount: polDeposito || null,
-        total_premium: polDeposito + (polPagoMensual * polTerminoMeses),
+        total_premium: calcPolicyPremium(polDeposito, polPagoMensual, polTerminoMeses),
         notes: polNotas || null,
         created_by: session.user.id
       };
@@ -6357,7 +6470,7 @@
     if((epPagoRaw !== '' || epDepositoRaw !== '') && epTerminoMeses){
       const epPagoMensual = epPagoRaw !== '' ? (parseFloat(epPagoRaw) || 0) : 0;
       const epDeposito = epDepositoRaw !== '' ? (parseFloat(epDepositoRaw) || 0) : 0;
-      payload.total_premium = epDeposito + (epPagoMensual * epTerminoMeses);
+      payload.total_premium = calcPolicyPremium(epDeposito, epPagoMensual, epTerminoMeses);
     }
     const { error } = await sb.from('client_policies').update(payload).eq('id', id);
     if(error){
@@ -6668,7 +6781,7 @@
         monthly_payment: ecPagoMensual,
         deposit_amount: ecDeposito || null,
         term_months: ecTerminoMeses,
-        total_premium: ecDeposito + (ecPagoMensual * ecTerminoMeses),
+        total_premium: calcPolicyPremium(ecDeposito, ecPagoMensual, ecTerminoMeses),
         effective_date: efectivaISO,
         created_by: session.user.id
       });
@@ -8641,9 +8754,10 @@
       const txModalidadPago = document.querySelector('input[name="tx-modalidad-pago"]:checked')?.value;
       const txCargoVal = parseFloat(document.getElementById('tx-cargo').value) || 0;
       const txPagoMensualVal = parseFloat(document.getElementById('tx-pago-mensual').value) || 0;
+      // Pago en full = solo ese monto; mensual = depósito + (término − 1) mensualidades.
       const totalPremiumCalc = txModalidadPago === 'mensual'
-        ? (txCargoVal + txPagoMensualVal * txTermMonths)
-        : txCargoVal;
+        ? calcPolicyPremium(txCargoVal, txPagoMensualVal, txTermMonths)
+        : calcPolicyPremium(txCargoVal, 0, txTermMonths);
 
       const { data: newPolicy, error: polError } = await sb.from('client_policies').insert({
         client_id: currentClientId,
@@ -11539,7 +11653,7 @@
 
     // Resumen: cuántas pólizas y cuánto suman de prima (client_policies.total_premium)
     // dentro del rango de fechas y filtro de producto/tipo actuales.
-    const totalPrimas = filtered.reduce((sum, p) => sum + Number(p.total_premium || 0), 0);
+    const totalPrimas = filtered.reduce((sum, p) => sum + policyPremium(p), 0);
     const countEl = document.getElementById('bon-total-count');
     const primasEl = document.getElementById('bon-total-primas');
     if(countEl) countEl.textContent = String(filtered.length);
@@ -11552,7 +11666,7 @@
     tbody.innerHTML = filtered.map(p => {
       const prod = allProducts.find(x => x.name === p.insurance_type);
       const cat = prod ? (prod.category || 'personal') : 'personal';
-      const prima = Number(p.total_premium || 0);
+      const prima = policyPremium(p);
       return `
         <tr style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')">
           <td>${formatDateUS(p.created_at?.split('T')[0])}</td>
@@ -11566,6 +11680,108 @@
       `;
     }).join('');
   }
+
+  // ---- Conversión de cotizaciones ----
+  // Cohorte: cotizaciones GUARDADAS cuya fecha (quote_date, o la de creación si no
+  // tiene) cae en el rango; "vendida" = client_quotes.sold (se marca al vender la
+  // cotización desde Nueva Transacción). Se agrupa por producto.
+  let conversionRows = [];
+
+  function conversionRangeDates(rangeKey){
+    const hoy = new Date();
+    const desde = new Date();
+    if(rangeKey === '5') desde.setDate(hoy.getDate() - 4);
+    else if(rangeKey === '7') desde.setDate(hoy.getDate() - 6);
+    else if(rangeKey === 'month') desde.setMonth(hoy.getMonth() - 1);
+    else if(rangeKey === 'year') desde.setFullYear(hoy.getFullYear() - 1);
+    return { desdeISO: toISODateLocal(desde), hastaISO: toISODateLocal(hoy) };
+  }
+
+  function setConversionRange(rangeKey){
+    document.querySelectorAll('.cv-range-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.range === rangeKey));
+    const { desdeISO, hastaISO } = conversionRangeDates(rangeKey);
+    document.getElementById('cv-desde').value = isoToMMDDYYYYDisplay(desdeISO);
+    document.getElementById('cv-hasta').value = isoToMMDDYYYYDisplay(hastaISO);
+    fetchConversion(desdeISO, hastaISO);
+  }
+
+  function setConversionRangeCustom(){
+    const desdeISO = mmddyyyyToISO(document.getElementById('cv-desde').value);
+    const hastaISO = mmddyyyyToISO(document.getElementById('cv-hasta').value);
+    if(!desdeISO || !hastaISO) return;
+    document.querySelectorAll('.cv-range-btn').forEach(btn => btn.classList.remove('active'));
+    fetchConversion(desdeISO, hastaISO);
+  }
+
+  function refreshConversionQuiet(){
+    const active = document.querySelector('.cv-range-btn.active');
+    if(active) setConversionRange(active.dataset.range); else setConversionRangeCustom();
+  }
+
+  async function fetchConversion(desdeISO, hastaISO){
+    const cols = 'id, client_id, product, company_name, quote_date, created_at, sold, sold_policy_id, created_by';
+    const startTs = new Date(desdeISO + 'T00:00:00').toISOString();
+    const endTs = new Date(hastaISO + 'T23:59:59.999').toISOString();
+    // Dos consultas: (a) con fecha de cotización dentro del rango, (b) sin fecha de cotización
+    // pero creadas dentro del rango.
+    const [a, b] = await Promise.all([
+      sb.from('client_quotes').select(cols).gte('quote_date', desdeISO).lte('quote_date', hastaISO).limit(5000),
+      sb.from('client_quotes').select(cols).is('quote_date', null).gte('created_at', startTs).lte('created_at', endTs).limit(5000)
+    ]);
+    const seen = new Set(); const rows = [];
+    [(a.data || []), (b.data || [])].forEach(list => list.forEach(r => { if(!seen.has(r.id)){ seen.add(r.id); rows.push(r); } }));
+    conversionRows = (a.error && b.error) ? [] : rows;
+    renderConversion();
+  }
+
+  // Cálculo puro (se prueba aparte): agrupa por producto.
+  function computeConversion(rows, tipo, categoryOf){
+    const byProd = {};
+    rows.forEach(r => {
+      const name = r.product || 'Sin producto';
+      const cat = categoryOf(name);
+      if(tipo !== 'todos' && cat !== tipo) return;
+      const g = byProd[name] || (byProd[name] = { product: name, category: cat, total: 0, sold: 0 });
+      g.total++;
+      if(r.sold) g.sold++;
+    });
+    const list = Object.values(byProd).sort((x, y) => y.total - x.total || x.product.localeCompare(y.product));
+    const total = list.reduce((n, g) => n + g.total, 0), sold = list.reduce((n, g) => n + g.sold, 0);
+    return { list, total, sold };
+  }
+
+  function renderConversion(){
+    const tbody = document.getElementById('cv-body');
+    if(!tbody) return;
+    const tipo = document.getElementById('cv-tipo').value;
+    const categoryOf = name => { const prod = allProducts.find(x => x.name === name); return prod ? (prod.category || 'personal') : 'personal'; };
+    const { list, total, sold } = computeConversion(conversionRows, tipo, categoryOf);
+    const pct = (a, b) => b > 0 ? (Math.round((a / b) * 1000) / 10).toFixed(1) + '%' : '—';
+    const ratio = (a, b) => a > 0 ? (Math.round((b / a) * 10) / 10).toString() : '—';
+    document.getElementById('cv-total').textContent = String(total);
+    document.getElementById('cv-sold').textContent = String(sold);
+    document.getElementById('cv-pct').textContent = pct(sold, total);
+    document.getElementById('cv-ratio').textContent = ratio(sold, total);
+    if(list.length === 0){
+      tbody.innerHTML = '<tr><td colspan="7">No hay cotizaciones guardadas en este rango.</td></tr>';
+      return;
+    }
+    const row = g => {
+      const p = g.total > 0 ? Math.round((g.sold / g.total) * 100) : 0;
+      return `<tr>
+        <td>${INSURANCE_TYPE_LABELS[g.product] || g.product}</td>
+        <td><span class="badge ${g.category === 'comercial' ? 'purple' : 'blue'}">${g.category === 'comercial' ? 'Comercial' : 'Personal'}</span></td>
+        <td>${g.total}</td>
+        <td>${g.sold}</td>
+        <td>${g.total - g.sold}</td>
+        <td><div style="display:flex; align-items:center; gap:8px; min-width:120px;"><div style="flex:1; height:8px; background:#E6ECF5; border-radius:4px; overflow:hidden;"><div style="width:${p}%; height:100%; background:var(--blue);"></div></div><strong>${pct(g.sold, g.total)}</strong></div></td>
+        <td>${ratio(g.sold, g.total)}</td>
+      </tr>`;
+    };
+    tbody.innerHTML = list.map(row).join('') +
+      `<tr style="font-weight:800; background:#F7F9FC;"><td colspan="2">Total</td><td>${total}</td><td>${sold}</td><td>${total - sold}</td><td>${pct(sold, total)}</td><td>${ratio(sold, total)}</td></tr>`;
+  }
+
   // =================== FIN CLIENTES ===================
 
   // ===================== SERVICE FEES (solo super_admin) =====================
