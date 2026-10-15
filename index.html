@@ -1197,7 +1197,7 @@
              se vendieron (client_quotes.sold), por producto. -->
         <div class="dash-card" id="conversionCard" style="margin-top:20px;">
           <h4 style="margin:0;">🎯 Conversión de cotizaciones</h4>
-          <p class="sub">De las cotizaciones que guardaste en el rango, cuántas terminaron en póliza vendida. Solo cuentan las cotizaciones guardadas con "Guardar como cotización" (o al registrar un lead con cotización); una póliza vendida sin cotización guardada no entra a este porcentaje.</p>
+          <p class="sub">De las cotizaciones a las que se les puso precio (mensualidad, depósito o total) en el rango, cuántas terminaron en póliza vendida. Los leads o solicitudes de la página web que nadie ha cotizado (sin precio) no cuentan, y una póliza vendida sin cotización guardada tampoco entra a este porcentaje.</p>
           <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
             <button class="btn-ghost cv-range-btn" data-range="today" onclick="setConversionRange('today')" style="width:auto; padding:8px 16px;">Hoy</button>
             <button class="btn-ghost cv-range-btn" data-range="5" onclick="setConversionRange('5')" style="width:auto; padding:8px 16px;">Últimos 5 días</button>
@@ -1215,14 +1215,32 @@
               <input type="text" id="cv-hasta" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); setConversionRangeCustom();">
             </div>
           </div>
-          <div class="form-row" style="max-width:260px; margin-top:4px;">
-            <label>Tipo</label>
-            <select id="cv-tipo" onchange="renderConversion()">
-              <option value="todos">Todos</option>
-              <option value="personal">Personal</option>
-              <option value="comercial">Comercial</option>
-            </select>
+          <div class="form-row-2" style="margin-top:4px;">
+            <div class="form-row">
+              <label>Tipo</label>
+              <select id="cv-tipo" onchange="renderConversion()">
+                <option value="todos">Todos</option>
+                <option value="personal">Personal</option>
+                <option value="comercial">Comercial</option>
+              </select>
+            </div>
+            <!-- Producto(s): casillas con TODOS los productos del catálogo (más cualquier otro que
+                 aparezca en las cotizaciones), con cuántas cotizaciones tiene cada uno. -->
+            <div class="form-row" style="position:relative;">
+              <label>Producto(s)</label>
+              <button type="button" class="btn-ghost" id="cv-prod-toggle-btn" style="width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; gap:8px;" onclick="toggleCvProductDropdown(event)">
+                <span id="cv-prod-summary">Todos los productos</span>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <div id="cv-prod-dropdown" onclick="event.stopPropagation()" style="display:none; position:absolute; top:100%; left:0; z-index:30; background:#fff; border:1.5px solid var(--line); border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.12); padding:10px 12px; min-width:280px; max-height:340px; overflow-y:auto;">
+                <label style="display:flex; align-items:center; gap:6px; font-weight:700; cursor:pointer; padding:4px 0 8px; border-bottom:1px solid var(--line); margin-bottom:8px;">
+                  <input type="checkbox" id="cv-prod-todos" checked onchange="onCvProductoTodosChange()"> Todos los productos
+                </label>
+                <div id="cv-prod-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+              </div>
+            </div>
           </div>
+          <div id="cv-nopr-note" class="sub" style="margin:0 0 4px;"></div>
 
           <div style="margin-top:6px; padding:16px 18px; background:#F7F9FC; border-radius:12px; display:flex; gap:28px; flex-wrap:wrap;">
             <div>
@@ -11682,10 +11700,13 @@
   }
 
   // ---- Conversión de cotizaciones ----
-  // Cohorte: cotizaciones GUARDADAS cuya fecha (quote_date, o la de creación si no
-  // tiene) cae en el rango; "vendida" = client_quotes.sold (se marca al vender la
-  // cotización desde Nueva Transacción). Se agrupa por producto.
+  // Cohorte: cotizaciones GUARDADAS y CON PRECIO (mensualidad, depósito o total de referencia
+  // mayor a 0) cuya fecha (quote_date, o la de creación si no tiene) cae en el rango;
+  // "vendida" = client_quotes.sold (se marca al vender la cotización desde Nueva Transacción).
+  // Los leads / solicitudes del formulario de la página web NO tienen precio hasta que alguien
+  // los cotiza, así que no cuentan (así no se mezclan "vida" o "salud" que nadie cotizó).
   let conversionRows = [];
+  let cvSelected = null;          // null = todos los productos; Set = solo esos
 
   function conversionRangeDates(rangeKey){
     const hoy = new Date();
@@ -11719,7 +11740,7 @@
   }
 
   async function fetchConversion(desdeISO, hastaISO){
-    const cols = 'id, client_id, product, company_name, quote_date, created_at, sold, sold_policy_id, created_by';
+    const cols = 'id, client_id, product, company_name, quote_date, created_at, sold, sold_policy_id, created_by, monthly_payment, deposit_amount, service_fee_amount, total_reference';
     const startTs = new Date(desdeISO + 'T00:00:00').toISOString();
     const endTs = new Date(hastaISO + 'T23:59:59.999').toISOString();
     // Dos consultas: (a) con fecha de cotización dentro del rango, (b) sin fecha de cotización
@@ -11734,36 +11755,127 @@
     renderConversion();
   }
 
-  // Cálculo puro (se prueba aparte): agrupa por producto.
-  function computeConversion(rows, tipo, categoryOf){
-    const byProd = {};
+  // ¿A la cotización se le puso precio? (mensualidad, depósito o total de referencia > 0)
+  function isPricedQuote(r){
+    return (Number(r.monthly_payment) > 0) || (Number(r.deposit_amount) > 0) || (Number(r.total_reference) > 0);
+  }
+
+  // Cálculo puro (se prueba aparte). opts: { tipo, products (Set|null), categoryOf }
+  function conversionPasses(r, opts, ignoreProducts){
+    const name = r.product || 'Sin producto';
+    const tipo = opts.tipo || 'todos';
+    if(tipo !== 'todos' && (opts.categoryOf ? opts.categoryOf(name) : 'personal') !== tipo) return false;
+    if(!ignoreProducts && opts.products && !opts.products.has(name)) return false;
+    return true;
+  }
+
+  function computeConversion(rows, opts){
+    opts = opts || {};
+    const categoryOf = opts.categoryOf || (() => 'personal');
+    const byProd = {}; let unpriced = 0;
     rows.forEach(r => {
+      if(!conversionPasses(r, opts, false)) return;
+      if(!isPricedQuote(r)){ unpriced++; return; }
       const name = r.product || 'Sin producto';
-      const cat = categoryOf(name);
-      if(tipo !== 'todos' && cat !== tipo) return;
-      const g = byProd[name] || (byProd[name] = { product: name, category: cat, total: 0, sold: 0 });
+      const g = byProd[name] || (byProd[name] = { product: name, category: categoryOf(name), total: 0, sold: 0 });
       g.total++;
       if(r.sold) g.sold++;
     });
     const list = Object.values(byProd).sort((x, y) => y.total - x.total || x.product.localeCompare(y.product));
     const total = list.reduce((n, g) => n + g.total, 0), sold = list.reduce((n, g) => n + g.sold, 0);
-    return { list, total, sold };
+    return { list, total, sold, unpriced };
+  }
+
+  function conversionProductCounts(rows, opts){
+    const counts = {};
+    rows.forEach(r => { if(isPricedQuote(r) && conversionPasses(r, opts, true)){ const name = r.product || 'Sin producto'; counts[name] = (counts[name] || 0) + 1; } });
+    return counts;
+  }
+
+  function cvOpts(){
+    const categoryOf = name => { const prod = allProducts.find(x => x.name === name); return prod ? (prod.category || 'personal') : 'personal'; };
+    return { tipo: document.getElementById('cv-tipo').value, products: cvSelected, categoryOf };
+  }
+
+  // Casillas de producto: TODOS los activos del catálogo + cualquier otro producto que
+  // aparezca en las cotizaciones con precio del rango (aunque ya no esté en el catálogo).
+  function renderCvProductChecklist(){
+    const box = document.getElementById('cv-prod-list');
+    if(!box) return;
+    const counts = conversionProductCounts(conversionRows, cvOpts());
+    const names = new Set(allProducts.filter(p => p.active !== false).map(p => p.name));
+    conversionRows.forEach(r => { if(isPricedQuote(r)) names.add(r.product || 'Sin producto'); });
+    const label = n => INSURANCE_TYPE_LABELS[n] || n;
+    const list = Array.from(names).sort((x, y) => label(x).localeCompare(label(y)));
+    box.innerHTML = list.map(n => `
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13.5px;">
+        <input type="checkbox" class="cv-prod-item" value="${String(n).replace(/"/g, '&quot;')}" ${(cvSelected === null || cvSelected.has(n)) ? 'checked' : ''} onchange="onCvProductoItemChange()">
+        <span style="flex:1;">${label(n)}</span><span class="sub" style="margin:0;">${counts[n] || 0}</span>
+      </label>
+    `).join('');
+    updateCvProductSummary();
+  }
+
+  let cvProductDropdownOpen = false;
+  function toggleCvProductDropdown(evt){
+    evt.stopPropagation();
+    cvProductDropdownOpen = !cvProductDropdownOpen;
+    document.getElementById('cv-prod-dropdown').style.display = cvProductDropdownOpen ? 'block' : 'none';
+  }
+  document.addEventListener('click', function(){
+    if(cvProductDropdownOpen){
+      const dd = document.getElementById('cv-prod-dropdown');
+      if(dd) dd.style.display = 'none';
+      cvProductDropdownOpen = false;
+    }
+  });
+
+  function updateCvProductSummary(){
+    const summary = document.getElementById('cv-prod-summary');
+    if(!summary) return;
+    if(cvSelected === null){ summary.textContent = 'Todos los productos'; return; }
+    const names = Array.from(cvSelected).map(n => INSURANCE_TYPE_LABELS[n] || n);
+    if(names.length === 0) summary.textContent = 'Ningún producto seleccionado';
+    else if(names.length <= 2) summary.textContent = names.join(', ');
+    else summary.textContent = names.length + ' productos seleccionados';
+  }
+
+  function onCvProductoTodosChange(){
+    const all = document.getElementById('cv-prod-todos').checked;
+    cvSelected = all ? null : new Set();
+    document.querySelectorAll('.cv-prod-item').forEach(cb => { cb.checked = all; });
+    updateCvProductSummary();
+    renderConversion();
+  }
+
+  function onCvProductoItemChange(){
+    const items = Array.from(document.querySelectorAll('.cv-prod-item'));
+    const checked = items.filter(cb => cb.checked).map(cb => cb.value);
+    const allChecked = items.length > 0 && checked.length === items.length;
+    document.getElementById('cv-prod-todos').checked = allChecked;
+    cvSelected = allChecked ? null : new Set(checked);
+    updateCvProductSummary();
+    renderConversion();
   }
 
   function renderConversion(){
     const tbody = document.getElementById('cv-body');
     if(!tbody) return;
-    const tipo = document.getElementById('cv-tipo').value;
-    const categoryOf = name => { const prod = allProducts.find(x => x.name === name); return prod ? (prod.category || 'personal') : 'personal'; };
-    const { list, total, sold } = computeConversion(conversionRows, tipo, categoryOf);
+    const opts = cvOpts();
+    const { list, total, sold, unpriced } = computeConversion(conversionRows, opts);
     const pct = (a, b) => b > 0 ? (Math.round((a / b) * 1000) / 10).toFixed(1) + '%' : '—';
     const ratio = (a, b) => a > 0 ? (Math.round((b / a) * 10) / 10).toString() : '—';
     document.getElementById('cv-total').textContent = String(total);
     document.getElementById('cv-sold').textContent = String(sold);
     document.getElementById('cv-pct').textContent = pct(sold, total);
     document.getElementById('cv-ratio').textContent = ratio(sold, total);
+    const note = document.getElementById('cv-nopr-note');
+    if(note) note.textContent = unpriced > 0
+      ? unpriced + (unpriced === 1 ? ' cotización sin precio no se cuenta' : ' cotizaciones sin precio no se cuentan') + ' (leads o solicitudes que nadie ha cotizado todavía).'
+      : '';
+    renderCvProductChecklist();
     if(list.length === 0){
-      tbody.innerHTML = '<tr><td colspan="7">No hay cotizaciones guardadas en este rango.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7">No hay cotizaciones con precio en este rango/filtro.</td></tr>';
       return;
     }
     const row = g => {
