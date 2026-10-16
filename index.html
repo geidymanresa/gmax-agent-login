@@ -14016,7 +14016,7 @@ function cmIsManual(t){ return !!(t.classified_at || t.rule_id || t.note === 'ma
 // Clasificación EFECTIVA: lo manual se respeta; todo lo demás se calcula en vivo con las reglas guardadas, el texto del banco y
 // el tipo de cuenta. Así lo importado con versiones anteriores (todo gasto / todo sin clasificar) se corrige solo.
 function cmEffective(t, rules, account){
-  if(t.category && t.category !== 'unclassified' && cmIsManual(t)) return { category: t.category, payer: t.payer || null, auto: false, source: 'manual' };
+  if(t.category && t.category !== 'unclassified' && cmIsManual(t) && cmCategoryAllowed(Number(t.amount_cents), t.category)) return { category: t.category, payer: t.payer || null, auto: false, source: 'manual' };
   const s = cmSuggest(t, rules, account);
   if(s.source !== 'none') return { category: s.category, payer: s.payer, auto: true, source: s.source };
   return { category: 'unclassified', payer: null, auto: false, source: 'none' };
@@ -14042,6 +14042,31 @@ function cmSignCheck(rows){
   const normal = Math.max(score(1, true), score(1, false)), inverted = Math.max(score(-1, true), score(-1, false));
   const verdict = inverted >= 2 && inverted > normal * 2 ? 'inverted' : normal >= 2 && normal > inverted * 2 ? 'ok' : 'unknown';
   return { normal, inverted, verdict };
+}
+
+// Segunda comprobación de signos, sin necesitar el saldo: el TEXTO del banco dice hacia dónde va el dinero.
+// "Transfer from…", PAYROLL, ACH COMMIS, intereses → entradas. "Transfer to…", compras con tarjeta (…, CIUDAD, ST), Apple, Zoho… → salidas.
+const CM_IN_TEXT = /^\s*transfer\s+from\b|payroll|ach\s+commis|edi\s+pymnt|interest\s+earned|^\s*rbt-/i;
+const CM_OUT_TEXT = /^\s*transfer\s+to\b|apple\.com|\bpurchase\b|checkbook|facebk|zoho|ipostal|supabase|starbucks|name-?cheap|thinkific|\bpos\b|,\s*[A-Za-z][A-Za-z .]+,\s*[A-Z]{2,3}\s*$/i;
+function cmSignAudit(rows){
+  let agree = 0, contradict = 0;
+  (rows || []).forEach(r => {
+    const d = String(r.description || ''), a = Number(r.amount_cents);
+    const inn = CM_IN_TEXT.test(d), out = !inn && CM_OUT_TEXT.test(d);
+    if(!inn && !out) return;
+    if((inn && a > 0) || (out && a < 0)) agree++; else contradict++;
+  });
+  const strong = agree + contradict;
+  const verdict = strong >= 4 && contradict / strong >= 0.85 ? 'inverted' : strong >= 4 && agree / strong >= 0.85 ? 'ok' : 'unknown';
+  return { agree, contradict, strong, verdict };
+}
+// Veredicto combinado (saldo corriente + texto). Si cualquiera dice "al revés" y ninguno dice "bien", es al revés.
+function cmSignVerdict(rows){
+  const a = cmSignCheck(rows), b = cmSignAudit(rows);
+  if(a.verdict === 'inverted' && b.verdict !== 'ok') return 'inverted';
+  if(b.verdict === 'inverted' && a.verdict !== 'ok') return 'inverted';
+  if(a.verdict === 'ok' || b.verdict === 'ok') return 'ok';
+  return 'unknown';
 }
 
 // ---------- Fechas ----------
@@ -14163,7 +14188,16 @@ async function cmLoad(){
 }
 // CM.raw = tal como está en la base; CM.txns = con la clasificación EFECTIVA (lo manual manda; lo demás se calcula en vivo).
 function cmRebuild(){
-  CM.txns = (CM.raw || []).map(t => { const e = cmEffective(t, CM.rules, cmAccount(t.account_id)); return Object.assign({}, t, { category: e.category, payer: e.payer, auto: e.auto, source: e.source, raw_category: t.category }); });
+  // Si una importación quedó con los signos al revés (se detecta por el texto del banco), se corrige EN PANTALLA para que los totales sean los reales.
+  const byImp = {}; (CM.raw || []).forEach(t => { (byImp[t.import_id || '-'] = byImp[t.import_id || '-'] || []).push(t); });
+  CM.flipped = {};
+  Object.keys(byImp).forEach(id => { if(cmSignAudit(byImp[id]).verdict === 'inverted') CM.flipped[id] = true; });
+  CM.txns = (CM.raw || []).map(t => {
+    const flip = !!CM.flipped[t.import_id || '-'];
+    const base = flip ? Object.assign({}, t, { amount_cents: -Number(t.amount_cents) }) : t;
+    const e = cmEffective(base, CM.rules, cmAccount(t.account_id));
+    return Object.assign({}, base, { category: e.category, payer: e.payer, auto: e.auto, source: e.source, raw_category: t.category, flipped: flip, raw_amount: t.amount_cents });
+  });
 }
 async function cmOpen(){
   if(!isSuperAdminUser()) return;
@@ -14209,7 +14243,9 @@ function cmRender(){
   if(!CM.loaded){ body.innerHTML = '<p class="sub">Cargando…</p>'; if(nav) nav.innerHTML = ''; return; }
   const pend = CM.txns.filter(t => t.category === 'unclassified' && (!CM.accountId || t.account_id === CM.accountId)).length;
   nav.innerHTML = CM_VIEWS.map(([k, l]) => `<button type="button" class="tr-pill ${CM.view === k ? 'active' : ''}" onclick="cmSetView('${k}')">${l}${k === 'pendientes' && pend ? ` <span class="tr-badge">${pend}</span>` : ''}</button>`).join('');
-  body.innerHTML = CM.view === 'pendientes' ? cmHtmlPend() : CM.view === 'movimientos' ? cmHtmlMov() : CM.view === 'config' ? cmHtmlConfig() : cmHtmlResumen();
+  const nf = Object.keys(CM.flipped || {}).length;
+  const flipBanner = nf ? `<div class="msg error" id="cm-flip-banner" style="display:block; margin:10px 0;">${nf} archivo(s) importado(s) tenían los signos al revés (entradas como salidas). Los corregí en pantalla para que los totales sean los reales, pero en la base siguen al revés: ve a «Cuentas y reglas → Archivos importados», pulsa «Anular» en esos archivos y vuelve a subirlos.</div>` : '';
+  body.innerHTML = flipBanner + (CM.view === 'pendientes' ? cmHtmlPend() : CM.view === 'movimientos' ? cmHtmlMov() : CM.view === 'config' ? cmHtmlConfig() : cmHtmlResumen());
 }
 function cmFig(label, num, sub, extra){ return `<div class="tr-fig"><div class="label">${label}</div><div class="num" ${extra || ''}>${num}</div><div class="sub">${sub || ''}</div></div>`; }
 function cmHtmlResumen(){
@@ -14323,6 +14359,7 @@ async function cmSaveClassify(){
   if(category === 'commission' && !payer && !window.confirm('No escribiste la compañía. Esas comisiones aparecerán como «Sin compañía asignada». ¿Continuar?')) return false;
   if(remember && !cmNormalizeKey(key)) throw new Error('Para recordar la regla escribe una o más palabras que identifiquen al pagador (sin números).');
   let ids = o.ids.slice();
+  if(ids.some(id => { const t = CM.txns.find(x => x.id === id); return t && t.flipped; })) throw new Error('Esta importación tiene los signos al revés en la base. Anúlala (Cuentas y reglas → Archivos importados) y vuelve a importar el archivo.');
   const sim = document.getElementById('cmc-similar');
   if(sim && sim.checked && key) ids = Array.from(new Set(ids.concat(cmFindSimilar(CM.txns, key, o.sign).map(t => t.id))));
   await cmApplyClassification({ ids, category, payer, rememberKey: remember ? key : null, audit: 'classify' });
@@ -14394,7 +14431,7 @@ function cmHtmlConfig(){
       </tbody></table></div></div>
     <div class="dash-card"><h3 style="margin:0 0 4px;">Archivos importados</h3><p class="sub">Si subiste un archivo equivocado (cuenta incorrecta, signos al revés…), pulsa «Anular»: se borran solo los movimientos de ese archivo y puedes volver a subirlo. Queda registro.</p>
       <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Fecha</th><th>Cuenta</th><th>Archivo</th><th style="text-align:right;">Filas</th><th style="text-align:right;">Nuevas</th><th style="text-align:right;">Repetidas</th><th></th></tr></thead><tbody>
-      ${CM.imports.slice(0, 50).map(i => `<tr><td>${formatDateUS(String(i.imported_at).slice(0, 10))}</td><td>${trE(cmAccName(i.account_id))}</td><td>${trE(i.file_name || '')}</td><td style="text-align:right;">${i.row_count}</td><td style="text-align:right;">${i.new_count}</td><td style="text-align:right;">${i.duplicate_count}</td><td><button type="button" class="btn-ghost" style="width:auto; padding:4px 12px;" onclick="cmVoidImport('${trE(i.id)}')">Anular</button></td></tr>`).join('') || '<tr><td colspan="7">Aún no hay archivos importados.</td></tr>'}
+      ${CM.imports.slice(0, 50).map(i => `<tr><td>${formatDateUS(String(i.imported_at).slice(0, 10))}</td><td>${trE(cmAccName(i.account_id))}</td><td>${trE(i.file_name || '')}${CM.flipped && CM.flipped[i.id] ? ' <span class="tr-chip tr-chip-red">signos al revés</span>' : ''}</td><td style="text-align:right;">${i.row_count}</td><td style="text-align:right;">${i.new_count}</td><td style="text-align:right;">${i.duplicate_count}</td><td><button type="button" class="btn-ghost" style="width:auto; padding:4px 12px;" onclick="cmVoidImport('${trE(i.id)}')">Anular</button></td></tr>`).join('') || '<tr><td colspan="7">Aún no hay archivos importados.</td></tr>'}
       </tbody></table></div></div>`;
 }
 function cmVoidImport(id){
@@ -14464,28 +14501,30 @@ async function cmImportFileChosen(ev){
   const f = ev.target.files && ev.target.files[0]; if(!f) return;
   const text = await f.text(); const rows = trParseCSV(text);
   if(rows.length < 2){ document.getElementById('cmi-preview').innerHTML = '<div class="msg error" style="display:block;">El archivo no tiene filas.</div>'; return; }
-  CM.imp = { name: f.name, rows, hash: await trSha256Hex(text), mapping: trDetectColumns(rows[0]), invert: false, autoInverted: false };
-  const m0 = CM.imp.mapping;
-  if(m0.amount >= 0 && m0.balance >= 0 && cmSignCheck(trBuildBankRows(rows, { date: m0.date, description: m0.description, amount: m0.amount, balance: m0.balance }, {}).rows).verdict === 'inverted'){ CM.imp.invert = true; CM.imp.autoInverted = true; }
+  CM.imp = { name: f.name, rows, hash: await trSha256Hex(text), mapping: trDetectColumns(rows[0]), invert: false, locked: false, autoInverted: false };
   cmImportRenderPreview();
 }
 function cmImportRenderPreview(){
   const I = CM.imp; const el = document.getElementById('cmi-preview'); if(!el || !I) return;
   const head = I.rows[0]; const m = I.mapping;
   const opts = (sel, withNone) => (withNone ? '<option value="-1">— ninguna —</option>' : '') + head.map((h, i) => `<option value="${i}" ${sel === i ? 'selected' : ''}>${trE(h || 'columna ' + (i + 1))}</option>`).join('');
-  const built = trBuildBankRows(I.rows, m.amount >= 0 ? { date: m.date, description: m.description, amount: m.amount, balance: m.balance } : { date: m.date, description: m.description, debit: m.debit, credit: m.credit, balance: m.balance }, { invertSign: I.invert });
+  const mapObj = m.amount >= 0 ? { date: m.date, description: m.description, amount: m.amount, balance: m.balance } : { date: m.date, description: m.description, debit: m.debit, credit: m.credit, balance: m.balance };
+  // Los signos NO los decide la persona si el archivo permite comprobarlos (saldo corriente + texto del banco): así no se importa al revés.
+  const verdict = cmSignVerdict(trBuildBankRows(I.rows, mapObj, {}).rows);
+  I.locked = m.amount >= 0 && verdict !== 'unknown';
+  if(I.locked){ I.autoInverted = verdict === 'inverted'; I.invert = verdict === 'inverted'; }
+  const built = trBuildBankRows(I.rows, mapObj, { invertSign: I.invert });
   I.built = built;
-  const chk = m.balance >= 0 ? cmSignCheck(trBuildBankRows(I.rows, m.amount >= 0 ? { date: m.date, description: m.description, amount: m.amount, balance: m.balance } : { date: m.date, description: m.description, debit: m.debit, credit: m.credit, balance: m.balance }, {}).rows) : { verdict: 'unknown' };
   let signMsg = '';
-  if(m.amount >= 0){
-    if(I.autoInverted && I.invert) signMsg = '<div class="msg" id="cmi-signmsg" style="display:block; background:#E9F7F0; color:#177A54;">Los saldos del archivo indican que los signos venían al revés (las entradas con «−» y las salidas con «+»). Ya los corregí automáticamente.</div>';
-    else if(chk.verdict === 'inverted' && !I.invert) signMsg = '<div class="msg error" id="cmi-signmsg" style="display:block;">Cuidado: los saldos del archivo indican que los signos están al revés. Marca «invertir signo» o las comisiones saldrán como salidas.</div>';
-    else if(chk.verdict === 'ok' && I.invert) signMsg = '<div class="msg error" id="cmi-signmsg" style="display:block;">Cuidado: tienes marcado «invertir signo», pero los saldos del archivo indican que los signos ya vienen bien. Desmárcalo.</div>';
-  }
+  if(m.amount >= 0 && I.locked && I.invert) signMsg = '<div class="msg" id="cmi-signmsg" style="display:block; background:#E9F7F0; color:#177A54;">Este archivo trae los signos al revés (las entradas con «−» y las salidas con «+»). Ya los corregí automáticamente.</div>';
+  else if(m.amount < 0 && verdict === 'inverted') signMsg = '<div class="msg error" id="cmi-signmsg" style="display:block;">Parece que intercambiaste las columnas de Débitos y Créditos: las comisiones saldrían como salidas. Cámbialas.</div>';
+  else if(m.amount >= 0 && !I.locked) signMsg = '<div class="msg" id="cmi-signmsg" style="display:block; background:#FFF3DC; color:#8A5A00;">No pude comprobar los signos con este archivo. Revisa que las entradas (comisiones) salgan en verde y las salidas en rojo en la tabla de abajo; si no, marca «invertir signo».</div>';
   const accId = trVal('cmi-account'); const acc = cmAccount(accId); I.account = acc;
   const fps = trFingerprintBases('cm:' + accId, built.rows); I.fps = fps;
   const existing = new Set(CM.txns.map(t => t.fingerprint)); I.split = trSplitDuplicates(fps, existing);
   I.fileDup = CM.imports.some(x => x.account_id === accId && x.file_hash === I.hash);
+  const negFps = trFingerprintBases('cm:' + accId, built.rows.map(r => Object.assign({}, r, { amount_cents: -r.amount_cents })));
+  I.flipDup = negFps.filter((fp, i) => existing.has(fp) && !existing.has(fps[i])).length;
   I.sugg = built.rows.map(r => cmSuggest(r, CM.rules, acc));
   const cnt = { auto: 0, review: 0 };
   I.split.fresh.forEach(i => { if(I.sugg[i].source === 'none') cnt.review++; else cnt.auto++; });
@@ -14495,8 +14534,9 @@ function cmImportRenderPreview(){
       <div class="form-row-2" style="margin-top:8px;"><div class="form-row"><label>Fecha</label><select id="cmm-date">${opts(m.date)}</select></div><div class="form-row"><label>Descripción</label><select id="cmm-desc">${opts(m.description)}</select></div></div>
       <div class="form-row-2"><div class="form-row"><label>Importe (una sola columna)</label><select id="cmm-amount">${opts(m.amount, true)}</select></div><div class="form-row"><label>Saldo corriente (opcional)</label><select id="cmm-bal">${opts(m.balance, true)}</select></div></div>
       <div class="form-row-2"><div class="form-row"><label>Débitos (si van aparte)</label><select id="cmm-debit">${opts(m.debit, true)}</select></div><div class="form-row"><label>Créditos (si van aparte)</label><select id="cmm-credit">${opts(m.credit, true)}</select></div></div>
-      <label style="display:flex; gap:8px; align-items:center; font-size:13px;"><input type="checkbox" id="cmm-invert" ${I.invert ? 'checked' : ''}> El banco muestra los retiros como números positivos (invertir signo)</label></div>
+      <label style="display:flex; gap:8px; align-items:center; font-size:13px;"><input type="checkbox" id="cmm-invert" ${I.invert ? 'checked' : ''} ${I.locked ? 'disabled' : ''}> El banco muestra los retiros como números positivos (invertir signo)${I.locked ? ' <span class="sub">— lo decido yo según el archivo</span>' : ''}</label></div>
     ${signMsg}
+    ${I.flipDup ? `<div class="msg error" id="cmi-flipdup" style="display:block;">${I.flipDup} fila(s) de este archivo ya existen en la base con el signo contrario (una importación anterior quedó al revés). Anúlala primero en «Cuentas y reglas → Archivos importados»; si no, se duplicaría.</div>` : ''}
     ${I.fileDup ? '<div class="msg error" style="display:block;">Este mismo archivo ya fue importado antes en esta cuenta. No se volverá a importar.</div>' : ''}
     <p style="margin:10px 0 4px;" id="cmi-summary"><strong>${built.rows.length}</strong> filas válidas · <strong>${I.split.fresh.length}</strong> nuevas · <strong>${I.split.dup.length}</strong> repetidas (se omiten) · <strong>${built.errors.length}</strong> con error. Entradas ${trFmt(credits)} · Salidas ${trFmt(debits)}.</p>
     <p class="sub" id="cmi-forecast">De las nuevas: ${cnt.auto} se clasifican solas (pagos de aseguradoras, transferencias, gastos…) · ${cnt.review} quedan por clasificar. Después podrás revisar y cambiar lo que esté mal.</p>
@@ -14512,6 +14552,7 @@ function cmImportRenderPreview(){
 async function cmDoImport(){
   const I = CM.imp; if(!I || !I.built) throw new Error('Primero elige un archivo.');
   if(I.fileDup) throw new Error('Este archivo ya se importó antes.');
+  if(I.flipDup) throw new Error('Hay una importación anterior con los signos al revés. Anúlala primero (Cuentas y reglas → Archivos importados) para no duplicar.');
   if(!I.built.rows.length) throw new Error('No hay filas válidas para importar.');
   if(I.built.errors.length && !window.confirm(I.built.errors.length + ' fila(s) con error se omitirán (fechas o importes inválidos). ¿Importar el resto?')) return false;
   const accId = trVal('cmi-account'); const acc = cmAccount(accId);
