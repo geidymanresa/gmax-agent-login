@@ -14140,12 +14140,87 @@ function cmSummarize(txns, opts){
   S.monthly = Array.from(months.values()).sort((x, y) => x.month.localeCompare(y.month));
   return S;
 }
+// ---------- Gastos fijos mensuales ----------
+// Un gasto fijo = {id, name, match_key, expected_cents|null, amount_varies, due_day, account_id|null}. «Pagado» se deduce de los movimientos importados.
+const CM_FIXED_GRACE_DAYS = 5;   // el banco puede tardar unos días en publicar un cargo: hasta aquí se dice «pendiente», después «no salió»
+function cmMonthOf(iso){ return String(iso || '').slice(0, 7); }
+function cmMonthShift(month, n){ const m = /^(\d{4})-(\d{2})$/.exec(month); const d = new Date(Date.UTC(+m[1], +m[2] - 1 + n, 1)); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0'); }
+function cmDueDate(month, day){ const m = /^(\d{4})-(\d{2})$/.exec(month); const last = new Date(Date.UTC(+m[1], +m[2], 0)).getUTCDate(); return month + '-' + String(Math.min(Math.max(1, day | 0), last)).padStart(2, '0'); }
+function cmDayDiff(a, b){ return Math.round((cmParseISO(a) - cmParseISO(b)) / 86400000); }
+function cmFixedStatusOf(exp, month, todayISO, lastDate, hasMark){
+  const due = cmDueDate(month, exp.due_day);
+  if(hasMark) return 'manual';
+  if(todayISO <= due) return 'upcoming';
+  if(!lastDate || lastDate < due) return 'nodata';
+  return cmDayDiff(lastDate, due) < CM_FIXED_GRACE_DAYS ? 'pending' : 'late';
+}
+// Devuelve una fila por gasto fijo con su estado en ese mes. txns: movimientos efectivos; marks: [{expense_id, month}]
+function cmFixedMonth(exps, txns, month, todayISO, marks){
+  const debits = (txns || []).filter(t => Number(t.amount_cents) < 0 && cmMonthOf(t.posted_at) === month);
+  const lastByAcc = {}; let lastAny = null;
+  (txns || []).forEach(t => { if(!lastByAcc[t.account_id] || t.posted_at > lastByAcc[t.account_id]) lastByAcc[t.account_id] = t.posted_at; if(!lastAny || t.posted_at > lastAny) lastAny = t.posted_at; });
+  const list = (exps || []).slice().sort((a, b) => (a.due_day - b.due_day) || String(a.name).localeCompare(String(b.name)));
+  const used = new Set(); const found = {};
+  const cands = e => debits.filter(t => !used.has(t.id) && (!e.account_id || t.account_id === e.account_id) && cmMatchesKey(t.description, e.match_key));
+  const closest = (arr, e) => { const due = cmDueDate(month, e.due_day); return arr.slice().sort((x, y) => Math.abs(cmDayDiff(x.posted_at, due)) - Math.abs(cmDayDiff(y.posted_at, due)))[0] || null; };
+  const exact = e => e.expected_cents && !e.amount_varies;
+  // 1) los de monto exacto (así los 3 cargos distintos de Apple no se confunden) 2) los de monto variable 3) los de monto exacto que salieron con otro importe
+  list.filter(exact).forEach(e => { const t = closest(cands(e).filter(x => Math.abs(Number(x.amount_cents)) === Number(e.expected_cents)), e); if(t){ used.add(t.id); found[e.id] = { txn: t, diff: 0 }; } });
+  list.filter(e => !exact(e)).forEach(e => { const t = closest(cands(e), e); if(t){ used.add(t.id); found[e.id] = { txn: t, diff: e.expected_cents ? Math.abs(Number(t.amount_cents)) - Number(e.expected_cents) : 0 }; } });
+  list.filter(e => exact(e) && !found[e.id]).forEach(e => { const t = closest(cands(e), e); if(t){ used.add(t.id); found[e.id] = { txn: t, diff: Math.abs(Number(t.amount_cents)) - Number(e.expected_cents) }; } });
+  const markSet = new Set((marks || []).filter(m => m.month === month).map(m => m.expense_id));
+  return list.map(e => {
+    const f = found[e.id]; const due = cmDueDate(month, e.due_day);
+    const extra = f && exact(e) ? cands(e).filter(x => Math.abs(Number(x.amount_cents)) === Number(e.expected_cents)).length : 0;
+    const last = e.account_id ? lastByAcc[e.account_id] : lastAny;
+    const status = f ? 'paid' : cmFixedStatusOf(e, month, todayISO, last, markSet.has(e.id));
+    return { exp: e, month, due, status, txn: f ? f.txn : null, paidCents: f ? Math.abs(Number(f.txn.amount_cents)) : 0, diffCents: f ? f.diff : 0, extra, lastDate: last || null, marked: markSet.has(e.id) };
+  });
+}
+function cmFixedTotals(rows){
+  const T = { count: rows.length, paid: 0, manual: 0, open: 0, late: 0, expectedCents: 0, paidCents: 0, missingCents: 0 };
+  rows.forEach(r => {
+    const exp = Number(r.exp.expected_cents || 0); T.expectedCents += exp;
+    if(r.status === 'paid'){ T.paid++; T.paidCents += r.paidCents; }
+    else if(r.status === 'manual'){ T.manual++; T.paidCents += exp; }
+    else { T.open++; T.missingCents += exp; if(r.status === 'late') T.late++; }
+  });
+  return T;
+}
+// Sugerencias: cargos de salida que se repiten en 2+ meses distintos. Agrupa por (palabras clave, importe exacto); lo que cambia de importe sale aparte como «monto variable».
+function cmFixedSuggest(txns, existing){
+  const out = []; const ex = existing || [];
+  const debits = (txns || []).filter(t => Number(t.amount_cents) < 0 && (t.category === 'expense' || t.category === 'other_debit' || t.category === 'unclassified'));
+  // palabras del comercio (antes de la primera coma, que es la ciudad): 2 palabras bastan y aguantan variaciones («NEXT INSUR PRO L» / «NEXT INSUR* PROF LIAB»)
+  const keyOf = t => { const d = String(t.description || ''); if(/^\s*transfer\b/i.test(d)) return ''; const head = d.split(',')[0]; return cmNormalizeKey(head).split(' ').slice(0, 2).join(' ') || ''; };
+  const byKA = {}, byK = {};
+  debits.forEach(t => { const k = keyOf(t); if(!k) return; const a = Math.abs(Number(t.amount_cents)); (byKA[k + '|' + a] = byKA[k + '|' + a] || []).push(t); (byK[k] = byK[k] || []).push(t); });
+  const median = arr => { const s = arr.slice().sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
+  const months = arr => new Set(arr.map(t => cmMonthOf(t.posted_at)));
+  const covered = (k, a) => ex.some(e => e.match_key === k && (a === null ? true : (!e.expected_cents || e.amount_varies || Number(e.expected_cents) === a)));
+  const exactKeys = new Set();
+  Object.keys(byKA).forEach(ka => {
+    const arr = byKA[ka]; const [k, a] = [ka.slice(0, ka.lastIndexOf('|')), Number(ka.slice(ka.lastIndexOf('|') + 1))];
+    if(months(arr).size < 2 || covered(k, a)) return;
+    exactKeys.add(k);
+    out.push({ key: k, cents: a, varies: false, day: median(arr.map(t => +t.posted_at.slice(8, 10))), months: months(arr).size, sample: arr[0].description, account_id: arr[0].account_id, strong: true });
+  });
+  Object.keys(byK).forEach(k => {
+    const arr = byK[k]; const amts = new Set(arr.map(t => Math.abs(Number(t.amount_cents))));
+    if(exactKeys.has(k) || amts.size < 2 || months(arr).size < 2 || covered(k, null)) return;
+    const perMonth = {}; arr.forEach(t => { perMonth[cmMonthOf(t.posted_at)] = (perMonth[cmMonthOf(t.posted_at)] || 0) + 1; });
+    out.push({ key: k, cents: Math.round(arr.reduce((s, t) => s + Math.abs(Number(t.amount_cents)), 0) / arr.length), varies: true, day: median(arr.map(t => +t.posted_at.slice(8, 10))), months: months(arr).size, sample: arr[0].description, account_id: arr[0].account_id, strong: false });
+  });
+  const perKey = {}; out.forEach(o => { perKey[o.key] = (perKey[o.key] || 0) + 1; });
+  out.forEach(o => { const base = cmTitle(o.key); o.name = perKey[o.key] > 1 ? base + ' ($' + (o.cents / 100).toFixed(2) + ')' : base; });
+  return out.sort((a, b) => (b.strong - a.strong) || (b.months - a.months) || a.day - b.day);
+}
 // ===== COMMISSIONS-CORE-END =====
 // ===== COMMISSIONS-UI-START =====
 // Pantalla de "Comisiones" (solo super_admin). Reutiliza el lector de CSV, las huellas y los modales de Tesorería.
-const CM = { loaded: false, loading: false, error: null, accounts: [], txns: [], rules: [], imports: [], view: 'resumen', range: '15', custom: { from: '', to: '' }, accountId: '', search: '', catFilter: '', imp: null, cls: null, groups: [] };
+const CM = { loaded: false, loading: false, error: null, accounts: [], txns: [], rules: [], imports: [], view: 'resumen', range: '15', custom: { from: '', to: '' }, accountId: '', search: '', catFilter: '', imp: null, cls: null, groups: [], fixed: [], fixedMarks: [], fixedError: null, fixedMonth: '' };
 const CM_RANGES = [['today', 'Hoy'], ['5', 'Últimos 5 días'], ['15', 'Últimos 15 días'], ['month', 'Este mes'], ['lastmonth', 'Mes pasado'], ['year', 'Este año'], ['all', 'Todo']];
-const CM_VIEWS = [['resumen', 'Resumen'], ['pendientes', 'Por clasificar'], ['movimientos', 'Movimientos'], ['config', 'Cuentas y reglas']];
+const CM_VIEWS = [['resumen', 'Resumen'], ['pendientes', 'Por clasificar'], ['movimientos', 'Movimientos'], ['gastosfijos', 'Gastos fijos'], ['config', 'Cuentas y reglas']];
 const CM_ROW_LIMIT = 300;
 
 async function loadComisiones(){
@@ -14182,6 +14257,12 @@ async function cmLoad(){
       cmSelectAll('commission_accounts', 'created_at', true), cmSelectAll('commission_txns', 'posted_at', false),
       cmSelectAll('commission_payer_rules', 'created_at', true), cmSelectAll('commission_imports', 'imported_at', false)]);
     CM.accounts = accounts; CM.raw = txns; CM.rules = rules; CM.imports = imports; cmRebuild(); CM.loaded = true;
+    // Gastos fijos: tablas aparte (migración 4). Si todavía no se corrió, el resto de Comisiones funciona igual.
+    CM.fixedError = null;
+    try {
+      const [fx, mk] = await Promise.all([cmSelectAll('commission_fixed_expenses', 'created_at', true), cmSelectAll('commission_fixed_marks', 'marked_at', true)]);
+      CM.fixed = fx; CM.fixedMarks = mk;
+    } catch(e2){ CM.fixed = []; CM.fixedMarks = []; CM.fixedError = /does not exist|schema cache|relation/i.test(e2.message) ? 'Falta correr migracion_comisiones_4_gastos_fijos.sql en Supabase (SQL Editor). Hazlo una vez y recarga esta página.' : e2.message; }
   } catch(e){
     CM.error = /does not exist|schema cache|relation/i.test(e.message) ? 'Falta correr migracion_comisiones.sql en Supabase (SQL Editor). Hazlo una vez y recarga esta página.' : e.message;
   } finally { CM.loading = false; }
@@ -14245,7 +14326,7 @@ function cmRender(){
   nav.innerHTML = CM_VIEWS.map(([k, l]) => `<button type="button" class="tr-pill ${CM.view === k ? 'active' : ''}" onclick="cmSetView('${k}')">${l}${k === 'pendientes' && pend ? ` <span class="tr-badge">${pend}</span>` : ''}</button>`).join('');
   const nf = Object.keys(CM.flipped || {}).length;
   const flipBanner = nf ? `<div class="msg error" id="cm-flip-banner" style="display:block; margin:10px 0;">${nf} archivo(s) importado(s) tenían los signos al revés (entradas como salidas). Los corregí en pantalla para que los totales sean los reales, pero en la base siguen al revés: ve a «Cuentas y reglas → Archivos importados», pulsa «Anular» en esos archivos y vuelve a subirlos.</div>` : '';
-  body.innerHTML = flipBanner + (CM.view === 'pendientes' ? cmHtmlPend() : CM.view === 'movimientos' ? cmHtmlMov() : CM.view === 'config' ? cmHtmlConfig() : cmHtmlResumen());
+  body.innerHTML = flipBanner + (CM.view === 'pendientes' ? cmHtmlPend() : CM.view === 'movimientos' ? cmHtmlMov() : CM.view === 'gastosfijos' ? cmHtmlFixed() : CM.view === 'config' ? cmHtmlConfig() : cmHtmlResumen());
 }
 function cmFig(label, num, sub, extra){ return `<div class="tr-fig"><div class="label">${label}</div><div class="num" ${extra || ''}>${num}</div><div class="sub">${sub || ''}</div></div>`; }
 function cmHtmlResumen(){
@@ -14264,9 +14345,12 @@ function cmHtmlResumen(){
   const payerRows = S.byPayer.map(p => `<tr><td>${trE(p.payer)}</td><td style="text-align:right;">${p.count}</td><td style="text-align:right;"><strong>${trFmt(p.cents)}</strong></td><td style="text-align:right;">${S.commission ? (p.cents * 100 / S.commission).toFixed(1) + '%' : '—'}</td><td>${formatDateUS(p.first)}${p.first !== p.last ? ' – ' + formatDateUS(p.last) : ''}</td></tr>`).join('');
   const monthly = S.monthly.length > 1 ? `<div class="dash-card"><h3 style="margin:0 0 8px;">Por mes</h3><div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Mes</th><th style="text-align:right;">Comisiones</th><th style="text-align:right;">Desde Agency Sweep</th></tr></thead><tbody>${S.monthly.map(m => `<tr><td>${trE(m.month)}</td><td style="text-align:right;">${trFmt(m.commission)}</td><td style="text-align:right;">${trFmt(m.agencyFees)}</td></tr>`).join('')}</tbody></table></div></div>` : '';
   const pendBanner = S.unclassifiedCount ? `<div class="msg error" id="cm-pend-banner" style="display:block; margin:10px 0;">Hay ${S.unclassifiedCount} movimiento(s) sin clasificar en este periodo (entradas ${trFmt(S.unclassifiedIn)}, salidas ${trFmt(S.unclassifiedOut)}). Mientras no los clasifiques no cuentan como comisión ni como gasto. <a href="#" onclick="cmSetView('pendientes'); return false;">Clasificar ahora</a></div>` : '';
+  const fxLine = (CM.fixed.length && !CM.fixedError) ? (() => { const m = cmToday().slice(0, 7); const T = cmFixedTotals(cmFixedMonth(CM.fixed, CM.txns, m, cmToday(), CM.fixedMarks));
+    return `<div class="tr-box" id="cm-fixed-line" style="margin:10px 0;">Gastos fijos de ${trE(cmMonthLabel(m))}: <strong>${T.paid + T.manual} de ${T.count}</strong> ya salieron${T.late ? ` · <strong style="color:#b42318;">${T.late} no salió</strong>` : ''}${T.missingCents ? ' · faltan ' + trFmt(T.missingCents) : ''}. <a href="#" onclick="cmSetView('gastosfijos'); return false;">Ver detalle</a></div>`; })() : '';
   return `
     <p class="sub" id="cm-range-label">${trE(cmRangeLabel(r))}${CM.accountId ? ' · ' + trE(cmAccName(CM.accountId)) : ' · todas las cuentas'}</p>
     ${pendBanner}
+    ${fxLine}
     <div class="dash-card" id="cm-by-account"><h3 style="margin:0 0 4px;">Cuánto entró en cada cuenta</h3>
       <style>#cm-by-account table{font-size:13px; table-layout:auto; width:100%;} #cm-by-account th{font-size:11px;} #cm-by-account th,#cm-by-account td{padding:7px 8px;} #cm-by-account th{white-space:normal; letter-spacing:0; line-height:1.2; vertical-align:bottom;} #cm-by-account td.r,#cm-by-account th.r{text-align:right; white-space:nowrap;} #cm-by-account tfoot td{border-top:2px solid #d8deea; background:#f7f9fc;}</style>
       <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cuenta</th><th class="r">Comisiones</th><th class="r">Desde Sweep</th><th class="r">Otros</th><th class="r">Gastos</th><th class="r">A personal / otras</th><th class="r">Sin clasificar</th><th class="r">Total entró</th><th class="r">Total salió</th></tr></thead><tbody>${accRows}</tbody><tfoot>${accTotal}</tfoot></table></div>
@@ -14387,6 +14471,111 @@ async function cmApplyClassification(p){
 }
 async function cmReloadAfter(msg){
   CM.loaded = false; await cmLoad(); CM.loaded = !CM.error; cmFillAccountSelect(); cmRender(); if(msg) cmToast(msg);
+}
+
+// --- Gastos fijos ---
+const CM_MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+function cmMonthLabel(m){ const x = /^(\d{4})-(\d{2})$/.exec(m || ''); return x ? CM_MONTHS_ES[+x[2] - 1] + ' ' + x[1] : ''; }
+function cmFixedMonthSet(){ return CM.fixedMonth || cmToday().slice(0, 7); }
+function cmFixedShift(n){ CM.fixedMonth = cmMonthShift(cmFixedMonthSet(), n); cmRender(); }
+const CM_FIXED_STATUS = { paid: ['Pagado', 'green'], manual: ['Pagado (a mano)', 'green'], upcoming: ['Aún no toca', 'gray'], pending: ['Pendiente', 'amber'], late: ['No salió', 'red'], nodata: ['Sin datos aún', 'gray'] };
+function cmHtmlFixed(){
+  if(CM.fixedError) return `<div class="msg error" style="display:block;">${trE(CM.fixedError)}</div>`;
+  const month = cmFixedMonthSet(); const rows = cmFixedMonth(CM.fixed, CM.txns, month, cmToday(), CM.fixedMarks); const T = cmFixedTotals(rows);
+  const lastBy = {}; CM.txns.forEach(t => { if(!lastBy[t.account_id] || t.posted_at > lastBy[t.account_id]) lastBy[t.account_id] = t.posted_at; });
+  const cover = CM.accounts.filter(a => lastBy[a.id]).map(a => `${trE(a.name)}${a.last4 ? ' ••' + trE(a.last4) : ''}: ${formatDateUS(lastBy[a.id])}`).join(' · ');
+  const tr_ = rows.map(r => {
+    const e = r.exp; const [lab, kind] = CM_FIXED_STATUS[r.status]; const acct = e.account_id ? ' · ' + trE(cmAccName(e.account_id)) : '';
+    let paid = '<span class="sub">—</span>';
+    if(r.txn){ const d = r.diffCents; paid = `${formatDateUS(r.txn.posted_at)} · <strong>${trFmt(r.paidCents)}</strong>` + (e.expected_cents && d ? ` <span class="tr-chip tr-chip-amber" title="Esperabas ${trFmt(e.expected_cents)}">${d > 0 ? '+' : '−'}${trFmt(Math.abs(d))} vs lo normal</span>` : '') + (r.extra > 0 ? ' <span class="tr-chip tr-chip-red">cobrado 2 veces</span>' : ''); }
+    else if(r.marked) paid = '<span class="sub">Marcado a mano</span>';
+    else if(r.status === 'nodata') paid = `<span class="sub">tu archivo llega hasta ${r.lastDate ? formatDateUS(r.lastDate) : '—'}</span>`;
+    const act = r.status === 'paid' ? '' : r.marked ? `<button type="button" class="btn-ghost" style="width:auto; padding:4px 10px;" onclick="cmFixedUnmark('${trE(e.id)}')">Quitar marca</button>` : `<button type="button" class="btn-ghost" style="width:auto; padding:4px 10px;" onclick="cmFixedMark('${trE(e.id)}')">Marcar pagado</button>`;
+    return `<tr id="cmf-${trE(e.id)}" data-status="${r.status}"><td>${trE(e.name)}${e.notes ? `<div class="sub" style="margin:0;">${trE(e.notes)}</div>` : ''}<div class="sub" style="margin:0;">${trE(e.match_key)}${acct}</div></td><td style="white-space:nowrap;">${formatDateUS(r.due)}</td><td style="text-align:right; white-space:nowrap;">${e.expected_cents ? (e.amount_varies ? '≈ ' : '') + trFmt(e.expected_cents) : '<span class="sub">varía</span>'}</td><td><span class="tr-chip tr-chip-${kind}">${lab}</span></td><td>${paid}</td><td style="white-space:nowrap; text-align:right;">${act} <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px;" onclick="cmOpenFixed('${trE(e.id)}')">Editar</button></td></tr>`;
+  }).join('');
+  return `
+    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin:6px 0 10px;">
+      <div style="display:flex; align-items:center; gap:8px;"><button type="button" class="tr-pill" onclick="cmFixedShift(-1)" aria-label="Mes anterior">‹</button><strong id="cm-fixed-month" style="min-width:150px; text-align:center;">${trE(cmMonthLabel(month))}</strong><button type="button" class="tr-pill" onclick="cmFixedShift(1)" aria-label="Mes siguiente">›</button></div>
+      <div><button type="button" class="btn-ghost" style="width:auto; padding:7px 16px;" onclick="cmOpenFixedSuggest()">Sugerir desde mis movimientos</button> <button type="button" class="btn-primary" style="width:auto; padding:7px 16px;" onclick="cmOpenFixed()">+ Agregar gasto fijo</button></div>
+    </div>
+    ${CM.fixed.length ? `<div class="grid tr-figs" id="cm-fixed-figs" style="display:grid; gap:12px;">
+      ${cmFig('Ya salieron', `${T.paid + T.manual} de ${T.count}`, T.late ? `${T.late} no salió` : 'Sin atrasos', 'id="cm-f-paid"')}
+      ${cmFig('Esperado en el mes', trFmt(T.expectedCents), 'Suma de los gastos con monto fijo', 'id="cm-f-exp"')}
+      ${cmFig('Ya pagado', trFmt(T.paidCents), 'Lo que sí salió del banco (y lo marcado a mano)', 'id="cm-f-done"')}
+      ${cmFig('Falta por salir', trFmt(T.missingCents), 'De los que todavía no salen', 'id="cm-f-miss"')}
+    </div>` : ''}
+    <div class="dash-card"><div class="dash-table-wrap"><table class="dash-table" id="cm-fixed"><thead><tr><th>Gasto</th><th>Le toca</th><th style="text-align:right;">Esperado</th><th>Estado</th><th>Lo que salió</th><th></th></tr></thead><tbody>
+      ${tr_ || '<tr><td colspan="6">Todavía no hay gastos fijos. Pulsa «Sugerir desde mis movimientos» y elige los que se repiten cada mes, o agrégalos tú.</td></tr>'}</tbody></table></div>
+      <p class="sub" style="margin:8px 0 0;">Se marca «Pagado» solo cuando en el CSV hay un cargo con esas palabras ese mes (y, si el importe es fijo, con ese mismo importe). Si el banco aún no publicó el día, dice «Sin datos aún» en vez de «No salió». Último movimiento importado — ${cover || 'ninguno'}.</p></div>`;
+}
+function cmFixedPreview(){
+  const el = document.getElementById('cmf-prev'); if(!el) return;
+  const key = trVal('cmf-key').trim(); const acct = trVal('cmf-acct');
+  if(!key){ el.textContent = ''; return; }
+  const m = CM.txns.filter(t => Number(t.amount_cents) < 0 && (!acct || t.account_id === acct) && cmMatchesKey(t.description, key)).sort((a, b) => b.posted_at.localeCompare(a.posted_at));
+  el.textContent = m.length ? `Con esas palabras encontré ${m.length} cargo(s) en lo que has importado; el último fue el ${formatDateUS(m[0].posted_at)} por ${trFmt(Math.abs(m[0].amount_cents))}.` : 'No encontré cargos con esas palabras en lo que has importado (puede ser normal si aún no sale). Revisa que estén escritas como aparecen en tu banco.';
+}
+function cmOpenFixed(id){
+  const e = id ? CM.fixed.find(x => x.id === id) : null; if(id && !e) return;
+  trModal(e ? 'Editar gasto fijo' : 'Agregar gasto fijo', `
+    <div class="form-row"><label>Nombre</label><input type="text" id="cmf-name" maxlength="80" value="${trE(e ? e.name : '')}" placeholder="Ej: Turbo Rater"></div>
+    <div class="form-row"><label>Palabras con que aparece en el banco</label><input type="text" id="cmf-key" maxlength="80" value="${trE(e ? e.match_key : '')}" placeholder="Ej: seaway" oninput="cmFixedPreview()"><p class="sub" id="cmf-prev" style="margin:4px 0 0;"></p></div>
+    <div class="form-row-2"><div class="form-row"><label>Monto de cada mes (USD)</label><input type="text" id="cmf-amt" inputmode="decimal" value="${e && e.expected_cents ? (e.expected_cents / 100).toFixed(2) : ''}" placeholder="Ej: 89.00 (vacío si cambia)"></div>
+    <div class="form-row"><label>Día del mes en que lo cobran</label><input type="text" id="cmf-day" inputmode="numeric" maxlength="2" value="${e ? e.due_day : ''}" placeholder="1 a 31"></div></div>
+    <label style="display:flex; gap:8px; align-items:center; font-size:13px; margin:2px 0 8px;"><input type="checkbox" id="cmf-var" ${e && e.amount_varies ? 'checked' : ''}> El monto cambia un poco cada mes (lo marco pagado aunque no sea idéntico)</label>
+    <div class="form-row"><label>Cuenta donde sale</label><select id="cmf-acct" onchange="cmFixedPreview()"><option value="">Cualquiera</option>${CM.accounts.map(a => `<option value="${trE(a.id)}" ${e && e.account_id === a.id ? 'selected' : ''}>${trE(a.name)}${a.last4 ? ' ••' + trE(a.last4) : ''}</option>`).join('')}</select></div>
+    <div class="form-row"><label>Nota (opcional)</label><input type="text" id="cmf-notes" maxlength="300" value="${trE(e && e.notes || '')}" placeholder="Ej: póliza de errores y omisiones"></div>`,
+    [{ label: 'Cancelar' }].concat(e ? [{ label: 'Eliminar', onClick: async () => {
+      if(!window.confirm('¿Eliminar este gasto fijo? También se borran sus marcas «pagado a mano».')) throw new Error('No se eliminó.');
+      const { error } = await sb.from('commission_fixed_expenses').delete().eq('id', e.id); if(error) throw new Error(error.message);
+      await trAudit('commission_fixed_delete', 'commission_fixed_expenses', e.id, { name: e.name });
+      await cmReloadAfter('Gasto fijo eliminado.');
+    } }] : []).concat([{ label: 'Guardar', primary: true, onClick: () => cmSaveFixed(id) }]));
+  setTimeout(cmFixedPreview, 0);
+}
+async function cmSaveFixed(id){
+  const name = trVal('cmf-name').trim(); const key = trVal('cmf-key').trim().toLowerCase().replace(/\s+/g, ' ');
+  const day = parseInt(trVal('cmf-day'), 10); const amtRaw = trVal('cmf-amt').trim();
+  if(!name) throw new Error('Escribe el nombre del gasto.');
+  if(key.length < 2 || !cmTokens(key).length) throw new Error('Escribe las palabras con que aparece en el banco (ej: seaway).');
+  if(!(day >= 1 && day <= 31)) throw new Error('El día debe estar entre 1 y 31.');
+  let cents = null; if(amtRaw){ cents = trParseMoney(amtRaw); if(cents === null || cents <= 0) throw new Error('El monto no es válido. Ejemplo: 89.00'); }
+  const varies = document.getElementById('cmf-var').checked || cents === null;
+  const row = { name, match_key: key, expected_cents: cents, amount_varies: varies, due_day: day, account_id: trVal('cmf-acct') || null, notes: trVal('cmf-notes').trim() || null };
+  const { error } = await (id ? sb.from('commission_fixed_expenses').update(row).eq('id', id) : sb.from('commission_fixed_expenses').insert(row));
+  if(error) throw new Error(/duplicate key|unique/i.test(error.message) ? 'Ya tienes un gasto fijo con ese nombre.' : error.message);
+  await trAudit(id ? 'commission_fixed_edit' : 'commission_fixed_add', 'commission_fixed_expenses', id || null, { name, key, cents, day });
+  await cmReloadAfter(id ? 'Gasto fijo actualizado.' : 'Gasto fijo agregado.');
+}
+function cmOpenFixedSuggest(){
+  const S = cmFixedSuggest(CM.txns, CM.fixed); CM.fixedSug = S;
+  if(!S.length){ trModal('Sugerencias', '<p>No encontré cargos que se repitan en 2 o más meses distintos con lo que has importado, o ya los tienes todos. Sube más meses del CSV, o agrégalos a mano con «+ Agregar gasto fijo».</p>', [{ label: 'Cerrar', primary: true }]); return; }
+  trModal('Sugerencias de gastos fijos', `<p class="sub" style="margin-top:0;">Son cargos de salida que se repiten en varios meses. Los de importe fijo vienen marcados; los que cambian de monto (o no parecen fijos) vienen sin marcar. Quita los que no sean gastos fijos y corrige el nombre si quieres.</p>
+    <div class="dash-table-wrap" style="max-height:340px; overflow:auto;"><table class="dash-table" id="cm-fixed-sug"><thead><tr><th></th><th>Nombre</th><th style="text-align:right;">Monto</th><th>Día</th><th>Meses</th></tr></thead><tbody>
+    ${S.map((x, i) => `<tr><td><input type="checkbox" id="cmfs-on-${i}" ${x.strong ? 'checked' : ''}></td><td><input type="text" id="cmfs-name-${i}" maxlength="80" value="${trE(x.name)}" style="width:100%;"><div class="sub" style="margin:0;">${trE(x.key)} · ${trE(x.sample)}</div></td><td style="text-align:right; white-space:nowrap;">${x.varies ? '≈ ' : ''}${trFmt(x.cents)}</td><td>${x.day}</td><td>${x.months}</td></tr>`).join('')}</tbody></table></div>`,
+    [{ label: 'Cancelar' }, { label: 'Agregar los marcados', primary: true, onClick: async () => {
+      const rows = []; (CM.fixedSug || []).forEach((x, i) => { if(document.getElementById('cmfs-on-' + i).checked){ const nm = trVal('cmfs-name-' + i).trim(); if(!nm) throw new Error('Un gasto marcado no tiene nombre.'); rows.push({ name: nm, match_key: x.key, expected_cents: x.cents, amount_varies: x.varies, due_day: x.day, account_id: x.account_id || null, notes: null }); } });
+      if(!rows.length) throw new Error('No marcaste ninguno.');
+      if(new Set(rows.map(r => r.name.toLowerCase())).size !== rows.length) throw new Error('Hay dos con el mismo nombre; cámbialo.');
+      const { error } = await sb.from('commission_fixed_expenses').insert(rows);
+      if(error) throw new Error(/duplicate key|unique/i.test(error.message) ? 'Alguno de esos nombres ya existe en tu lista.' : error.message);
+      await trAudit('commission_fixed_add_many', 'commission_fixed_expenses', null, { count: rows.length });
+      await cmReloadAfter(rows.length + ' gasto(s) fijo(s) agregado(s).');
+    } }]);
+}
+async function cmFixedMark(id){
+  const month = cmFixedMonthSet();
+  const { error } = await sb.from('commission_fixed_marks').insert({ expense_id: id, month });
+  if(error){ cmToast(/duplicate key|unique/i.test(error.message) ? 'Ya estaba marcado.' : error.message, 'error'); return; }
+  await trAudit('commission_fixed_mark', 'commission_fixed_marks', id, { month });
+  await cmReloadAfter('Marcado como pagado.');
+}
+async function cmFixedUnmark(id){
+  const month = cmFixedMonthSet();
+  const { error } = await sb.from('commission_fixed_marks').delete().eq('expense_id', id).eq('month', month);
+  if(error){ cmToast(error.message, 'error'); return; }
+  await trAudit('commission_fixed_unmark', 'commission_fixed_marks', id, { month });
+  await cmReloadAfter('Marca quitada.');
 }
 
 // --- Movimientos ---
