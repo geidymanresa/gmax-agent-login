@@ -2103,6 +2103,24 @@
             </div>
           </div>
 
+<!-- ===== TRUCKING-CARD-START ===== -->
+          <!-- Aplicación de trucking (solo aparece si el cliente tiene Trucking / Auto comercial o ya tiene una aplicación) -->
+          <div class="dash-card" id="cd-truckingCard" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h4 style="margin:0;">🚛 Aplicación de trucking</h4>
+              <button type="button" class="btn-primary" style="width:auto; padding:9px 18px; margin:0;" onclick="tkOpenApp(currentClientId)" id="cd-truckingNewBtn">Nueva aplicación</button>
+            </div>
+            <p class="sub">Datos del asegurado, conductores, vehículos y coberturas para llenar la aplicación y el anexo de flota de la agencia (PDF listos para imprimir; no se envían a ninguna aseguradora solos).</p>
+            <div class="msg" id="tk-card-msg"></div>
+            <div class="dash-table-wrap">
+              <table class="dash-table">
+                <thead><tr><th>Actualizada</th><th>Asegurado</th><th>Cotización</th><th>Estado</th><th>Flota</th><th>PDF</th><th></th></tr></thead>
+                <tbody id="cd-truckingList"><tr><td colspan="7">—</td></tr></tbody>
+              </table>
+            </div>
+          </div>
+<!-- ===== TRUCKING-CARD-END ===== -->
+
           <!-- Editar cotización — visible solo para la administradora suprema por ahora -->
           <div class="dash-card" id="cd-editQuoteCard" style="display:none;">
             <h4>Editar cotización</h4>
@@ -3099,6 +3117,43 @@
         <p class="sub" style="margin-top:18px;">Herramienta de control interno; no sustituye la revisión de tu contador/a. Los números salen de los CSV que importas (el banco manda). Las comisiones que una aseguradora te descuenta de pagos futuros no aparecen como retiro en el banco: se ven como una comisión menor.</p>
       </section>
 <!-- ===== COMMISSIONS-HTML-END ===== -->
+
+<!-- ===== TRUCKING-HTML-START ===== -->
+      <section class="dash-tab" id="tab-trucking" style="display:none;">
+        <style>
+          #tab-trucking .sub{margin-bottom:6px; font-size:13px; color:var(--slate-light);}
+          #tab-trucking .dash-card{margin:14px 0; padding:18px;}
+          #tab-trucking .tk-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:0 14px;}
+          #tab-trucking .tk-grid .form-row{margin-bottom:12px;}
+          #tab-trucking .tk-grid .wide{grid-column:1/-1;}
+          #tab-trucking .form-row input, #tab-trucking .form-row select, #tab-trucking .form-row textarea{padding:9px 11px; font-size:14px;}
+          #tab-trucking .tk-steps{display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 4px;}
+          #tab-trucking .tk-step{border:1.5px solid var(--line); background:#fff; border-radius:100px; padding:7px 13px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:'Poppins',sans-serif; color:var(--slate);}
+          #tab-trucking .tk-step.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+          #tab-trucking .tk-step .n{opacity:.7; margin-right:4px;}
+          #tab-trucking .tk-item{border:1.5px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; background:#fff;}
+          #tab-trucking .tk-item-head{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px;}
+          #tab-trucking .tk-item-head b{font-family:'Poppins',sans-serif; font-size:13.5px;}
+          #tab-trucking .tk-bar{position:sticky; bottom:0; background:#fff; border-top:1.5px solid var(--line); padding:12px 4px; margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; z-index:5;}
+          #tab-trucking .tk-bar button{width:auto; padding:11px 20px; margin:0;}
+          #tab-trucking .tk-list{margin:6px 0 0 18px; font-size:13.5px;}
+          #tab-trucking .tk-err{color:#B23A3A;}
+          #tab-trucking .tk-warn{color:#8A5A00;}
+          #tab-trucking .tk-cov{display:grid; grid-template-columns:minmax(200px,2fr) 1fr 1fr; gap:8px 12px; align-items:center;}
+          #tab-trucking .tk-cov label.chk{display:flex; gap:8px; align-items:center; font-size:14px;}
+          #tab-trucking .tk-cov input[type=text]{width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:9px; font-size:14px; font-family:inherit;}
+          #tab-trucking .tk-mini{width:auto; padding:5px 11px; margin:0; font-size:12px;}
+          #tab-trucking .tk-dl{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0;}
+          #tab-trucking .tk-dl button{width:auto; padding:11px 18px; margin:0;}
+          @media (max-width:700px){ #tab-trucking .tk-cov{grid-template-columns:1fr;} }
+        </style>
+        <a class="back-link" href="#" onclick="tkClose(); return false;">← Volver al cliente</a>
+        <h2>Aplicación de trucking</h2>
+        <p class="sub" id="tk-subtitle"></p>
+        <div id="tk-msg" class="msg"></div>
+        <div id="tk-root"></div>
+      </section>
+<!-- ===== TRUCKING-HTML-END ===== -->
 
       <!-- TAB: UNDERWRITING (administradores) -->
       <section class="dash-tab" id="tab-underwriting" style="display:none;">
@@ -5934,6 +5989,7 @@
         return;
       }
       showMsg('newClientMsg','success','Cliente agregado correctamente, con su póliza activa.');
+      if(typeof tkAfterNewClient === 'function') tkAfterNewClient(inserted.id, polTipo);
       document.getElementById('newClientForm').reset();
       document.getElementById('nc-businessBlock').style.display = 'none';
       document.getElementById('nc-act-expiracion').value = '';
@@ -6000,6 +6056,7 @@
     }
 
     showMsg('newClientMsg','success','Cliente agregado correctamente, como lead.');
+    if(typeof tkAfterNewClient === 'function') tkAfterNewClient(inserted.id, polTipo);
     document.getElementById('newClientForm').reset();
     document.getElementById('nc-businessBlock').style.display = 'none';
     document.getElementById('nc-pol-compania').style.display = 'none';
@@ -6143,6 +6200,7 @@
   async function loadClientPolicies(clientId){
     const { data: policies } = await sb.from('client_policies').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
     currentClientPolicies = policies || [];
+    if(typeof tkRefreshCardSoon === 'function') tkRefreshCardSoon(clientId);
     // Mantiene la lista de Clientes y la etiqueta Activo/Inactivo al día después
     // de cancelar, restaurar o agregar una póliza.
     try{
@@ -7715,6 +7773,7 @@
     // ya no tiene sentido que siga apareciendo aquí como si estuviera pendiente.
     const data = (allData || []).filter(q => !q.sold);
     currentClientQuotes = data;
+    if(typeof tkRefreshCardSoon === 'function') tkRefreshCardSoon(clientId);
     const tbody = document.getElementById('cd-quotesList');
     if(!tbody) return;
     if(!data || data.length === 0){
@@ -14769,6 +14828,687 @@ async function cmDoImport(){
   if(rows.length - auto > 0) CM.view = 'pendientes', cmRender();
 }
 // ===== COMMISSIONS-UI-END =====
+
+// ===== TRUCKING-CORE-START =====
+// Núcleo del módulo «Aplicación de trucking»: datos, validación y reglas de qué va en cada PDF. Sin pantalla ni red: se prueba solo con node.
+const TK_TEMPLATE_VERSION = 'trk-2026-10-v1';
+const TK_APP_DRIVERS = 5, TK_APP_VEHICLES = 6, TK_FLEET_DRIVERS = 39, TK_FLEET_VEHICLES = 6;
+const TK_COVERAGES = [
+  ['liability', 'Responsabilidad civil (liability)'], ['physical_damage', 'Daños físicos'], ['motor_truck_cargo', 'Carga (motor truck cargo)'],
+  ['um_uim', 'UM / UIM'], ['pip', 'PIP'], ['non_owned_trailer', 'Remolque no propio (non-owned trailer)'],
+  ['general_liability', 'Responsabilidad general (GL)'], ['other', 'Otra cobertura'], ['additional', 'Cobertura adicional con nombre']];
+const TK_UNIT_TYPES = ['Tractor', 'Straight truck / camión', 'Box truck', 'Pickup', 'Dump truck', 'Trailer - dry van', 'Trailer - reefer', 'Trailer - flatbed', 'Trailer - lowboy', 'Trailer - tanque', 'Trailer - otro', 'Otro'];
+const TK_FREQ = [['', ''], ['mensual', 'mensual'], ['semanal', 'semanal'], ['anual', 'anual'], ['total', 'total de la póliza']];
+const TK_COMMODITY_EXAMPLE = 'Ej: Dry goods 60';
+
+function tkUid(){
+  if(typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'id-' + Math.random().toString(36).slice(2, 10) + Math.random().toString(36).slice(2, 10);
+}
+function tkBlankDriver(){ return { id: tkUid(), full_name: '', license_number: '', license_state: '', date_of_birth: '', license_issue_date: '', hire_date: '', years_experience: '', license_expiry: '' }; }
+function tkBlankVehicle(kind){ return { id: tkUid(), kind: kind || 'truck', unit_number: '', unit_type: kind === 'trailer' ? 'Trailer - dry van' : 'Tractor', year: '', make_model: '', vin: '', vin_exception: false, stated_value: '', use: '', gross_weight_lb: '', deductible: '' }; }
+function tkBlankCoverages(){ const c = {}; TK_COVERAGES.forEach(([k]) => { c[k] = { requested: false, limit: '', deductible: '' }; }); c.additional.label = ''; return c; }
+function tkBlankApp(){
+  return {
+    id: null, client_id: null, quote_id: null, status: 'draft', data_rev: 1, include_fleet: null,
+    insured: { legal_name: '', dba: '', mailing_address: '', garaging_address: '', phone: '', email: '', fein: '', financial_manager: '' },
+    business: { usdot: '', mc: '', txdmv: '', ca: '', years_in_business: '', radius_miles: '', commodities: [] },
+    policy: { effective_date: '', target_price: '', target_frequency: '' },
+    prior_policy: { company: '', number: '' },
+    drivers: [], vehicles: [], coverages: tkBlankCoverages(), additional_information: '', certificate_holders: []
+  };
+}
+function tkIsTrailerType(t){ return /trailer|remolque/i.test(String(t || '')); }
+
+// ---------- Formato ----------
+function tkFmtDate(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); return m ? m[2] + '/' + m[3] + '/' + m[1] : ''; }
+function tkFmtMoney(v){
+  if(v === '' || v === null || v === undefined) return '';
+  const n = Number(String(v).replace(/[$,\s]/g, '')); if(!isFinite(n)) return String(v);
+  const neg = n < 0; const fixed = Math.abs(n).toFixed(Number.isInteger(n) ? 0 : 2); const [i, d] = fixed.split('.');
+  return (neg ? '-' : '') + '$' + i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (d ? '.' + d : '');
+}
+function tkFmtNumber(v){ if(v === '' || v === null || v === undefined) return ''; const n = Number(String(v).replace(/[,\s]/g, '')); return isFinite(n) ? String(n) : String(v); }
+// Helvetica (WinAnsi) solo dibuja letras latinas con acentos y símbolos comunes; lo demás se cambia por «?» y se avisa.
+function tkWinAnsi(text){
+  const extra = new Set([0x20AC, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0x017D, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x017E, 0x0178]);
+  let out = '', replaced = 0;
+  for(const ch of String(text === null || text === undefined ? '' : text).replace(/\r\n?/g, '\n')){
+    const c = ch.codePointAt(0);
+    if(ch === '\n' || (c >= 0x20 && c <= 0x7E) || (c >= 0xA0 && c <= 0xFF) || extra.has(c)) out += ch;
+    else if(c === 0x09) out += ' ';
+    else { out += '?'; replaced++; }
+  }
+  return { text: out, replaced };
+}
+function tkCommoditiesText(list){
+  return (list || []).filter(c => c && String(c.name || '').trim()).map(c => String(c.name).trim() + (c.pct !== '' && c.pct !== null && c.pct !== undefined ? ' ' + tkFmtNumber(c.pct) + '%' : '')).join(', ');
+}
+function tkContactInfo(ins){ return [ins.phone && ('Tel: ' + String(ins.phone).trim()), ins.email && ('Email: ' + String(ins.email).trim())].filter(Boolean).join('  ·  '); }
+function tkTargetPriceText(p){
+  const price = String(p.target_price || '').trim(); if(!price) return '';
+  const label = (TK_FREQ.find(f => f[0] === p.target_frequency) || [])[1] || '';
+  return (/^[\d,.]+$/.test(price) ? tkFmtMoney(price) : price) + (label ? ' ' + label : '');
+}
+function tkHoldersText(list){
+  const rows = (list || []).filter(h => h && (String(h.name || '').trim() || String(h.address || '').trim()));
+  if(!rows.length) return '';
+  return 'Certificate holders:\n' + rows.map((h, i) => (i + 1) + ') ' + String(h.name || '').trim() + (String(h.address || '').trim() ? ' — ' + String(h.address).replace(/\s*\n\s*/g, ', ').trim() : '')).join('\n');
+}
+function tkAdditionalText(app){ return [String(app.additional_information || '').trim(), tkHoldersText(app.certificate_holders)].filter(Boolean).join('\n\n'); }
+
+// ---------- Cuántos caben y cuándo va el anexo ----------
+function tkChunk(arr, n){ const out = []; for(let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
+function tkFleetRule(app){
+  const d = (app.drivers || []).length, v = (app.vehicles || []).length;
+  const overflow = d > TK_APP_DRIVERS || v > TK_APP_VEHICLES;
+  const suggested = v >= 2 || overflow;
+  const included = app.include_fleet === null || app.include_fleet === undefined ? overflow : !!app.include_fleet;   // null = automático
+  return { drivers: d, vehicles: v, overflow, suggested, included, loses: !included && overflow };
+}
+// Qué páginas salen: la aplicación (primeros 5 conductores y 6 vehículos) y, si va el anexo, TODOS en grupos de 39 / 6.
+function tkPlan(app){
+  const R = tkFleetRule(app);
+  const plan = { appDrivers: app.drivers.slice(0, TK_APP_DRIVERS), appVehicles: app.vehicles.slice(0, TK_APP_VEHICLES), fleet: R.included && (app.drivers.length || app.vehicles.length), driverPages: [], vehiclePages: [] };
+  if(plan.fleet){ plan.driverPages = tkChunk(app.drivers, TK_FLEET_DRIVERS); plan.vehiclePages = tkChunk(app.vehicles, TK_FLEET_VEHICLES); }
+  plan.fleetPages = plan.driverPages.length + plan.vehiclePages.length;
+  return plan;
+}
+
+// ---------- Valores por campo del PDF ----------
+const TK_CELL_LABELS = { full_name: 'Nombre', license_number: 'Licencia #', license_state: 'Estado de licencia', date_of_birth: 'Fecha de nacimiento', license_issue_date: 'Emisión de licencia', hire_date: 'Fecha de contratación', years_experience: 'Años de experiencia',
+  unit_number: 'Unidad', unit_type: 'Tipo de unidad', year: 'Año', make_model: 'Marca / modelo', vin: 'VIN', stated_value: 'Valor', use: 'Uso', gross_weight_lb: 'Peso bruto', deductible: 'Deducible' };
+function tkCellLabel(name, offset){ const m = /^(drivers|vehicles)\.(\d+)\.(\w+)$/.exec(name); if(!m) return name; return (m[1] === 'drivers' ? 'Conductor ' : 'Vehículo ') + (+m[2] + 1 + (offset || 0)) + ' · ' + (TK_CELL_LABELS[m[3]] || m[3]); }
+function tkDriverCells(d, hireOrIssue){
+  const o = { full_name: String(d.full_name || '').trim(), license_number: String(d.license_number || '').trim(), license_state: String(d.license_state || '').trim().toUpperCase(), date_of_birth: tkFmtDate(d.date_of_birth), years_experience: tkFmtNumber(d.years_experience) };
+  if(hireOrIssue === 'issue') o.license_issue_date = tkFmtDate(d.license_issue_date); else o.hire_date = tkFmtDate(d.hire_date);   // aplicación: emisión de licencia; anexo: contratación. Nunca se copia una a la otra.
+  return o;
+}
+function tkVehicleCells(v){
+  return { unit_number: String(v.unit_number || '').trim(), unit_type: String(v.unit_type || '').trim(), year: tkFmtNumber(v.year), make_model: String(v.make_model || '').trim(),
+    vin: String(v.vin || '').trim().toUpperCase(), stated_value: tkFmtMoney(v.stated_value), use: String(v.use || '').trim(), gross_weight_lb: tkFmtNumber(v.gross_weight_lb), deductible: String(v.deductible || '').trim() };
+}
+// Devuelve { values: {campo: texto}, multiline: [campos], labels: {campo: etiqueta legible} }
+function tkAppValues(app){
+  const V = {}, L = {}; const put = (name, text, label) => { const t = String(text === null || text === undefined ? '' : text); if(t.trim() !== ''){ V[name] = t; L[name] = label || name; } };
+  const i = app.insured, b = app.business, p = app.policy, pp = app.prior_policy;
+  put('insured.legal_name', i.legal_name, 'Nombre legal'); put('insured.dba', i.dba, 'DBA'); put('insured.mailing_address', i.mailing_address, 'Dirección postal'); put('insured.garaging_address', i.garaging_address, 'Dirección donde se guardan los vehículos');
+  put('insured.contact_info', tkContactInfo(i), 'Teléfono / email'); put('insured.fein', i.fein, 'FEIN'); put('insured.financial_manager', i.financial_manager, 'Responsable financiero');
+  put('policy.effective_date', tkFmtDate(p.effective_date), 'Fecha efectiva');
+  put('business.usdot', b.usdot, 'USDOT'); put('business.mc', b.mc, 'MC'); put('business.txdmv', b.txdmv, 'TXDMV'); put('business.ca', b.ca, 'CA'); put('business.years_in_business', tkFmtNumber(b.years_in_business), 'Años de negocio');
+  put('prior_policy.company', pp.company, 'Aseguradora anterior'); put('prior_policy.number', pp.number, 'Póliza anterior');
+  put('business.commodities_description', tkCommoditiesText(b.commodities), 'Mercancías'); put('business.radius_miles', tkFmtNumber(b.radius_miles), 'Radio (millas)'); put('policy.target_price_description', tkTargetPriceText(p), 'Precio objetivo');
+  app.drivers.slice(0, TK_APP_DRIVERS).forEach((d, n) => { const c = tkDriverCells(d, 'issue'); Object.keys(c).forEach(k => put('drivers.' + n + '.' + k, c[k], tkCellLabel('drivers.' + n + '.' + k))); });
+  app.vehicles.slice(0, TK_APP_VEHICLES).forEach((v, n) => { const c = tkVehicleCells(v); Object.keys(c).forEach(k => put('vehicles.' + n + '.' + k, c[k], tkCellLabel('vehicles.' + n + '.' + k))); });
+  TK_COVERAGES.forEach(([k, label]) => { const c = app.coverages[k]; if(!c || !c.requested) return;
+    put('coverages.' + k + '.limit', c.limit, label + ' · límite'); put('coverages.' + k + '.deductible', c.deductible, label + ' · deducible'); });
+  if(app.coverages.additional && app.coverages.additional.requested) put('labels.additional', app.coverages.additional.label, 'Nombre de la cobertura adicional');
+  put('additional_information', tkAdditionalText(app), 'Información adicional');
+  return { values: V, labels: L, multiline: ['additional_information'] };
+}
+function tkFleetDriverValues(chunk){ const V = {}; chunk.forEach((d, n) => { const c = tkDriverCells(d, 'hire'); Object.keys(c).forEach(k => { if(String(c[k]).trim() !== '') V['drivers.' + n + '.' + k] = c[k]; }); }); return V; }
+function tkFleetVehicleValues(chunk){ const V = {}; chunk.forEach((v, n) => { const c = tkVehicleCells(v); Object.keys(c).forEach(k => { if(String(c[k]).trim() !== '') V['vehicles.' + n + '.' + k] = c[k]; }); }); return V; }
+
+// ---------- Validación ----------
+function tkValidDate(iso){ const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '')); if(!m) return false; const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])); return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3]; }
+function tkNonNeg(v){ if(v === '' || v === null || v === undefined) return true; const n = Number(String(v).replace(/[$,\s]/g, '')); return isFinite(n) && n >= 0; }
+// «errors» impiden completar; «warnings» solo avisan. Un borrador incompleto siempre se puede guardar.
+function tkValidate(app, todayISO){
+  const E = [], W = []; const today = todayISO || new Date().toISOString().slice(0, 10);
+  if(!String(app.insured.legal_name || '').trim()) E.push('Falta el nombre legal del asegurado.');
+  if(!app.policy.effective_date) E.push('Falta la fecha efectiva solicitada.'); else if(!tkValidDate(app.policy.effective_date)) E.push('La fecha efectiva no es válida.');
+  if(!app.vehicles.length) E.push('Agrega al menos un vehículo.');
+  if(!app.drivers.length) E.push('Agrega al menos un conductor.');
+  if(!TK_COVERAGES.some(([k]) => app.coverages[k] && app.coverages[k].requested)) E.push('Elige al menos una cobertura solicitada.');
+  const holders = (app.business.commodities || []).filter(c => String(c.name || '').trim());
+  if(holders.length){ const total = holders.reduce((s, c) => s + (Number(c.pct) || 0), 0); if(Math.abs(total - 100) > 0.001) E.push('Los porcentajes de mercancías suman ' + tkFmtNumber(Math.round(total * 100) / 100) + '%; deben sumar 100%.'); }
+  app.drivers.forEach((d, n) => { const t = 'Conductor ' + (n + 1) + (d.full_name ? ' (' + d.full_name + ')' : '');
+    if(!String(d.full_name || '').trim()) E.push(t + ': falta el nombre.');
+    if(d.date_of_birth && !tkValidDate(d.date_of_birth)) E.push(t + ': fecha de nacimiento no válida.'); else if(d.date_of_birth && d.date_of_birth > today) E.push(t + ': la fecha de nacimiento no puede ser futura.');
+    ['license_issue_date', 'hire_date', 'license_expiry'].forEach(k => { if(d[k] && !tkValidDate(d[k])) E.push(t + ': fecha no válida (' + k + ').'); });
+    if(!tkNonNeg(d.years_experience)) E.push(t + ': los años de experiencia no pueden ser negativos.');
+    if(d.license_state && !/^[A-Za-z]{2}$/.test(String(d.license_state).trim())) W.push(t + ': el estado de la licencia debería tener 2 letras (ej. TX).'); });
+  app.vehicles.forEach((v, n) => { const t = 'Vehículo ' + (n + 1) + (v.unit_number ? ' (' + v.unit_number + ')' : '');
+    if(!String(v.year || '').trim() && !String(v.make_model || '').trim() && !String(v.vin || '').trim()) E.push(t + ': está vacío (pon año, marca/modelo o VIN, o elimínalo).');
+    const vin = String(v.vin || '').trim().toUpperCase(); const yr = Number(v.year);
+    if(vin){ if(vin.length !== 17 && yr >= 1981 && !v.vin_exception) E.push(t + ': el VIN debe tener 17 caracteres (marca «VIN no estándar» si es un vehículo antiguo).');
+      else if(vin.length === 17 && /[IOQ]/.test(vin)) W.push(t + ': el VIN tiene I, O o Q, que no se usan en VIN reales; revísalo.'); }
+    else if(yr >= 1981) W.push(t + ': falta el VIN.');
+    if(!tkNonNeg(v.stated_value)) E.push(t + ': el valor no puede ser negativo.'); if(!tkNonNeg(v.gross_weight_lb)) E.push(t + ': el peso no puede ser negativo.');
+    if(v.year !== '' && v.year !== undefined && !(Number(v.year) >= 1900 && Number(v.year) <= 2100)) E.push(t + ': el año no es válido.'); });
+  if(!tkNonNeg(app.business.years_in_business) || !tkNonNeg(app.business.radius_miles)) E.push('Años de negocio y radio no pueden ser negativos.');
+  if(app.policy.effective_date && tkValidDate(app.policy.effective_date) && app.policy.effective_date < today) W.push('La fecha efectiva ya pasó.');
+  const R = tkFleetRule(app);
+  if(R.loses) W.push('Hay más conductores/vehículos de los que caben en la aplicación y el anexo está apagado: no se imprimirían. Activa «Incluir anexo de flota».');
+  return { errors: E, warnings: W, canComplete: E.length === 0 };
+}
+// ===== TRUCKING-CORE-END =====
+// ===== TRUCKING-PDF-START =====
+// Genera los PDF llenando EXACTAMENTE las plantillas oficiales (pdf-lib). Nada de regenerar el diseño en HTML.
+// Se usa en el navegador (pdf-lib por CDN) y en las pruebas (pdf-lib de node): siempre recibe «PDFLib» y una función que da los bytes de la plantilla.
+const TK_FIT_MIN_SIZE = 5.5, TK_PAD = 6;
+const TK_TEMPLATE_FILES = { app: 'trucking/Trucking_Aplicacion_En_Blanco.pdf', fleet: 'trucking/Trucking_Flota_En_Blanco.pdf' };
+
+function tkDefaultFontSize(field, fallback){
+  try{ const da = field.acroField.getDefaultAppearance() || ''; const m = /([\d.]+)\s+Tf/.exec(da); if(m && +m[1] > 0) return +m[1]; }catch(e){}
+  return fallback || 8;
+}
+function tkWrapLines(font, text, size, maxW){
+  const out = [];
+  String(text).split('\n').forEach(par => {
+    if(par.trim() === ''){ out.push(''); return; }
+    let line = '';
+    par.split(' ').forEach(word => {
+      let w = word;
+      while(font.widthOfTextAtSize(w, size) > maxW && w.length > 1){      // palabra más larga que la línea: se parte
+        let k = w.length - 1; while(k > 1 && font.widthOfTextAtSize(w.slice(0, k), size) > maxW) k--;
+        if(line){ out.push(line); line = ''; }
+        out.push(w.slice(0, k)); w = w.slice(k);
+      }
+      const t = line ? line + ' ' + w : w;
+      if(line && font.widthOfTextAtSize(t, size) > maxW){ out.push(line); line = w; } else line = t;
+    });
+    out.push(line);
+  });
+  return out;
+}
+// Llena un campo: reduce la letra hasta TK_FIT_MIN_SIZE; si aun así no cabe, deja una marca visible [cont.N] y manda el texto completo a la hoja de continuación.
+function tkSetFieldText(form, font, name, rawText, o, cont, notes){
+  let field; try{ field = form.getTextField(name); }catch(e){ notes.push('La plantilla no tiene el campo «' + name + '».'); return; }
+  const san = tkWinAnsi(rawText); const text = san.text; if(san.replaced) notes.push('«' + (o.label || name) + '»: ' + san.replaced + ' carácter(es) que el PDF no puede dibujar se cambiaron por «?».');
+  const rect = field.acroField.getWidgets()[0].getRectangle(); const availW = rect.width - TK_PAD, availH = rect.height;
+  const base = tkDefaultFontSize(field, 8); let size = base;
+  if(o.multiline){
+    field.enableMultiline();
+    const lh = s => font.heightAtSize(s) + 1.2;
+    let lines; size = base;
+    for(;;){ lines = tkWrapLines(font, text, size, availW); if(lines.length * lh(size) <= availH - 8 || size <= TK_FIT_MIN_SIZE) break; size = Math.max(TK_FIT_MIN_SIZE, size - 0.5); }
+    const maxLines = Math.max(1, Math.floor((availH - 8) / lh(size)));
+    let shown = text;
+    if(lines.length > maxLines){
+      const n = cont.length + 1; cont.push({ label: o.label || name, text: text, n });
+      const mark = '… (continúa en hoja de continuación ' + n + ')';
+      shown = lines.slice(0, maxLines - 1).join('\n') + '\n' + mark;
+    }
+    field.setText(shown); field.setFontSize(size); return;
+  }
+  size = base;
+  while(font.widthOfTextAtSize(text, size) > availW && size > TK_FIT_MIN_SIZE) size = Math.max(TK_FIT_MIN_SIZE, size - 0.5);
+  let shown = text;
+  if(font.widthOfTextAtSize(text, size) > availW){
+    const n = cont.length + 1; cont.push({ label: o.label || name, text: text, n });
+    const mark = '[cont.' + n + ']';
+    let k = text.length; while(k > 0 && font.widthOfTextAtSize(text.slice(0, k) + '… ' + mark, size) > availW) k--;
+    shown = k > 0 ? text.slice(0, k) + '… ' + mark : mark;
+  }
+  field.setText(shown); field.setFontSize(size);
+}
+function tkFillAll(form, font, values, labels, multiline, cont, notes){
+  Object.keys(values).forEach(name => tkSetFieldText(form, font, name, values[name], { label: labels && labels[name], multiline: (multiline || []).includes(name) }, cont, notes));
+  form.updateFieldAppearances(font); form.flatten();
+}
+async function tkContinuationPages(PDFLib, doc, items, head){
+  if(!items.length) return 0;
+  const font = await doc.embedFont(PDFLib.StandardFonts.Helvetica), bold = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold);
+  const W = 612, H = 792, M = 50, SZ = 9.5, LH = 12.5; let page = null, y = 0, count = 0;
+  const newPage = () => { page = doc.addPage([W, H]); count++; y = H - M;
+    page.drawText(tkWinAnsi(head.title).text, { x: M, y, size: 13, font: bold, color: PDFLib.rgb(0.1, 0.1, 0.1) }); y -= 16;
+    page.drawText(tkWinAnsi(head.sub).text, { x: M, y, size: 8.5, font, color: PDFLib.rgb(0.35, 0.35, 0.35) }); y -= 22; };
+  newPage();
+  items.forEach(it => {
+    const lines = tkWrapLines(font, tkWinAnsi(it.text).text, SZ, W - 2 * M);
+    if(y < M + 40) newPage();
+    page.drawText(tkWinAnsi('[' + it.n + '] ' + it.label).text, { x: M, y, size: 10, font: bold }); y -= LH + 2;
+    lines.forEach(l => { if(y < M){ newPage(); } page.drawText(l, { x: M, y, size: SZ, font }); y -= LH; });
+    y -= 10;
+  });
+  return count;
+}
+function tkSetMeta(doc, meta, kind){
+  doc.setTitle('Trucking ' + kind + ' — ' + (meta.insuredName || ''));
+  doc.setSubject((meta.draft ? 'BORRADOR · ' : '') + 'Plantilla ' + TK_TEMPLATE_VERSION + ' · aplicación v' + meta.quoteVersion);
+  doc.setAuthor(meta.userName || 'GMAX Agent CRM'); doc.setCreator('GMAX Agent CRM'); doc.setProducer('GMAX Agent CRM (pdf-lib)');
+  doc.setKeywords(['plantilla=' + TK_TEMPLATE_VERSION, 'version=' + meta.quoteVersion, 'usuario=' + (meta.userName || ''), 'fecha=' + meta.dateISO]);
+  try{ doc.setCreationDate(new Date()); doc.setModificationDate(new Date()); }catch(e){}
+}
+function tkFileName(kind, app, dateISO, ver, draft){
+  const base = String(app.insured.legal_name || 'Cliente').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'Cliente';
+  return 'Trucking_' + kind + '_' + base + '_' + dateISO + '_v' + ver + (draft ? '_BORRADOR' : '') + '.pdf';
+}
+// Devuelve { application, fleet, packet } (bytes) + páginas + avisos. «ctx»: { PDFLib, getTemplate(which) → Uint8Array|Promise, userName, dateISO, quoteVersion }
+async function tkBuildPdfs(app, ctx){
+  const PL = ctx.PDFLib, PDFDocument = PL.PDFDocument; const notes = [];
+  const plan = tkPlan(app);
+  const meta = { insuredName: app.insured.legal_name, userName: ctx.userName, dateISO: ctx.dateISO, quoteVersion: ctx.quoteVersion || app.data_rev || 1, draft: !!ctx.draft };
+  const appBytes = await ctx.getTemplate('app'), fleetBytes = await ctx.getTemplate('fleet');
+  const head = kind => ({ title: 'Hoja de continuación — ' + kind, sub: String(app.insured.legal_name || '').slice(0, 60) + ' · plantilla ' + TK_TEMPLATE_VERSION + ' · versión ' + meta.quoteVersion + ' · ' + tkFmtDate(ctx.dateISO) });
+
+  // 1) Aplicación (siempre: primeros 5 conductores y 6 vehículos, sin inventar filas)
+  const appDoc = await PDFDocument.load(appBytes); const font = await appDoc.embedFont(PL.StandardFonts.Helvetica);
+  const A = tkAppValues(app); const contApp = [];
+  tkFillAll(appDoc.getForm(), font, A.values, A.labels, A.multiline, contApp, notes);
+  const contAppPages = await tkContinuationPages(PL, appDoc, contApp, head('Aplicación de trucking'));
+  tkSetMeta(appDoc, meta, 'Aplicación');
+
+  // 2) Anexo de flota: una carga NUEVA de la plantilla por página (campos con el mismo nombre no se pueden repetir) → se llena, se aplana y se copia
+  let fleetDoc = null, fleetCount = 0, contFleetPages = 0;
+  if(plan.fleet){
+    fleetDoc = await PDFDocument.create(); const contFleet = []; const total = plan.driverPages.length + plan.vehiclePages.length; let n = 0;
+    const stamps = [];
+    const addPage = async (pageIndex, values, label, offset, kind) => {
+      const d = await PDFDocument.load(fleetBytes); const f = await d.embedFont(PL.StandardFonts.Helvetica);
+      const lab = {}; Object.keys(values).forEach(k => { lab[k] = tkCellLabel(k, offset); });
+      tkFillAll(d.getForm(), f, values, lab, [], contFleet, notes);
+      const [pg] = await fleetDoc.copyPages(d, [pageIndex]); fleetDoc.addPage(pg); n++; stamps.push({ pg, label, n });
+    };
+    for(let i = 0; i < plan.driverPages.length; i++) await addPage(0, tkFleetDriverValues(plan.driverPages[i]), 'Conductores ' + (i + 1) + '/' + plan.driverPages.length, i * TK_FLEET_DRIVERS);
+    for(let i = 0; i < plan.vehiclePages.length; i++) await addPage(1, tkFleetVehicleValues(plan.vehiclePages[i]), 'Vehículos ' + (i + 1) + '/' + plan.vehiclePages.length, i * TK_FLEET_VEHICLES);
+    const sf = await fleetDoc.embedFont(PL.StandardFonts.Helvetica);
+    stamps.forEach(s => s.pg.drawText(tkWinAnsi((app.insured.legal_name || '') + '  ·  Anexo de flota — ' + s.label + '  ·  pág. ' + s.n + ' de ' + total).text, { x: 70, y: 22, size: 7, font: sf, color: PL.rgb(0.4, 0.4, 0.4) }));
+    contFleetPages = await tkContinuationPages(PL, fleetDoc, contFleet, head('Anexo de flota'));
+    fleetCount = total; tkSetMeta(fleetDoc, meta, 'Anexo de flota');
+  }
+
+  // 3) Expediente completo = aplicación + anexo
+  const packet = await PDFDocument.create();
+  for(const src of [appDoc, fleetDoc]){ if(!src) continue; const idx = src.getPageIndices(); const pgs = await packet.copyPages(src, idx); pgs.forEach(p => packet.addPage(p)); }
+  tkSetMeta(packet, meta, 'Expediente completo');
+  const out = { application: await appDoc.save(), fleet: fleetDoc ? await fleetDoc.save() : null, packet: await packet.save(), notes, plan,
+    pages: { application: 2 + contAppPages, fleetCore: fleetCount, fleetContinuation: contFleetPages, packet: packet.getPageCount() },
+    names: { application: tkFileName('Aplicacion', app, ctx.dateISO, meta.quoteVersion, ctx.draft), fleet: tkFileName('Anexo_Flota', app, ctx.dateISO, meta.quoteVersion, ctx.draft), packet: tkFileName('Expediente', app, ctx.dateISO, meta.quoteVersion, ctx.draft) } };
+  return out;
+}
+// ===== TRUCKING-PDF-END =====
+// ===== TRUCKING-UI-START =====
+// Pantalla «Aplicación de trucking»: formulario por pasos, guardado en la base y generación de los PDF con las plantillas de la agencia.
+const TK = { app: null, client: null, quotes: [], docs: [], step: 0, dirty: false, saving: false, busy: false, tplCache: {}, pdfLibP: null, vtimer: null };
+const TK_STEPS = ['Asegurado', 'Operación', 'Conductores', 'Vehículos', 'Coberturas', 'Adicional', 'Revisar y PDF'];
+const TK_KIND_LABEL = { application: 'Aplicación', fleet: 'Anexo de flota', packet: 'Expediente completo' };
+
+function tkEsc(s){ return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+function tkToday(){ return toISODateLocal(new Date()); }
+function tkMsg(type, text){ const el = document.getElementById('tk-msg'); if(!el) return; el.className = 'msg' + (type ? ' ' + type : ''); el.textContent = text || ''; if(text && type === 'error') el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function tkUserName(){ try{ return (currentProfile && (currentProfile.full_name || currentProfile.email)) || 'Usuario'; }catch(e){ return 'Usuario'; } }
+
+// ---------- Carga de pdf-lib y plantillas ----------
+function tkLoadPdfLib(){
+  if(window.PDFLib) return Promise.resolve(window.PDFLib);
+  if(TK.pdfLibP) return TK.pdfLibP;
+  TK.pdfLibP = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+    s.onload = () => window.PDFLib ? res(window.PDFLib) : (TK.pdfLibP = null, rej(new Error('El generador de PDF no cargó bien.')));
+    s.onerror = () => { TK.pdfLibP = null; rej(new Error('No se pudo cargar el generador de PDF. Revisa tu internet e intenta de nuevo.')); };
+    document.head.appendChild(s);
+  });
+  return TK.pdfLibP;
+}
+async function tkTemplate(which){
+  if(TK.tplCache[which]) return TK.tplCache[which];
+  let r; try{ r = await fetch(TK_TEMPLATE_FILES[which], { cache: 'no-cache' }); }catch(e){ throw new Error('No se pudo leer la plantilla PDF (' + TK_TEMPLATE_FILES[which] + '). Revisa tu internet.'); }
+  if(!r.ok) throw new Error('Falta la plantilla PDF «' + TK_TEMPLATE_FILES[which] + '» en el sitio (error ' + r.status + '). Hay que subir la carpeta «trucking» junto a index.html.');
+  const bytes = new Uint8Array(await r.arrayBuffer());
+  if(String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== '%PDF') throw new Error('La plantilla «' + TK_TEMPLATE_FILES[which] + '» no es un PDF válido.');
+  TK.tplCache[which] = bytes; return bytes;
+}
+
+// ---------- Datos: fila ↔ aplicación ----------
+function tkFromRow(row){
+  const b = tkBlankApp(), d = row.data || {};
+  const app = Object.assign(b, { id: row.id, client_id: row.client_id, quote_id: row.quote_id || null, status: row.status || 'draft', data_rev: row.data_rev || 1, include_fleet: row.include_fleet === undefined ? null : row.include_fleet });
+  ['insured', 'business', 'policy', 'prior_policy'].forEach(k => { app[k] = Object.assign({}, b[k], d[k] || {}); });
+  app.business.commodities = (Array.isArray(app.business.commodities) ? app.business.commodities : []).map(c => ({ name: String(c.name || ''), pct: c.pct === undefined ? '' : c.pct }));
+  TK_COVERAGES.forEach(([k]) => { app.coverages[k] = Object.assign({ requested: false, limit: '', deductible: '' }, (d.coverages || {})[k] || {}); }); app.coverages.additional.label = ((d.coverages || {}).additional || {}).label || '';
+  app.drivers = (d.drivers || []).map(x => Object.assign(tkBlankDriver(), x, { id: x.id || tkUid() }));
+  app.vehicles = (d.vehicles || []).map(x => Object.assign(tkBlankVehicle(x.kind), x, { id: x.id || tkUid() }));
+  app.additional_information = d.additional_information || ''; app.certificate_holders = (d.certificate_holders || []).map(h => ({ name: String(h.name || ''), address: String(h.address || '') }));
+  return app;
+}
+function tkSerialize(a){ return { schema: 1, insured: a.insured, business: a.business, policy: a.policy, prior_policy: a.prior_policy, drivers: a.drivers, vehicles: a.vehicles, coverages: a.coverages, additional_information: a.additional_information, certificate_holders: a.certificate_holders }; }
+function tkPrefill(client, quotes){
+  const a = tkBlankApp(); a.client_id = client.id; const c = client || {};
+  a.insured.legal_name = c.business_legal_name || c.full_name || ''; a.insured.dba = c.business_dba || '';
+  const line = [c.mailing_address || c.address, c.city, [c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  a.insured.mailing_address = line; a.insured.garaging_address = c.business_address || '';
+  a.insured.phone = c.phone || ''; a.insured.email = c.email || ''; a.insured.fein = c.business_ein || '';
+  if(c.business_start_date){ const y = new Date().getFullYear() - Number(String(c.business_start_date).slice(0, 4)); if(y >= 0 && y < 150) a.business.years_in_business = String(y); }
+  const q = (quotes || []).find(x => x.product === 'auto_comercial'); if(q) a.quote_id = q.id;
+  return a;
+}
+function tkToRow(a){ return { quote_id: a.quote_id || null, status: a.status, include_fleet: a.include_fleet, template_version: TK_TEMPLATE_VERSION, data: tkSerialize(a) }; }
+
+// ---------- Entrada desde el perfil / cliente nuevo ----------
+async function tkOpenApp(clientId, appId){
+  if(!clientId) return;
+  if(TK.dirty && TK.app && !confirm('Tienes cambios sin guardar en otra aplicación de trucking. ¿Descartarlos?')) return;
+  const [cr, qr] = await Promise.all([sb.from('clients').select('*').eq('id', clientId).single(), sb.from('client_quotes').select('*').eq('client_id', clientId).order('created_at', { ascending: false })]);
+  if(cr.error || !cr.data){ alert('No se pudo abrir el cliente: ' + ((cr.error && cr.error.message) || 'no encontrado')); return; }
+  let app;
+  if(appId){
+    const r = await sb.from('trucking_applications').select('*').eq('id', appId).single();
+    if(r.error || !r.data){ alert('No se pudo abrir la aplicación: ' + ((r.error && r.error.message) || 'no encontrada')); return; }
+    app = tkFromRow(r.data);
+  } else app = tkPrefill(cr.data, qr.data);
+  TK.app = app; TK.client = cr.data; TK.quotes = qr.data || []; TK.step = 0; TK.dirty = false; TK.docs = [];
+  tkMsg('', ''); switchTab('trucking'); window.scrollTo(0, 0);
+  tkRender();
+  if(app.id) await tkLoadDocs();
+}
+function tkAfterNewClient(clientId, tipo){
+  if(tipo !== 'auto_comercial' || !clientId) return;
+  setTimeout(() => { if(confirm('Este cliente es de Trucking / Auto comercial.\n\n¿Quieres llenar ahora la aplicación de trucking? (También puedes hacerlo después desde su perfil.)')){ tkOpenFromList(clientId); } }, 1100);
+}
+async function tkOpenFromList(clientId){ await openClient(clientId); await tkOpenApp(clientId); }
+async function tkClose(){
+  if(TK.dirty && !confirm('Tienes cambios sin guardar. ¿Salir sin guardar?')) return;
+  TK.dirty = false; const id = TK.client && TK.client.id; switchTab('clientes'); if(id) await openClient(id);
+}
+window.addEventListener('beforeunload', e => { const t = document.getElementById('tab-trucking'); if(TK.dirty && t && t.style.display !== 'none'){ e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- Tarjeta en el perfil del cliente ----------
+let tkCardTimer = null;
+function tkRefreshCardSoon(clientId){ clearTimeout(tkCardTimer); tkCardTimer = setTimeout(() => { tkLoadClientCard(clientId).catch(() => {}); }, 200); }
+async function tkLoadClientCard(clientId){
+  const card = document.getElementById('cd-truckingCard'); if(!card) return;
+  const relevant = (currentClientPolicies || []).some(p => p.insurance_type === 'auto_comercial' && p.status !== 'cancelled') || (currentClientQuotes || []).some(q => q.product === 'auto_comercial');
+  let apps = [], docs = [], err = null;
+  try{
+    const r = await sb.from('trucking_applications').select('id,status,data_rev,include_fleet,quote_id,data,updated_at').eq('client_id', clientId).order('updated_at', { ascending: false });
+    if(r.error) throw r.error; apps = r.data || [];
+    if(apps.length){ const d = await sb.from('trucking_documents').select('id,application_id,kind,data_rev,generated_at').eq('client_id', clientId).order('generated_at', { ascending: false }); if(d.error) throw d.error; docs = d.data || []; }
+  }catch(e){ err = e; }
+  if(clientId !== currentClientId) return;
+  card.style.display = (relevant || apps.length || err && relevant) ? 'block' : 'none';
+  const msg = document.getElementById('tk-card-msg'); const tb = document.getElementById('cd-truckingList');
+  msg.className = 'msg'; msg.textContent = '';
+  if(err){ const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
+    msg.className = 'msg error'; msg.textContent = missing ? 'Falta correr «migracion_trucking.sql» en Supabase (SQL Editor) para poder guardar aplicaciones de trucking.' : 'No se pudieron cargar las aplicaciones: ' + (err.message || err);
+    tb.innerHTML = '<tr><td colspan="7">—</td></tr>'; document.getElementById('cd-truckingNewBtn').disabled = missing; return; }
+  document.getElementById('cd-truckingNewBtn').disabled = false;
+  if(!apps.length){ tb.innerHTML = '<tr><td colspan="7">Todavía no hay aplicación de trucking para este cliente. Toca «Nueva aplicación».</td></tr>'; return; }
+  const isAdm = typeof isAdminUser === 'function' && isAdminUser();
+  tb.innerHTML = apps.map(a => {
+    const d = a.data || {}, ins = d.insured || {}; const nd = (d.drivers || []).length, nv = (d.vehicles || []).length;
+    const q = (currentClientQuotes || []).find(x => x.id === a.quote_id);
+    const mine = docs.filter(x => x.application_id === a.id); const latest = mine.reduce((m, x) => (!m || x.data_rev > m) ? x.data_rev : m, 0);
+    const pdf = !mine.length ? '<span class="badge gray">Sin PDF</span>' : latest >= a.data_rev ? '<span class="badge active">Al día (v' + latest + ')</span>' : '<span class="badge pending">PDF pendiente de actualizar</span>';
+    const rule = tkFleetRule({ drivers: new Array(nd), vehicles: new Array(nv), include_fleet: a.include_fleet });
+    return '<tr><td>' + tkEsc(formatDateTimeUS(a.updated_at)) + '</td><td>' + tkEsc(ins.legal_name || '—') + '</td><td>' + (q ? tkEsc((INSURANCE_TYPE_LABELS[q.product] || q.product || '') + ' ' + (q.company_name || '')) : '—') + '</td>'
+      + '<td><span class="badge ' + (a.status === 'completed' ? 'active' : 'pending') + '">' + (a.status === 'completed' ? 'Completada' : 'Borrador') + '</span></td>'
+      + '<td>' + nd + ' cond. / ' + nv + ' veh.<br><span class="sub" style="margin:0;">' + (rule.included ? 'con anexo' : 'sin anexo') + '</span></td><td>' + pdf + '</td>'
+      + '<td style="white-space:nowrap;"><button type="button" class="tbl-btn" onclick="tkOpenApp(currentClientId,\'' + a.id + '\')">Abrir</button>' + (isAdm ? '<button type="button" class="tbl-btn reject" onclick="tkDeleteApp(\'' + a.id + '\')">Eliminar</button>' : '') + '</td></tr>';
+  }).join('');
+}
+async function tkDeleteApp(id){
+  if(!confirm('¿Eliminar esta aplicación de trucking y sus PDF guardados? No se puede deshacer.')) return;
+  const d = await sb.from('trucking_documents').select('storage_path').eq('application_id', id);
+  const paths = (d.data || []).map(x => x.storage_path).filter(Boolean);
+  if(paths.length) await sb.storage.from('client-documents').remove(paths);
+  const r = await sb.from('trucking_applications').delete().eq('id', id);
+  if(r.error){ alert('No se pudo eliminar: ' + r.error.message); return; }
+  await tkLoadClientCard(currentClientId);
+}
+async function tkLoadDocs(){
+  if(!TK.app || !TK.app.id){ TK.docs = []; return; }
+  const r = await sb.from('trucking_documents').select('*').eq('application_id', TK.app.id).order('generated_at', { ascending: false });
+  TK.docs = r.data || []; if(TK.step === 6) tkRenderReview();
+}
+
+// ---------- Pantalla ----------
+function tkRender(){
+  const a = TK.app, root = document.getElementById('tk-root'); if(!a || !root) return;
+  const c = TK.client || {};
+  document.getElementById('tk-subtitle').textContent = 'Cliente: ' + (c.full_name || '—') + ' · ' + (a.id ? 'Versión de datos ' + a.data_rev + ' · ' + (a.status === 'completed' ? 'Completada' : 'Borrador') : 'Aún sin guardar') + (TK.dirty ? ' · cambios sin guardar' : '');
+  const steps = '<div class="tk-steps">' + TK_STEPS.map((n, i) => '<button type="button" class="tk-step' + (i === TK.step ? ' on' : '') + '" data-act="goto:' + i + '"><span class="n">' + (i + 1) + '</span>' + tkEsc(n) + '</button>').join('') + '</div>';
+  const body = [tkStep0, tkStep1, tkStep2, tkStep3, tkStep4, tkStep5, tkStep6][TK.step]();
+  const last = TK.step === TK_STEPS.length - 1;
+  const bar = '<div class="tk-bar">' + (TK.step > 0 ? '<button type="button" class="btn-ghost" data-act="prev">← Anterior</button>' : '')
+    + '<button type="button" class="btn-ghost" data-act="save">Guardar borrador</button>'
+    + (last ? '' : '<button type="button" class="btn-primary" data-act="next" style="background:var(--blue,#2B6BE4);">Continuar →</button>')
+    + '<button type="button" class="btn-primary" data-act="complete">Completar y generar PDF</button><span class="sub" id="tk-dirtyNote" style="margin:0;"></span></div>';
+  root.innerHTML = steps + '<div class="dash-card" id="tk-body">' + body + '</div><div class="dash-card" id="tk-valid"></div>' + bar;
+  tkRenderValidation(); tkDirtyNote();
+  if(last) tkRenderReview();
+}
+function tkDirtyNote(){ const n = document.getElementById('tk-dirtyNote'); if(n) n.textContent = TK.dirty ? 'Hay cambios sin guardar' : (TK.app && TK.app.id ? 'Guardado' : ''); const s = document.getElementById('tk-subtitle'); if(s && TK.client){ const a = TK.app; s.textContent = 'Cliente: ' + (TK.client.full_name || '—') + ' · ' + (a.id ? 'Versión de datos ' + a.data_rev + ' · ' + (a.status === 'completed' ? 'Completada' : 'Borrador') : 'Aún sin guardar') + (TK.dirty ? ' · cambios sin guardar' : ''); } }
+function tkI(b, label, val, o){
+  o = o || {}; const t = o.t || 'text'; const cls = 'form-row' + (o.wide ? ' wide' : ''); let ctl;
+  if(o.select) ctl = '<select data-b="' + b + '" data-t="' + t + '">' + o.select.map(x => '<option value="' + tkEsc(x[0]) + '"' + (String(val === null || val === undefined ? '' : val) === String(x[0]) ? ' selected' : '') + '>' + tkEsc(x[1]) + '</option>').join('') + '</select>';
+  else if(o.area) ctl = '<textarea rows="' + (o.rows || 4) + '" data-b="' + b + '" data-t="text" style="width:100%;">' + tkEsc(val) + '</textarea>';
+  else ctl = '<input type="text" data-b="' + b + '" data-t="' + t + '" value="' + tkEsc(t === 'date' ? tkFmtDate(val) : val) + '"' + (t === 'date' ? ' maxlength="10" inputmode="numeric" placeholder="MM/DD/AAAA"' : (o.ph ? ' placeholder="' + tkEsc(o.ph) + '"' : '')) + (o.max ? ' maxlength="' + o.max + '"' : '') + ' autocomplete="off">';
+  return '<div class="' + cls + '"><label>' + tkEsc(label) + (o.hint ? ' <span style="font-weight:400; color:var(--slate-light);">' + tkEsc(o.hint) + '</span>' : '') + '</label>' + ctl + '</div>';
+}
+function tkStep0(){
+  const a = TK.app, i = a.insured;
+  const qopts = [['', 'Sin cotización relacionada']].concat(TK.quotes.map(q => [q.id, (q.quote_date ? formatDateUS(q.quote_date) : formatDateUS((q.created_at || '').split('T')[0])) + ' · ' + (INSURANCE_TYPE_LABELS[q.product] || q.product || 'Cotización') + (q.company_name ? ' · ' + q.company_name : '') + (q.sold ? ' (vendida)' : '')]));
+  return '<h4>Asegurado</h4><p class="sub">Se llenó con lo que ya está en el perfil del cliente; corrígelo aquí si hace falta (no cambia el perfil).</p><div class="tk-grid">'
+    + tkI('quote_id', 'Cotización relacionada', a.quote_id || '', { select: qopts, wide: true })
+    + tkI('insured.legal_name', 'Nombre legal del asegurado *', i.legal_name, { wide: true }) + tkI('insured.dba', 'DBA (nombre comercial)', i.dba, { wide: true })
+    + tkI('insured.mailing_address', 'Dirección postal', i.mailing_address, { wide: true }) + tkI('insured.garaging_address', 'Dirección donde se guardan los vehículos (garaging)', i.garaging_address, { wide: true })
+    + tkI('insured.phone', 'Teléfono', i.phone) + tkI('insured.email', 'Correo electrónico', i.email) + tkI('insured.fein', 'FEIN / EIN', i.fein, { hint: '(con ceros tal cual)' }) + tkI('insured.financial_manager', 'Responsable financiero', i.financial_manager)
+    + '</div>';
+}
+function tkStep1(){
+  const a = TK.app, b = a.business, p = a.policy, pp = a.prior_policy;
+  const com = b.commodities.map((c, n) => '<div class="tk-grid" style="grid-template-columns:2fr 1fr auto; align-items:end;">' + tkI('commodities:' + n + ':name', 'Mercancía', c.name, { ph: 'Ej: Dry goods' }) + tkI('commodities:' + n + ':pct', '% del total', c.pct, { t: 'num', ph: '60' })
+    + '<div class="form-row"><button type="button" class="btn-ghost tk-mini" data-act="delcom:' + n + '">Quitar</button></div></div>').join('');
+  const total = b.commodities.filter(c => String(c.name || '').trim()).reduce((s, c) => s + (Number(c.pct) || 0), 0);
+  return '<h4>Operación y póliza solicitada</h4><div class="tk-grid">'
+    + tkI('policy.effective_date', 'Fecha efectiva solicitada *', p.effective_date, { t: 'date' }) + tkI('business.usdot', 'USDOT #', b.usdot, { hint: '(o «No aplica»)' }) + tkI('business.mc', 'MC #', b.mc, { hint: '(o «No aplica»)' })
+    + tkI('business.txdmv', 'TXDMV #', b.txdmv) + tkI('business.ca', 'CA #', b.ca) + tkI('business.years_in_business', 'Años en el negocio', b.years_in_business, { t: 'num' })
+    + tkI('prior_policy.company', 'Aseguradora anterior', pp.company) + tkI('prior_policy.number', 'Póliza anterior #', pp.number)
+    + tkI('business.radius_miles', 'Radio de operación (millas)', b.radius_miles, { t: 'num' })
+    + tkI('policy.target_price', 'Precio objetivo', p.target_price, { t: 'num', ph: '12500' }) + tkI('policy.target_frequency', 'Cada cuánto', p.target_frequency, { select: TK_FREQ })
+    + '</div><h4 style="margin-top:14px;">Mercancías que transporta</h4><p class="sub">Los porcentajes deben sumar 100%. <b>Suma actual: ' + tkFmtNumber(Math.round(total * 100) / 100) + '%</b></p>' + com
+    + '<button type="button" class="btn-ghost tk-mini" data-act="addcom">+ Agregar mercancía</button>';
+}
+function tkMoveBtns(list, id, n, len){ return '<button type="button" class="btn-ghost tk-mini" data-act="up:' + list + ':' + id + '"' + (n === 0 ? ' disabled' : '') + ' title="Subir">▲</button><button type="button" class="btn-ghost tk-mini" data-act="down:' + list + ':' + id + '"' + (n === len - 1 ? ' disabled' : '') + ' title="Bajar">▼</button><button type="button" class="btn-ghost tk-mini" style="color:#C23B3B;" data-act="del:' + list + ':' + id + '">Quitar</button>'; }
+function tkStep2(){
+  const a = TK.app; const R = tkFleetRule(a);
+  const rows = a.drivers.map((d, n) => '<div class="tk-item" data-id="' + d.id + '"><div class="tk-item-head"><b>Conductor ' + (n + 1) + (d.full_name ? ' · ' + tkEsc(d.full_name) : '') + '</b>'
+    + '<span class="badge ' + (n < TK_APP_DRIVERS ? 'active' : 'blue') + '">' + (n < TK_APP_DRIVERS ? 'va en la aplicación y en el anexo' : 'solo en el anexo de flota') + '</span><span style="flex:1"></span>' + tkMoveBtns('drivers', d.id, n, a.drivers.length) + '</div>'
+    + '<div class="tk-grid">' + ['full_name:Nombre completo *:text', 'license_number:Licencia #:text', 'license_state:Estado de la licencia:upper', 'date_of_birth:Fecha de nacimiento:date', 'license_issue_date:Emisión de la licencia (aplicación):date', 'hire_date:Fecha de contratación (anexo):date', 'years_experience:Años de experiencia:num', 'license_expiry:Vence la licencia:date'].map(s => { const [k, l, t] = s.split(':'); return tkI('drivers:' + d.id + ':' + k, l, d[k], { t, max: k === 'license_state' ? 2 : 0 }); }).join('') + '</div></div>').join('');
+  return '<h4>Conductores (' + a.drivers.length + ')</h4><p class="sub">La aplicación tiene lugar para 5 conductores; si hay más, todos van en el anexo de flota. El orden es el que se imprime.</p>'
+    + (R.overflow ? '<div class="msg" style="display:block; background:#FEF3E2; color:#8A5A00;">Hay más de 5 conductores: el anexo de flota se incluye automáticamente.</div>' : '')
+    + (rows || '<p class="sub">Aún no hay conductores.</p>')
+    + '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"><button type="button" class="btn-primary tk-mini" style="margin:0;" data-act="adddrv">+ Agregar conductor</button><button type="button" class="btn-ghost tk-mini" style="margin:0;" data-act="impdrv">Traer conductores del perfil del cliente</button></div>';
+}
+function tkStep3(){
+  const a = TK.app; const R = tkFleetRule(a);
+  const kinds = [['truck', 'Camión / tractor'], ['trailer', 'Remolque']];
+  const rows = a.vehicles.map((v, n) => '<div class="tk-item" data-id="' + v.id + '"><div class="tk-item-head"><b>' + (v.kind === 'trailer' ? 'Remolque' : 'Camión') + ' ' + (n + 1) + (v.unit_number ? ' · ' + tkEsc(v.unit_number) : '') + '</b>'
+    + '<span class="badge ' + (n < TK_APP_VEHICLES ? 'active' : 'blue') + '">' + (n < TK_APP_VEHICLES ? 'va en la aplicación y en el anexo' : 'solo en el anexo de flota') + '</span><span style="flex:1"></span>' + tkMoveBtns('vehicles', v.id, n, a.vehicles.length) + '</div>'
+    + '<div class="tk-grid">' + tkI('vehicles:' + v.id + ':kind', 'Clase', v.kind, { select: kinds }) + tkI('vehicles:' + v.id + ':unit_number', 'Unidad # (Item)', v.unit_number) + tkI('vehicles:' + v.id + ':unit_type', 'Tipo de unidad', v.unit_type, { select: TK_UNIT_TYPES.map(x => [x, x]).concat(TK_UNIT_TYPES.includes(v.unit_type) ? [] : [[v.unit_type, v.unit_type]]) })
+    + tkI('vehicles:' + v.id + ':year', 'Año', v.year, { t: 'num', max: 4 }) + tkI('vehicles:' + v.id + ':make_model', 'Marca / modelo', v.make_model) + tkI('vehicles:' + v.id + ':vin', 'VIN (17 caracteres)', v.vin, { t: 'upper', max: 25 })
+    + '<div class="form-row"><label>&nbsp;</label><label style="font-weight:400; display:flex; gap:8px; align-items:center;"><input type="checkbox" data-b="vehicles:' + v.id + ':vin_exception" data-t="bool"' + (v.vin_exception ? ' checked' : '') + ' style="width:auto;"> VIN no estándar (vehículo antiguo)</label></div>'
+    + tkI('vehicles:' + v.id + ':stated_value', 'Valor declarado ($)', v.stated_value, { t: 'num' }) + tkI('vehicles:' + v.id + ':use', 'Uso', v.use) + tkI('vehicles:' + v.id + ':gross_weight_lb', 'Peso bruto (lb)', v.gross_weight_lb, { t: 'num' }) + tkI('vehicles:' + v.id + ':deductible', 'Deducible', v.deductible)
+    + '</div></div>').join('');
+  return '<h4>Vehículos (' + a.vehicles.length + ')</h4><p class="sub">La aplicación tiene lugar para 6 vehículos; si hay más, todos van en el anexo de flota (6 por página).</p>'
+    + (R.overflow && a.vehicles.length > TK_APP_VEHICLES ? '<div class="msg" style="display:block; background:#FEF3E2; color:#8A5A00;">Hay más de 6 vehículos: el anexo de flota se incluye automáticamente.</div>' : '')
+    + (rows || '<p class="sub">Aún no hay vehículos.</p>')
+    + '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;"><button type="button" class="btn-primary tk-mini" style="margin:0;" data-act="addveh:truck">+ Agregar camión / tractor</button><button type="button" class="btn-primary tk-mini" style="margin:0;" data-act="addveh:trailer">+ Agregar remolque</button><button type="button" class="btn-ghost tk-mini" style="margin:0;" data-act="impveh">Traer vehículos del perfil del cliente</button></div>';
+}
+function tkStep4(){
+  const a = TK.app;
+  const rows = TK_COVERAGES.map(([k, label]) => { const c = a.coverages[k];
+    return '<label class="chk"><input type="checkbox" data-b="coverages.' + k + '.requested" data-t="bool"' + (c.requested ? ' checked' : '') + ' style="width:16px;"> ' + tkEsc(label) + '</label>'
+      + '<input type="text" data-b="coverages.' + k + '.limit" data-t="text" placeholder="Límite" value="' + tkEsc(c.limit) + '">' + '<input type="text" data-b="coverages.' + k + '.deductible" data-t="text" placeholder="Deducible" value="' + tkEsc(c.deductible) + '">'
+      + (k === 'additional' ? '<div style="grid-column:1/-1;">' + tkI('coverages.additional.label', 'Nombre de la cobertura adicional (se imprime en la aplicación)', c.label, { ph: 'Ej: Trailer interchange' }) + '</div>' : ''); }).join('');
+  return '<h4>Coberturas solicitadas *</h4><p class="sub">Marca las que pide el cliente y escribe límite y deducible por separado. Las etiquetas «MTC» y «Non-Owned Trailer» ya vienen impresas en la plantilla.</p><div class="tk-cov"><b>Cobertura</b><b>Límite</b><b>Deducible</b>' + rows + '</div>';
+}
+function tkStep5(){
+  const a = TK.app;
+  const hs = a.certificate_holders.map((h, n) => '<div class="tk-item"><div class="tk-item-head"><b>Certificate holder ' + (n + 1) + '</b><span style="flex:1"></span><button type="button" class="btn-ghost tk-mini" style="color:#C23B3B;" data-act="delhol:' + n + '">Quitar</button></div><div class="tk-grid">' + tkI('holders:' + n + ':name', 'Nombre', h.name) + tkI('holders:' + n + ':address', 'Dirección', h.address, { area: true, rows: 2 }) + '</div></div>').join('');
+  return '<h4>Información adicional</h4><p class="sub">Va en el recuadro «Additional Information/coverages» de la aplicación. Si es muy largo, se achica la letra y, si aun así no cabe, el resto se imprime en una hoja de continuación identificada (nunca se corta en silencio).</p>'
+    + tkI('additional_information', 'Información adicional / coberturas', a.additional_information, { area: true, rows: 6, wide: true })
+    + '<h4 style="margin-top:14px;">Certificate holders</h4><p class="sub">Pueden ser varios; se imprimen dentro de la información adicional.</p>' + hs + '<button type="button" class="btn-ghost tk-mini" data-act="addhol">+ Agregar certificate holder</button>';
+}
+function tkStep6(){
+  return '<h4>Revisar y generar</h4><p class="sub">Revisa los avisos de abajo. «Completar y generar PDF» guarda, genera la aplicación, el anexo de flota (si corresponde) y el expediente completo, y los guarda en el expediente del cliente. Nada se envía a ninguna aseguradora.</p><div id="tk-review"></div>';
+}
+function tkRenderValidation(){
+  const el = document.getElementById('tk-valid'); if(!el) return; const a = TK.app; const v = tkValidate(a, tkToday()); const plan = tkPlan(a); const R = tkFleetRule(a);
+  const li = (arr, cls) => arr.length ? '<ul class="tk-list ' + cls + '">' + arr.map(x => '<li>' + tkEsc(x) + '</li>').join('') + '</ul>' : '';
+  const pages = 2 + (plan.fleet ? plan.fleetPages : 0);
+  el.innerHTML = '<h4 style="margin-bottom:4px;">' + (v.canComplete ? '✅ Lista para completar' : 'Para poder completar falta') + '</h4>' + li(v.errors, 'tk-err') + (v.warnings.length ? '<p class="sub" style="margin-top:8px;"><b>Avisos (no impiden completar)</b></p>' + li(v.warnings, 'tk-warn') : '')
+    + '<p class="sub" style="margin-top:8px;">Se imprimirán <b>' + pages + ' páginas</b>: aplicación (2)' + (plan.fleet ? ' + anexo de flota (' + plan.driverPages.length + ' de conductores, ' + plan.vehiclePages.length + ' de vehículos)' : (R.suggested ? ' · se sugiere agregar el anexo de flota (varios vehículos)' : '')) + '. Un borrador incompleto siempre se puede guardar.</p>';
+}
+function tkRenderReview(){
+  const box = document.getElementById('tk-review'); if(!box) return; const a = TK.app; const R = tkFleetRule(a); const plan = tkPlan(a);
+  const stale = !TK.docs.length || Math.max.apply(null, TK.docs.map(d => d.data_rev)) < a.data_rev || TK.dirty;
+  const opts = [['', 'Automático (' + (R.overflow ? 'se incluye: hay más de 5 conductores o 6 vehículos' : R.suggested ? 'no se incluye; se sugiere con varios vehículos' : 'no se incluye') + ')'], ['true', 'Incluir anexo de flota'], ['false', 'No incluir anexo de flota']];
+  const hist = TK.docs.length ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Generado</th><th>Documento</th><th>Versión de datos</th><th>Plantilla</th><th>Estado</th><th></th></tr></thead><tbody>' + TK.docs.map(d => '<tr><td>' + tkEsc(formatDateTimeUS(d.generated_at)) + '</td><td>' + tkEsc(TK_KIND_LABEL[d.kind] || d.kind) + '<br><span class="sub" style="margin:0;">' + tkEsc(d.file_name) + '</span></td><td>v' + d.data_rev + '</td><td>' + tkEsc(d.template_version) + '</td><td>' + (d.data_rev >= a.data_rev && !TK.dirty ? '<span class="badge active">Al día</span>' : '<span class="badge pending">Pendiente de actualizar</span>') + '</td><td><button type="button" class="tbl-btn" data-act="doc:' + d.id + '">Descargar</button></td></tr>').join('') + '</tbody></table></div>' : '<p class="sub">Todavía no se ha generado ningún PDF de esta aplicación.</p>';
+  box.innerHTML = tkI('include_fleet', 'Incluir anexo de flota', a.include_fleet === null ? '' : String(a.include_fleet), { select: opts, t: 'tri', wide: true })
+    + (stale && TK.docs.length ? '<div class="msg" style="display:block; background:#FEF3E2; color:#8A5A00;"><b>PDF pendiente de actualizar:</b> los datos cambiaron después del último PDF. Toca «Completar y generar PDF» para crear la versión nueva.</div>' : '')
+    + '<div class="tk-dl"><button type="button" class="btn-ghost" data-act="dl:application">Descargar aplicación</button><button type="button" class="btn-ghost" data-act="dl:fleet"' + (plan.fleet ? '' : ' title="Esta aplicación no lleva anexo"') + '>Descargar anexo de flota</button><button type="button" class="btn-ghost" data-act="dl:packet">Descargar expediente completo</button></div>'
+    + '<p class="sub">Si la aplicación está incompleta, los botones de descarga generan un <b>borrador</b> (el nombre del archivo termina en _BORRADOR) y no lo guardan en el expediente.</p><h4 style="margin-top:12px;">PDF generados</h4>' + hist;
+}
+
+// ---------- Cambios en pantalla ----------
+function tkSetB(b, v){
+  const a = TK.app; if(b.indexOf(':') >= 0){ const [list, id, key] = b.split(':');
+    const arr = list === 'drivers' ? a.drivers : list === 'vehicles' ? a.vehicles : list === 'commodities' ? a.business.commodities : a.certificate_holders;
+    const it = (list === 'commodities' || list === 'holders') ? arr[+id] : arr.find(x => x.id === id); if(it) it[key] = v; return; }
+  const p = b.split('.'); let o = a; for(let i = 0; i < p.length - 1; i++) o = o[p[i]]; o[p[p.length - 1]] = v;
+}
+function tkMarkDirty(){ TK.dirty = true; if(TK.app.status === 'completed') TK.app.status = 'draft'; tkDirtyNote(); clearTimeout(TK.vtimer); TK.vtimer = setTimeout(() => { tkRenderValidation(); if(TK.step === 6) tkRenderReview(); }, 350); }
+function tkOnInput(el){
+  const b = el.dataset.b; if(!b) return; const t = el.dataset.t || 'text'; let v;
+  if(t === 'bool') v = el.checked;
+  else if(t === 'date'){ maskDateInput(el); v = mmddyyyyToISO(el.value) || ''; el.style.borderColor = (el.value.length === 10 && !v) ? '#C23B3B' : ''; }
+  else if(t === 'upper'){ const s = el.selectionStart; el.value = el.value.toUpperCase(); try{ el.setSelectionRange(s, s); }catch(e){} v = el.value; }
+  else if(t === 'tri') v = el.value === '' ? null : el.value === 'true';
+  else v = el.value;
+  tkSetB(b, v);
+  if(/:kind$/.test(b)){ const id = b.split(':')[1]; const veh = TK.app.vehicles.find(x => x.id === id); if(veh && (veh.unit_type === 'Tractor' || veh.unit_type === 'Trailer - dry van')) veh.unit_type = v === 'trailer' ? 'Trailer - dry van' : 'Tractor'; tkMarkDirty(); tkRender(); return; }
+  tkMarkDirty();
+}
+function tkMove(list, id, dir){ const arr = list === 'drivers' ? TK.app.drivers : TK.app.vehicles; const i = arr.findIndex(x => x.id === id); const j = i + dir; if(i < 0 || j < 0 || j >= arr.length) return; const t = arr[i]; arr[i] = arr[j]; arr[j] = t; tkMarkDirty(); tkRender(); }
+async function tkImportDrivers(){
+  const r = await sb.from('client_drivers').select('*').eq('client_id', TK.app.client_id); if(r.error){ tkMsg('error', 'No se pudieron leer los conductores del cliente: ' + r.error.message); return; }
+  const norm = s => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim(); let added = 0, skipped = 0;
+  (r.data || []).filter(d => d.status !== 'removed').forEach(d => { const name = buildFullName(d.first_name, d.middle_name, d.last_name);
+    if(TK.app.drivers.some(x => (d.license_number && norm(x.license_number) === norm(d.license_number)) || norm(x.full_name) === norm(name))){ skipped++; return; }
+    const n = tkBlankDriver(); Object.assign(n, { full_name: name, license_number: d.license_number || '', license_state: d.license_state || '', date_of_birth: d.date_of_birth || '', license_expiry: d.license_expiration || '' }); TK.app.drivers.push(n); added++; });
+  tkMarkDirty(); tkRender(); tkMsg(added ? 'success' : '', added ? added + ' conductor(es) agregado(s) del perfil' + (skipped ? ' (' + skipped + ' ya estaban)' : '') + '. Completa fecha de contratación, emisión de licencia y años de experiencia.' : 'No hay conductores nuevos en el perfil del cliente' + (skipped ? ' (' + skipped + ' ya estaban)' : '') + '.');
+}
+async function tkImportVehicles(){
+  const r = await sb.from('client_vehicles').select('*').eq('client_id', TK.app.client_id); if(r.error){ tkMsg('error', 'No se pudieron leer los vehículos del cliente: ' + r.error.message); return; }
+  let added = 0, skipped = 0;
+  (r.data || []).filter(v => v.status !== 'removed').forEach(v => { const vin = String(v.vin || '').trim().toUpperCase();
+    if(vin && TK.app.vehicles.some(x => String(x.vin || '').toUpperCase() === vin)){ skipped++; return; }
+    const n = tkBlankVehicle('truck'); Object.assign(n, { vin, year: v.year ? String(v.year) : '', make_model: [v.make, v.model].filter(Boolean).join(' ') }); TK.app.vehicles.push(n); added++; });
+  tkMarkDirty(); tkRender(); tkMsg(added ? 'success' : '', added ? added + ' vehículo(s) agregado(s) del perfil' + (skipped ? ' (' + skipped + ' ya estaban)' : '') + '. Completa unidad, tipo, valor, uso y peso.' : 'No hay vehículos nuevos en el perfil del cliente' + (skipped ? ' (' + skipped + ' ya estaban)' : '') + '.');
+}
+function tkAct(act){
+  const a = TK.app, p = act.split(':');
+  switch(p[0]){
+    case 'goto': return tkGoto(+p[1]);
+    case 'next': return tkGoto(Math.min(TK.step + 1, TK_STEPS.length - 1), true);
+    case 'prev': return tkGoto(Math.max(TK.step - 1, 0));
+    case 'save': return tkSave({});
+    case 'complete': return tkComplete();
+    case 'adddrv': a.drivers.push(tkBlankDriver()); tkMarkDirty(); return tkRender();
+    case 'addveh': a.vehicles.push(tkBlankVehicle(p[1])); tkMarkDirty(); return tkRender();
+    case 'del': { const arr = p[1] === 'drivers' ? a.drivers : a.vehicles; const it = arr.find(x => x.id === p[2]); const nm = it && (it.full_name || it.unit_number || it.vin || ''); if(!confirm('¿Quitar ' + (p[1] === 'drivers' ? 'este conductor' : 'este vehículo') + (nm ? ' (' + nm + ')' : '') + '?')) return; arr.splice(arr.findIndex(x => x.id === p[2]), 1); tkMarkDirty(); return tkRender(); }
+    case 'up': return tkMove(p[1], p[2], -1);
+    case 'down': return tkMove(p[1], p[2], 1);
+    case 'impdrv': return tkImportDrivers();
+    case 'impveh': return tkImportVehicles();
+    case 'addcom': a.business.commodities.push({ name: '', pct: '' }); tkMarkDirty(); return tkRender();
+    case 'delcom': a.business.commodities.splice(+p[1], 1); tkMarkDirty(); return tkRender();
+    case 'addhol': a.certificate_holders.push({ name: '', address: '' }); tkMarkDirty(); return tkRender();
+    case 'delhol': a.certificate_holders.splice(+p[1], 1); tkMarkDirty(); return tkRender();
+    case 'dl': return tkDownload(p[1]);
+    case 'doc': return tkDownloadStored(p[1]);
+  }
+}
+async function tkGoto(n, autosave){
+  if(autosave || TK.dirty){ const ok = await tkSave({ quiet: true }); if(!ok && autosave) return; }
+  TK.step = n; tkRender(); window.scrollTo(0, 0);
+}
+function tkBusy(b){ TK.busy = b; document.querySelectorAll('#tk-root button').forEach(x => { x.disabled = b; }); }
+
+// ---------- Guardar ----------
+async function tkSave(o){
+  o = o || {}; const a = TK.app; if(!a || TK.saving) return false;
+  if(!String(a.insured.legal_name || '').trim() && !a.id){ tkMsg('error', 'Escribe al menos el nombre legal del asegurado para guardar el borrador.'); return false; }
+  TK.saving = true; tkBusy(true);
+  try{
+    const row = tkToRow(a); const v = tkValidate(a, tkToday()); if(!v.canComplete) row.status = 'draft';
+    let res;
+    if(!a.id){ const { data: { session } } = await sb.auth.getSession(); res = await sb.from('trucking_applications').insert(Object.assign(row, { client_id: a.client_id, created_by: session.user.id })).select().single(); }
+    else res = await sb.from('trucking_applications').update(row).eq('id', a.id).eq('data_rev', a.data_rev).select().maybeSingle();
+    if(res.error){ const missing = /does not exist|schema cache|42P01|PGRST205/i.test(res.error.message || ''); tkMsg('error', missing ? 'Falta correr «migracion_trucking.sql» en Supabase (SQL Editor).' : 'No se pudo guardar: ' + res.error.message); return false; }
+    if(!res.data){ tkMsg('error', 'Esta aplicación cambió en otra pantalla o con otro usuario mientras la editabas. Para no pisar esos cambios, no se guardó. Vuelve a abrirla desde el perfil del cliente.'); return false; }
+    a.id = res.data.id; a.data_rev = res.data.data_rev; a.status = res.data.status; TK.dirty = false;
+    if(!o.quiet) tkMsg('success', v.canComplete ? 'Guardado (versión de datos ' + a.data_rev + ').' : 'Borrador guardado (versión de datos ' + a.data_rev + '). Todavía falta: ' + v.errors.length + ' cosa(s) para poder completarla.');
+    else tkMsg('', '');
+    tkDirtyNote(); if(TK.step === 6) tkRenderReview();
+    return true;
+  }catch(e){ tkMsg('error', 'No se pudo guardar: ' + (e.message || e)); return false; }
+  finally{ TK.saving = false; tkBusy(false); }
+}
+
+// ---------- PDF ----------
+function tkSaveBlob(bytes, name){
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })); const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+async function tkRun(draft){
+  const PL = await tkLoadPdfLib();
+  return tkBuildPdfs(TK.app, { PDFLib: PL, getTemplate: tkTemplate, userName: tkUserName(), dateISO: tkToday(), quoteVersion: TK.app.data_rev, draft: !!draft });
+}
+async function tkComplete(){
+  const a = TK.app; const v = tkValidate(a, tkToday());
+  if(!v.canComplete){ TK.step = 6; tkRender(); tkMsg('error', 'Todavía no se puede completar: ' + v.errors.length + ' cosa(s) por corregir (están listadas abajo). Puedes guardar como borrador.'); return; }
+  if(!(await tkSave({ quiet: true }))) return;
+  tkBusy(true); tkMsg('', '');
+  const uploaded = [];
+  try{
+    const res = await tkRun(false); const { data: { session } } = await sb.auth.getSession(); const ts = Date.now(); const rows = [];
+    const items = [['application', res.application, res.pages.application], ['fleet', res.fleet, res.pages.fleetCore + res.pages.fleetContinuation], ['packet', res.packet, res.pages.packet]].filter(x => x[1]);
+    for(const [kind, bytes, pages] of items){
+      const path = a.client_id + '/trucking/' + a.id + '_v' + a.data_rev + '_' + kind + '_' + ts + '.pdf';
+      const up = await sb.storage.from('client-documents').upload(path, new Blob([bytes], { type: 'application/pdf' }), { contentType: 'application/pdf' });
+      if(up.error) throw new Error('No se pudo subir el PDF (' + TK_KIND_LABEL[kind] + '): ' + up.error.message);
+      uploaded.push(path);
+      rows.push({ application_id: a.id, client_id: a.client_id, kind, data_rev: a.data_rev, template_version: TK_TEMPLATE_VERSION, quote_id: a.quote_id || null, storage_path: path, file_name: res.names[kind], page_count: pages, notes: res.notes.length ? res.notes.join(' | ').slice(0, 900) : null, generated_by: session.user.id });
+    }
+    const ins = await sb.from('trucking_documents').insert(rows); if(ins.error) throw new Error('Se generaron los PDF pero no se pudo registrar el historial: ' + ins.error.message);
+    a.status = 'completed'; TK.dirty = false; TK.saving = false; const ok = await tkSave({ quiet: true });
+    await tkLoadDocs(); tkRender();
+    tkMsg('success', 'Listo: se generaron ' + items.length + ' PDF (versión de datos ' + a.data_rev + ') y quedaron guardados en el expediente. Descárgalos abajo.' + (res.notes.length ? ' Avisos: ' + res.notes.join(' ') : ''));
+  }catch(e){
+    if(uploaded.length) try{ await sb.storage.from('client-documents').remove(uploaded); }catch(_){}
+    tkMsg('error', 'No se pudo generar el PDF: ' + (e.message || e));
+  }finally{ tkBusy(false); }
+}
+async function tkDownload(kind){
+  const a = TK.app; const plan = tkPlan(a);
+  if(kind === 'fleet' && !plan.fleet){ tkMsg('error', 'Esta aplicación no lleva anexo de flota (todo cabe en la aplicación). Si lo quieres de todos modos, en «Revisar y PDF» cambia «Incluir anexo de flota» a «Incluir».'); return; }
+  const v = tkValidate(a, tkToday()); let draft = false;
+  if(!v.canComplete){ if(!confirm('Esta aplicación todavía está incompleta (' + v.errors.length + ' cosa/s por corregir).\n\n¿Descargar un BORRADOR de todos modos?')) return; draft = true; }
+  if(TK.dirty && !(await tkSave({ quiet: true }))) return;
+  const stored = !draft && TK.docs.find(d => d.kind === kind && d.data_rev === a.data_rev);
+  if(stored) return tkDownloadStored(stored.id);
+  tkBusy(true); tkMsg('', '');
+  try{ const res = await tkRun(draft); tkSaveBlob(res[kind], res.names[kind]); tkMsg('success', 'Se descargó ' + res.names[kind] + (draft ? ' (borrador, no se guardó en el expediente)' : ' (no se guardó en el expediente; usa «Completar y generar PDF» para guardarlo)') + '.'); }
+  catch(e){ tkMsg('error', 'No se pudo generar el PDF: ' + (e.message || e)); }
+  finally{ tkBusy(false); }
+}
+async function tkDownloadStored(id){
+  const d = TK.docs.find(x => x.id === id); if(!d) return;
+  try{ const s = await sb.storage.from('client-documents').createSignedUrl(d.storage_path, 300); if(s.error || !s.data) throw new Error((s.error && s.error.message) || 'sin acceso'); const r = await fetch(s.data.signedUrl); if(!r.ok) throw new Error('error ' + r.status); tkSaveBlob(new Uint8Array(await r.arrayBuffer()), d.file_name); }
+  catch(e){ tkMsg('error', 'No se pudo descargar el PDF: ' + (e.message || e)); }
+}
+
+// Eventos de la pantalla (una sola vez)
+(function(){
+  const root = document.getElementById('tk-root'); if(!root || root.dataset.bound) return; root.dataset.bound = '1';
+  root.addEventListener('input', e => { const el = e.target; if(el.dataset && el.dataset.b && el.tagName !== 'SELECT' && el.type !== 'checkbox') tkOnInput(el); });
+  root.addEventListener('change', e => { const el = e.target; if(el.dataset && el.dataset.b && (el.tagName === 'SELECT' || el.type === 'checkbox')) tkOnInput(el); });
+  root.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if(b && !b.disabled && !TK.busy){ e.preventDefault(); tkAct(b.dataset.act); } });
+})();
+// ===== TRUCKING-UI-END =====
 
   // =================== FIN TESORERÍA ===================
 
