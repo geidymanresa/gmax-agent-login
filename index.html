@@ -675,6 +675,7 @@
         <button class="dash-nav-btn" data-tab="tesoreria" id="navTesoreria" onclick="switchTab('tesoreria')" style="display:none;">Tesorería</button>
         <button class="dash-nav-btn" data-tab="comisiones" id="navComisiones" onclick="switchTab('comisiones')" style="display:none;">Comisiones</button>
         <button class="dash-nav-btn" data-tab="pagina" id="navPagina" onclick="switchTab('pagina')" style="display:none;">Página</button>
+        <button class="dash-nav-btn" data-tab="sms" id="navSms" onclick="switchTab('sms')" style="display:none;">SMS</button>
         <button class="dash-nav-btn" data-tab="underwriting" id="navUnderwriting" onclick="switchTab('underwriting')" style="display:none;">Underwriting</button>
         <button class="dash-nav-btn" data-tab="usuarios" id="navUsuarios" onclick="switchTab('usuarios')" style="display:none;">Usuarios</button>
         <button class="dash-nav-btn" data-tab="solicitudes" id="navSolicitudes" onclick="switchTab('solicitudes')" style="display:none;">Solicitudes de Agentes</button>
@@ -3223,6 +3224,37 @@
       </section>
 <!-- ===== PAGINA-HTML-END ===== -->
 
+<!-- ===== SMS-ADMIN-HTML-START ===== -->
+      <section class="dash-tab" id="tab-sms" style="display:none;">
+        <style>
+          #tab-sms .sub{margin-bottom:6px; font-size:13px; color:var(--slate-light);}
+          #tab-sms .dash-card{margin:14px 0; padding:18px;}
+          #tab-sms .sa-pills{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0;}
+          #tab-sms .sa-pill{border:1.5px solid var(--line); background:#fff; border-radius:100px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:'Poppins',sans-serif; color:var(--slate);}
+          #tab-sms .sa-pill.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+          #tab-sms .sa-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:12px 0;}
+          #tab-sms .sa-kpi{border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; background:#fff;}
+          #tab-sms .sa-kpi .n{font-family:'Poppins',sans-serif; font-size:26px; font-weight:800; color:var(--navy); line-height:1.1;}
+          #tab-sms .sa-kpi .l{font-size:12.5px; color:var(--slate-light); margin-top:4px;}
+          #tab-sms table.dash-table td, #tab-sms table.dash-table th{padding:8px 10px; font-size:13px; vertical-align:top;}
+          #tab-sms .sa-item{border:1.5px solid var(--line); border-radius:12px; padding:12px 14px; margin:10px 0; background:#fff;}
+          #tab-sms textarea{width:100%; padding:9px 11px; font-size:14px; border:1.5px solid var(--line); border-radius:9px; font-family:inherit;}
+          #tab-sms .sa-count{font-size:12.5px; color:var(--slate-light); margin:4px 0;}
+          #tab-sms .sa-warn{color:#9B2222;}
+          #tab-sms .sa-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+          #tab-sms .sa-mini{width:auto; padding:6px 12px; margin:0; font-size:12.5px;}
+          #tab-sms .sa-set{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px;}
+          #tab-sms .sa-set label{display:block; font-size:13px; font-weight:600; margin-bottom:5px;}
+          #tab-sms .sa-set input[type=number], #tab-sms .sa-set input[type=text]{width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:9px; font-size:14px;}
+        </style>
+        <h2>Mensajes de texto (SMS)</h2>
+        <p class="sub">Aprueba lo que se va a enviar, edita los textos y prende o apaga los envíos. Todo mensaje respeta el permiso del cliente, su pausa, el horario y el tope mensual.</p>
+        <div class="sa-pills" id="sa-views"></div>
+        <div id="sa-msg" class="msg"></div>
+        <div id="sa-body"></div>
+      </section>
+<!-- ===== SMS-ADMIN-HTML-END ===== -->
+
       <!-- TAB: UNDERWRITING (administradores) -->
       <section class="dash-tab" id="tab-underwriting" style="display:none;">
         <h2>Underwriting</h2>
@@ -4070,7 +4102,7 @@
     signPadHasStrokes = false;
   }
 
-    // ===== SMS-SIGN-JS-START =====
+        // ===== SMS-SIGN-JS-START =====
   // Casilla opcional de mensajes de texto al firmar un «Recibo de pago». Todo es «mejor esfuerzo»: si algo falla, la firma NO se afecta.
   const SMS_SIGN_VERSION = 'sms-2026-10-v1-receipt';
   async function smsSignRpc(name, body){
@@ -4328,6 +4360,7 @@
     placeLibroWrap(tab);
     if(tab === 'comisiones' && typeof cmOpen === 'function') cmOpen();
     if(tab === 'pagina' && typeof pwOpen === 'function') pwOpen();
+    if(tab === 'sms' && typeof saOpen === 'function') saOpen();
   }
 
   // Libro de negocio + Conversión viven en un solo bloque (#libroWrap) que se muestra en
@@ -4892,6 +4925,7 @@
     await safeLoad(loadTesoreria, 'Tesorería');
     await safeLoad(loadComisiones, 'Comisiones');
     await safeLoad(loadPagina, 'Página');
+    await safeLoad(loadSmsAdmin, 'SMS');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
     await safeLoad(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
     await safeLoad(loadDashboardAgentAlerts, 'Tareas de la administradora');
@@ -15737,6 +15771,152 @@ async function smsTogglePause(){
   SMS.busy = false;
 }
 // ===== SMS-UI-END =====
+
+// ===== SMS-ADMIN-START =====
+// Pestaña «SMS» del CRM (solo administradoras): cola de mensajes por aprobar, plantillas editables y ajustes del interruptor general.
+const SA = { view: 'cola', settings: null, templates: [], msgs: [], sel: new Set(), busy: false };
+const SA_VIEWS = [['cola', 'Por aprobar y enviados'], ['plantillas', 'Plantillas'], ['ajustes', 'Ajustes e interruptor']];
+const SA_VARS = ['nombre', 'agente', 'tipo', 'aseguradora', 'monto', 'fecha', 'telefono', 'texto'];
+const SA_SAMPLE = { nombre: 'María', agente: 'Geidy Manresa', tipo: 'auto', aseguradora: 'Progressive', monto: '150.00', fecha: '11/12/2026', telefono: '(713) 555-0101', texto: 'Sí, llámame' };
+const SA_CONSUMER_KINDS = ['followup', 'payment_reminder', 'renewal_reminder'];
+const SA_KIND_LABEL = { followup: 'Seguimiento de cotización', payment_reminder: 'Recordatorio de pago', renewal_reminder: 'Renovación', lead_alert: 'Aviso para ti: nuevo lead', owner_alert: 'Aviso para ti: el cliente respondió' };
+const SA_GSM = '@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&\'()*+,-./0123456789:;<=>?¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà';
+const SA_GSM_EXT = '^{}\\[~]|€';
+
+function saIsAdmin(){ try{ return isAdminUser(); }catch(e){ return false; } }
+function saIsSuper(){ try{ return isSuperAdminUser(); }catch(e){ return false; } }
+function saMsg(type, text){ const el = document.getElementById('sa-msg'); if(!el) return; el.className = 'msg' + (type ? ' ' + type : ''); el.textContent = text || ''; }
+function saFillSample(body){ return String(body || '').replace(/\{([a-z]+)\}/g, (m, k) => SA_SAMPLE[k] !== undefined ? SA_SAMPLE[k] : m); }
+// Cuántos mensajes (segmentos) ocupa un texto: GSM-7 (160 / 153 por segmento) o, si tiene acentos como á í ó ú, Unicode (70 / 67).
+function saSegments(text){
+  const t = String(text || ''); let gsm = true, units = 0;
+  for(const ch of t){ if(SA_GSM.includes(ch)) units += 1; else if(SA_GSM_EXT.includes(ch)) units += 2; else { gsm = false; break; } }
+  if(gsm) return { chars: t.length, encoding: 'GSM', segments: units === 0 ? 0 : (units <= 160 ? 1 : Math.ceil(units / 153)) };
+  const len = Array.from(t).reduce((a, c) => a + (c.codePointAt(0) > 0xFFFF ? 2 : 1), 0);
+  return { chars: t.length, encoding: 'UCS2', segments: len === 0 ? 0 : (len <= 70 ? 1 : Math.ceil(len / 67)) };
+}
+function saTemplateProblems(kind, body){
+  const out = []; const b = String(body || '');
+  if(b.trim().length < 10) out.push('Es demasiado corto (mínimo 10 caracteres).'); if(b.length > 600) out.push('Es demasiado largo (máximo 600 caracteres).');
+  (b.match(/\{[^}]*\}/g) || []).forEach(v => { const k = v.slice(1, -1); if(!SA_VARS.includes(k)) out.push('La variable ' + v + ' no existe. Las válidas son: ' + SA_VARS.map(x => '{' + x + '}').join(', ') + '.'); });
+  if(SA_CONSUMER_KINDS.includes(kind)){ if(!/STOP/.test(b)) out.push('Debe decir «Responde STOP para cancelar» (es obligatorio por ley).'); if(!/GMAX All Insurance/.test(b)) out.push('Debe decir quién escribe: «GMAX All Insurance».'); }
+  return out;
+}
+
+async function loadSmsAdmin(){ const b = document.getElementById('navSms'); if(b) b.style.display = saIsAdmin() ? '' : 'none'; }
+async function saOpen(){
+  if(!saIsAdmin()) return;
+  saRenderViews(); saMsg('', ''); await saShow(SA.view);
+}
+function saRenderViews(){ const el = document.getElementById('sa-views'); if(el) el.innerHTML = SA_VIEWS.map(v => '<button type="button" class="sa-pill' + (v[0] === SA.view ? ' on' : '') + '" onclick="saShow(\'' + v[0] + '\')">' + smsEsc(v[1]) + '</button>').join(''); }
+async function saShow(view){
+  SA.view = view; saRenderViews(); saMsg('', ''); const body = document.getElementById('sa-body'); if(!body) return; body.innerHTML = '<p class="sub">Cargando…</p>';
+  try{
+    if(view === 'cola') await saRenderQueue(); else if(view === 'plantillas') await saRenderTemplates(); else await saRenderSettings();
+  }catch(e){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String((e && (e.message || e.code)) || e));
+    body.innerHTML = ''; saMsg('error', missing ? 'Falta correr las migraciones de SMS en Supabase (migracion_sms_consentimiento.sql, migracion_sms_2_enlace_y_mensajes.sql y migracion_sms_3_plantillas_y_envio.sql).' : 'No se pudo cargar: ' + ((e && e.message) || e));
+  }
+}
+async function saLoadSettings(){ const r = await sb.from('sms_settings').select('*').eq('id', true).maybeSingle(); if(r.error) throw r.error; SA.settings = r.data; return r.data; }
+
+// ---------- Por aprobar y enviados ----------
+async function saRenderQueue(){
+  const s = await saLoadSettings();
+  const r = await sb.from('sms_messages').select('id,client_id,direction,kind,body,status,created_at,sent_at,error,to_owner,client:client_id(full_name)').order('created_at', { ascending: false }).limit(200); if(r.error) throw r.error;
+  SA.msgs = r.data || []; SA.sel = new Set();
+  const pend = SA.msgs.filter(m => m.status === 'pending_approval'), outs = SA.msgs.filter(m => m.direction === 'out');
+  const cnt = st => outs.filter(m => (Array.isArray(st) ? st : [st]).includes(m.status)).length;
+  const on = s && s.sending_enabled;
+  const nm = m => (m.client && m.client.full_name) || (m.to_owner ? 'Aviso para ti' : '—');
+  let h = '<div class="dash-card"><div class="sa-row"><b>Envíos a clientes:</b> <span style="font-weight:800; color:' + (on ? '#13633F' : '#9B2222') + ';">' + (on ? 'PRENDIDOS' : 'APAGADOS') + '</span>'
+    + '<span class="sub" style="margin:0 0 0 10px;">Visto bueno ' + (s && s.approval_required ? 'obligatorio' : 'no requerido') + ' · Avisos de nuevo lead ' + (s && s.lead_alerts_enabled ? 'prendidos' : 'apagados') + '</span></div>'
+    + (on ? '' : '<p class="sub" style="margin:6px 0 0;">Mientras estén apagados no sale ningún mensaje y no se planea nada nuevo. Se prenden en «Ajustes e interruptor».</p>') + '</div>';
+  h += '<div class="sa-kpis"><div class="sa-kpi"><div class="n">' + pend.length + '</div><div class="l">Por aprobar</div></div><div class="sa-kpi"><div class="n">' + cnt('queued') + '</div><div class="l">En cola</div></div><div class="sa-kpi"><div class="n">' + cnt(['sent', 'delivered']) + '</div><div class="l">Enviados (últimos 200)</div></div><div class="sa-kpi"><div class="n">' + cnt(['failed', 'undelivered']) + '</div><div class="l">Con problema</div></div></div>';
+  h += '<div class="dash-card"><h4 style="margin:0 0 6px;">Por aprobar</h4>';
+  if(!pend.length) h += '<p class="sub">No hay mensajes esperando tu visto bueno.</p>';
+  else {
+    h += '<div class="sa-row" style="margin:8px 0;"><button type="button" class="btn-ghost sa-mini" onclick="saSelectAll(true)">Seleccionar todos</button><button type="button" class="btn-ghost sa-mini" onclick="saSelectAll(false)">Quitar selección</button><button type="button" class="btn-primary sa-mini" id="sa-approve" onclick="saDecide(\'approve\')">Aprobar seleccionados</button><button type="button" class="btn-ghost sa-mini" id="sa-reject" onclick="saDecide(\'reject\')">Rechazar seleccionados</button></div>'
+      + '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th></th><th>Cliente</th><th>Tipo</th><th>Mensaje</th><th>Creado</th></tr></thead><tbody>'
+      + pend.map(m => '<tr><td><input type="checkbox" class="sa-chk" data-id="' + smsEsc(m.id) + '" onchange="saToggle(this)"></td><td>' + smsEsc(nm(m)) + '</td><td>' + smsEsc(SMS_KIND_LABEL[m.kind] || m.kind) + '</td><td style="max-width:460px; white-space:pre-wrap;">' + smsEsc(m.body) + '</td><td>' + smsEsc(smsFmtTime(m.created_at)) + '</td></tr>').join('') + '</tbody></table></div>';
+  }
+  h += '</div><div class="dash-card"><h4 style="margin:0 0 6px;">Últimos mensajes</h4><div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Fecha</th><th></th><th>Cliente</th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead><tbody>'
+    + (SA.msgs.filter(m => m.status !== 'pending_approval').slice(0, 60).map(m => '<tr><td>' + smsEsc(smsFmtTime(m.sent_at || m.created_at)) + '</td><td>' + (m.direction === 'in' ? '⬇' : '⬆') + '</td><td>' + smsEsc(nm(m)) + '</td><td>' + smsEsc(SMS_KIND_LABEL[m.kind] || m.kind) + '</td><td style="max-width:420px; white-space:pre-wrap;">' + smsEsc(m.body) + '</td><td>' + smsEsc(SMS_STATUS_LABEL[m.status] || m.status) + (m.error ? '<br><span class="sa-warn" style="font-size:12px;">' + smsEsc(m.error) + '</span>' : '') + '</td></tr>').join('') || '<tr><td colspan="6">Todavía no hay mensajes.</td></tr>')
+    + '</tbody></table></div></div>';
+  document.getElementById('sa-body').innerHTML = h;
+}
+function saToggle(el){ const id = el.getAttribute('data-id'); if(el.checked) SA.sel.add(id); else SA.sel.delete(id); }
+function saSelectAll(on){ document.querySelectorAll('#sa-body .sa-chk').forEach(c => { c.checked = on; saToggle(c); }); }
+async function saDecide(kind){
+  if(SA.busy) return; const ids = Array.from(SA.sel); if(!ids.length){ saMsg('error', 'Marca al menos un mensaje.'); return; }
+  if(kind === 'approve' && !window.confirm('¿Aprobar ' + ids.length + ' mensaje(s)? Saldrán en el siguiente envío (dentro del horario permitido).')) return;
+  SA.busy = true; saMsg('', '');
+  try{
+    const r = await sb.rpc(kind === 'approve' ? 'sms_approve' : 'sms_reject', { p_ids: ids }); if(r.error) throw r.error;
+    await saRenderQueue(); saMsg('success', (kind === 'approve' ? 'Aprobados: ' : 'Rechazados: ') + (r.data === undefined || r.data === null ? ids.length : r.data) + '.');
+  }catch(e){ saMsg('error', 'No se pudo: ' + ((e && e.message) || e)); }
+  SA.busy = false;
+}
+
+// ---------- Plantillas ----------
+async function saRenderTemplates(){
+  const r = await sb.from('sms_templates').select('*').order('key', { ascending: true }); if(r.error) throw r.error; SA.templates = r.data || []; const canEdit = saIsSuper();
+  const order = ['followup_1', 'followup_2', 'followup_3', 'followup_4', 'followup_last', 'payment_before', 'payment_due', 'payment_overdue', 'renewal_30', 'renewal_10', 'lead_alert', 'owner_alert'];
+  SA.templates.sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
+  let h = '<div class="dash-card"><p class="sub" style="margin:0;">Variables que puedes usar: ' + SA_VARS.map(v => '<code>{' + v + '}</code>').join(' ') + '. Cada texto que va al cliente debe decir <b>GMAX All Insurance</b> y <b>Responde STOP para cancelar</b>. ' + (canEdit ? '' : 'Solo la super administradora puede editarlos.') + ' Con acentos (á, í, ó, ú) el mensaje es Unicode y cabe menos (70 caracteres por mensaje en vez de 160); un texto largo se cobra como varios mensajes.</p></div>';
+  h += SA.templates.map(t => '<div class="sa-item" data-key="' + smsEsc(t.key) + '"><div class="sa-row" style="justify-content:space-between;"><b>' + smsEsc(t.name) + '</b><span class="sub" style="margin:0;">' + smsEsc(SA_KIND_LABEL[t.kind] || t.kind) + '</span></div>'
+    + '<textarea rows="3" maxlength="600" id="sa-t-' + smsEsc(t.key) + '" ' + (canEdit ? '' : 'disabled') + ' oninput="saCount(\'' + smsEsc(t.key) + '\')">' + smsEsc(t.body) + '</textarea><div class="sa-count" id="sa-c-' + smsEsc(t.key) + '"></div><div class="sub" id="sa-p-' + smsEsc(t.key) + '" style="margin:2px 0;"></div>'
+    + '<div class="sa-row"><label style="font-size:13px;"><input type="checkbox" id="sa-a-' + smsEsc(t.key) + '" ' + (t.active ? 'checked' : '') + ' ' + (canEdit ? '' : 'disabled') + '> Activa</label>' + (canEdit ? '<button type="button" class="btn-primary sa-mini" onclick="saSaveTemplate(\'' + smsEsc(t.key) + '\')">Guardar</button>' : '') + '</div></div>').join('');
+  document.getElementById('sa-body').innerHTML = h; SA.templates.forEach(t => saCount(t.key));
+}
+function saCount(key){
+  const t = SA.templates.find(x => x.key === key); const ta = document.getElementById('sa-t-' + key); if(!t || !ta) return; const seg = saSegments(saFillSample(ta.value));
+  document.getElementById('sa-c-' + key).textContent = ta.value.length + ' caracteres · aprox. ' + seg.segments + ' mensaje(s) de texto (' + (seg.encoding === 'GSM' ? 'sin acentos' : 'con acentos: Unicode') + ')';
+  const pr = saTemplateProblems(t.kind, ta.value); const el = document.getElementById('sa-p-' + key); el.className = 'sub' + (pr.length ? ' sa-warn' : ''); el.textContent = pr.length ? pr.join(' ') : 'Así se vería: ' + saFillSample(ta.value);
+}
+async function saSaveTemplate(key){
+  if(SA.busy || !saIsSuper()) return; const t = SA.templates.find(x => x.key === key); const body = document.getElementById('sa-t-' + key).value.trim(); const active = document.getElementById('sa-a-' + key).checked;
+  const pr = saTemplateProblems(t.kind, body); if(pr.length){ saMsg('error', 'No se guardó «' + t.name + '»: ' + pr.join(' ')); return; }
+  SA.busy = true; saMsg('', '');
+  try{ const r = await sb.from('sms_templates').update({ body, active, updated_at: new Date().toISOString() }).eq('key', key); if(r.error) throw r.error; t.body = body; t.active = active; saMsg('success', 'Guardado: ' + t.name + '.'); saCount(key); }
+  catch(e){ saMsg('error', 'No se pudo guardar: ' + ((e && e.message) || e)); }
+  SA.busy = false;
+}
+
+// ---------- Ajustes e interruptor ----------
+async function saRenderSettings(){
+  const s = await saLoadSettings(); const ed = saIsSuper(); const dis = ed ? '' : ' disabled'; if(!s){ document.getElementById('sa-body').innerHTML = '<p class="sub">No se encontró la configuración de SMS.</p>'; return; }
+  const ck = (id, v, label, help) => '<div><label><input type="checkbox" id="' + id + '"' + (v ? ' checked' : '') + dis + '> ' + label + '</label><p class="sub">' + help + '</p></div>';
+  const num = (id, v, label, min, max, help) => '<div><label for="' + id + '">' + label + '</label><input type="number" id="' + id + '" value="' + smsEsc(v) + '" min="' + min + '" max="' + max + '"' + dis + '><p class="sub">' + help + '</p></div>';
+  document.getElementById('sa-body').innerHTML = '<div class="dash-card"><div class="sa-set">'
+    + ck('sa-s-enabled', s.sending_enabled, '<b>Enviar mensajes a clientes</b>', 'Prende SOLO cuando Twilio ya aprobó la campaña y las funciones están desplegadas. Apagado = no se planea ni se envía nada.')
+    + ck('sa-s-approval', s.approval_required, 'Pedir mi visto bueno antes de enviar', 'Recomendado los primeros días: cada mensaje espera en «Por aprobar».')
+    + ck('sa-s-alerts', s.lead_alerts_enabled, 'Avisarme por texto de cada lead nuevo y de cada respuesta', 'Va al número guardado en el secret OWNER_ALERT_PHONE de Supabase (nunca en el CRM ni en la página).')
+    + ck('sa-s-sunday', s.no_sunday, 'No enviar los domingos', 'Recomendado.')
+    + num('sa-s-from', s.send_from_hour, 'Enviar desde las (hora de Houston, 0–23)', 0, 23, 'Ej.: 9 = 9:00 am.') + num('sa-s-to', s.send_to_hour, 'Enviar hasta las (1–24)', 1, 24, 'Ej.: 20 = 8:00 pm. Pasada esa hora el mensaje espera al día siguiente.')
+    + num('sa-s-cap', s.max_per_month, 'Máximo de mensajes por cliente en 30 días (1–8)', 1, 8, 'El texto de consentimiento promete «hasta 8 al mes»: no lo subas de 8.')
+    + num('sa-s-afrom', s.alert_from_hour, 'Avisos para ti: desde las (0–23)', 0, 23, 'Para que no te escriba de madrugada.') + num('sa-s-ato', s.alert_to_hour, 'Avisos para ti: hasta las (1–24)', 1, 24, '')
+    + '<div><label for="sa-s-agent">Nombre con el que firman los mensajes de leads sin agente asignada</label><input type="text" id="sa-s-agent" maxlength="60" value="' + smsEsc(s.default_agent_name) + '"' + dis + '></div></div>'
+    + (ed ? '<div class="sa-row" style="margin-top:14px;"><button type="button" class="btn-primary sa-mini" onclick="saSaveSettings()">Guardar ajustes</button></div>' : '<p class="sub">Solo la super administradora puede cambiar estos ajustes.</p>') + '</div>';
+}
+async function saSaveSettings(){
+  if(SA.busy || !saIsSuper()) return; const g = id => document.getElementById(id); const n = id => parseInt(g(id).value, 10);
+  const row = { sending_enabled: g('sa-s-enabled').checked, approval_required: g('sa-s-approval').checked, lead_alerts_enabled: g('sa-s-alerts').checked, no_sunday: g('sa-s-sunday').checked,
+    send_from_hour: n('sa-s-from'), send_to_hour: n('sa-s-to'), max_per_month: n('sa-s-cap'), alert_from_hour: n('sa-s-afrom'), alert_to_hour: n('sa-s-ato'), default_agent_name: g('sa-s-agent').value.trim() };
+  const bad = [];
+  if(!(row.send_from_hour >= 0 && row.send_from_hour <= 23)) bad.push('«Enviar desde» debe ser de 0 a 23.'); if(!(row.send_to_hour >= 1 && row.send_to_hour <= 24)) bad.push('«Enviar hasta» debe ser de 1 a 24.');
+  if(row.send_from_hour >= row.send_to_hour) bad.push('La hora de inicio debe ser menor que la final.'); if(!(row.max_per_month >= 1 && row.max_per_month <= 8)) bad.push('El máximo por mes debe ser de 1 a 8 (el consentimiento promete hasta 8).');
+  if(!(row.alert_from_hour >= 0 && row.alert_from_hour <= 23) || !(row.alert_to_hour >= 1 && row.alert_to_hour <= 24) || row.alert_from_hour >= row.alert_to_hour) bad.push('El horario de avisos para ti no es válido.');
+  if(row.default_agent_name.length < 2) bad.push('Escribe el nombre con el que se firman los mensajes.');
+  if(bad.length){ saMsg('error', bad.join(' ')); return; }
+  const turningOn = row.sending_enabled && !(SA.settings && SA.settings.sending_enabled);
+  if(turningOn && !window.confirm('Vas a PRENDER los envíos a clientes. ¿Ya aprobó Twilio la campaña y están desplegadas las funciones sms-run y sms-webhook?' + (row.approval_required ? '\n\nCada mensaje esperará tu visto bueno antes de salir.' : '\n\n⚠ Sin visto bueno: los mensajes saldrán solos.'))) return;
+  SA.busy = true; saMsg('', '');
+  try{ const r = await sb.from('sms_settings').update(Object.assign(row, { updated_at: new Date().toISOString() })).eq('id', true); if(r.error) throw r.error; await saRenderSettings(); saMsg('success', 'Ajustes guardados' + (row.sending_enabled ? ' — los envíos están PRENDIDOS.' : ' — los envíos están apagados.')); }
+  catch(e){ saMsg('error', 'No se pudo guardar: ' + ((e && e.message) || e)); }
+  SA.busy = false;
+}
+// ===== SMS-ADMIN-END =====
 
 // ===== PAGINA-UI-START =====
 // Pestaña «Página»: visitas a la página pública + editor del contenido (aviso festivo, aseguradoras, equipo).
