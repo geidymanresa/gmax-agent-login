@@ -432,6 +432,15 @@
         <button type="button" class="btn-ghost" style="width:auto; padding:6px 14px; margin-top:8px;" onclick="clearSignaturePad()">Borrar firma</button>
       </div>
 
+      <!-- ===== SMS-SIGN-HTML-START ===== -->
+      <!-- Casilla OPCIONAL (nunca bloquea la firma): solo aparece en «Recibo de pago» y si el cliente todavía no dio permiso -->
+      <div class="form-row" id="sign-sms-row" style="display:none;">
+        <label style="display:flex; align-items:flex-start; gap:10px; font-weight:400; cursor:pointer; background:#F5F8FF; border:1px solid var(--line); border-radius:10px; padding:12px 14px;">
+          <input type="checkbox" id="sign-sms-check" style="margin-top:3px; width:18px; height:18px; flex-shrink:0;">
+          <span id="sign-sms-text" style="font-size:13px; line-height:1.5;">Sí, quiero recibir mensajes de texto de GMAX All Insurance (recordatorios de mi póliza y pagos) al número que termina en <b id="sign-sms-l4">••••</b>. Hasta 8 mensajes al mes. Pueden aplicar tarifas de mensajes y datos. Responde STOP para cancelar o AYUDA para ayuda. Es opcional y no es condición para comprar ni para recibir servicios. No compartimos tu número de celular con terceros para fines de mercadeo. Ver <a href="https://gmaxallinsurance.com/terminos-y-condiciones.html#s8" target="_blank" rel="noopener">Términos</a> y <a href="https://gmaxallinsurance.com/politica-de-privacidad.html" target="_blank" rel="noopener">Política de Privacidad</a>.</span>
+        </label>
+      </div>
+      <!-- ===== SMS-SIGN-HTML-END ===== -->
       <div class="msg" id="sign-msg"></div>
       <button type="button" class="btn-primary" onclick="submitSignaturePad()">Firmar y enviar</button>
 
@@ -2104,7 +2113,31 @@
             </div>
           </div>
 
-<!-- ===== TRUCKING-CARD-START ===== -->
+<!-- ===== SMS-CARD-START ===== -->
+          <!-- Notificaciones por texto (SMS): permiso del cliente, pedirlo por WhatsApp, pausar y bitácora de mensajes -->
+          <div class="dash-card" id="cd-smsCard" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h4 style="margin:0;">💬 Notificaciones por texto (SMS)</h4>
+              <span id="sms-badge" style="font-size:12.5px; font-weight:700; padding:5px 12px; border-radius:999px; background:#EEF0F6; color:#5B6478;">—</span>
+            </div>
+            <p class="sub" id="sms-status-line" style="margin:8px 0 6px;">—</p>
+            <div id="sms-off-banner" style="display:none; background:#FFF6E0; border:1px solid #F0D58A; color:#7A5B00; border-radius:10px; padding:9px 12px; font-size:13px; margin:8px 0;"></div>
+            <div class="msg" id="sms-msg"></div>
+            <div id="sms-actions" style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;"></div>
+            <div id="sms-panel" style="display:none;"></div>
+            <h5 style="margin:16px 0 6px;">Mensajes</h5>
+            <div class="dash-table-wrap">
+              <table class="dash-table">
+                <thead><tr><th>Fecha</th><th></th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
+                <tbody id="sms-log"><tr><td colspan="5">—</td></tr></tbody>
+              </table>
+            </div>
+            <details style="margin-top:12px;"><summary style="cursor:pointer; font-size:13px; color:#5B6478;">Historial del permiso (quién lo dio y cómo)</summary>
+              <div class="dash-table-wrap" style="margin-top:8px;"><table class="dash-table"><thead><tr><th>Fecha</th><th>Qué pasó</th><th>Cómo</th><th>Detalle</th></tr></thead><tbody id="sms-consent-log"><tr><td colspan="4">—</td></tr></tbody></table></div>
+            </details>
+          </div>
+<!-- ===== SMS-CARD-END ===== -->
+          <!-- ===== TRUCKING-CARD-START ===== -->
           <!-- Aplicación de trucking (solo aparece si el cliente tiene Trucking / Auto comercial o ya tiene una aplicación) -->
           <div class="dash-card" id="cd-truckingCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -4036,6 +4069,32 @@
     signPadCtx.clearRect(0, 0, canvas.width, canvas.height);
     signPadHasStrokes = false;
   }
+
+    // ===== SMS-SIGN-JS-START =====
+  // Casilla opcional de mensajes de texto al firmar un «Recibo de pago». Todo es «mejor esfuerzo»: si algo falla, la firma NO se afecta.
+  const SMS_SIGN_VERSION = 'sms-2026-10-v1-receipt';
+  async function smsSignRpc(name, body){
+    const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + name, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: 'Bearer ' + SUPABASE_ANON_KEY }, body: JSON.stringify(body) });
+    if(!r.ok) throw new Error('http ' + r.status); return r.json();
+  }
+  async function smsSignOffer(token){
+    const row = document.getElementById('sign-sms-row'); if(!row) return;
+    row.style.display = 'none'; window.__smsSignOffered = false; const box = document.getElementById('sign-sms-check'); if(box) box.checked = false;
+    try{
+      const d = await smsSignRpc('get_receipt_sms_state', { p_token: token });
+      if(d && d.eligible){ document.getElementById('sign-sms-l4').textContent = '••' + (d.phone_last4 || ''); row.style.display = 'block'; window.__smsSignOffered = true; }
+    }catch(e){ /* sin casilla: la firma sigue normal */ }
+  }
+  function smsSignRecord(token){
+    try{
+      const box = document.getElementById('sign-sms-check'); if(!window.__smsSignOffered || !box || !box.checked) return;
+      smsSignRpc('record_receipt_sms_consent', {
+        p_token: token, p_text: (document.getElementById('sign-sms-text').textContent || '').replace(/\s+/g, ' ').trim().slice(0, 2000), p_version: SMS_SIGN_VERSION,
+        p_page: (window.location.origin + window.location.pathname).slice(0, 300), p_ua: (navigator.userAgent || '').slice(0, 300)
+      }).catch(() => {});
+    }catch(e){ /* silencioso a propósito */ }
+  }
+  // ===== SMS-SIGN-JS-END =====
 
   async function submitSignaturePad(){
     const nombre = document.getElementById('sign-name').value.trim();
@@ -6237,6 +6296,7 @@
   async function loadClientPolicies(clientId){
     const { data: policies } = await sb.from('client_policies').select('*').eq('client_id', clientId).order('created_at', { ascending: false });
     currentClientPolicies = policies || [];
+    if(typeof smsRefreshCardSoon === 'function') smsRefreshCardSoon(clientId);
     if(typeof tkRefreshCardSoon === 'function') tkRefreshCardSoon(clientId);
     // Mantiene la lista de Clientes y la etiqueta Activo/Inactivo al día después
     // de cancelar, restaurar o agregar una póliza.
@@ -15546,6 +15606,137 @@ async function tkDownloadStored(id){
   root.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if(b && !b.disabled && !TK.busy){ e.preventDefault(); tkAct(b.dataset.act); } });
 })();
 // ===== TRUCKING-UI-END =====
+
+// ===== SMS-UI-START =====
+// Tarjeta «Notificaciones por texto (SMS)» en el perfil del cliente: ver si dio permiso, pedirlo por WhatsApp con enlace personal,
+// registrar un permiso por escrito o un «no quiere textos», pausar el seguimiento y ver la bitácora de mensajes.
+const SMS = { clientId: null, client: null, status: 'none', last: null, link: null, busy: false, enabled: false };
+const SMS_CONSENT_URL = 'https://gmaxallinsurance.com/consentimiento.html';
+const SMS_SOURCE_LABEL = { web_form: 'Casilla del formulario de cotizar', web_form_uncheck: 'Desmarcó la casilla antes de enviar', consent_link: 'Enlace personal (WhatsApp)', keyword_reply: 'Respondió por texto (YES/START)', stop_reply: 'Respondió STOP', receipt_signature: 'Casilla al firmar el recibo', manual_written: 'Registrado a mano (por escrito)' };
+const SMS_KIND_LABEL = { followup: 'Seguimiento', payment_reminder: 'Recordatorio de pago', renewal_reminder: 'Renovación', manual: 'Manual', keyword_reply: 'Respuesta automática', reply: 'Respuesta', lead_alert: 'Aviso' };
+const SMS_STATUS_LABEL = { pending_approval: 'Espera tu visto bueno', queued: 'En cola', sent: 'Enviado', delivered: 'Entregado', undelivered: 'No entregado', failed: 'Falló', received: 'Recibido', canceled: 'Cancelado' };
+
+function smsEsc(s){ return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+function smsDigits(p){ return String(p || '').replace(/\D/g, '').slice(-10); }
+function smsFmtPhone(d){ d = smsDigits(d); return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : String(d || ''); }
+function smsFmtTime(iso){ try{ return new Date(iso).toLocaleString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }catch(e){ return String(iso || ''); } }
+function smsMsg(type, text){ const el = document.getElementById('sms-msg'); if(!el) return; el.className = 'msg' + (type ? ' ' + type : ''); el.textContent = text || ''; }
+function smsAgentName(){ try{ return (currentProfile && (currentProfile.full_name || '')) || 'tu agente'; }catch(e){ return 'tu agente'; } }
+function smsFirstName(c){ return String((c && c.full_name) || '').trim().split(/\s+/)[0] || ''; }
+function smsLinkMessage(first, url){ return (first ? 'Hola ' + first + ', soy ' : 'Hola, soy ') + smsAgentName() + ' de GMAX All Insurance. Si quieres recibir recordatorios de tu cotización y de tus pagos por mensaje de texto, confirma aquí (es opcional): ' + url; }
+
+let smsCardTimer = null;
+function smsRefreshCardSoon(clientId){ clearTimeout(smsCardTimer); smsCardTimer = setTimeout(() => { smsLoadClientCard(clientId).catch(() => {}); }, 250); }
+
+async function smsLoadClientCard(clientId){
+  const card = document.getElementById('cd-smsCard'); if(!card) return;
+  if(SMS.clientId !== clientId){ SMS.link = null; const p = document.getElementById('sms-panel'); if(p){ p.style.display = 'none'; p.innerHTML = ''; } }
+  SMS.clientId = clientId;
+  let client = null, events = [], msgs = [], prefs = null, enabled = false, err = null;
+  try{
+    const c = await sb.from('clients').select('id,full_name,phone').eq('id', clientId).single(); if(c.error) throw c.error; client = c.data;
+    const e = await sb.from('sms_consent_events').select('id,event,source,phone,consent_version,note,created_at').eq('client_id', clientId).order('created_at', { ascending: false }).limit(30); if(e.error) throw e.error; events = e.data || [];
+    const m = await sb.from('sms_messages').select('id,direction,kind,body,status,sent_at,scheduled_for,created_at,error').eq('client_id', clientId).order('created_at', { ascending: false }).limit(40); if(m.error) throw m.error; msgs = m.data || [];
+    const p = await sb.from('sms_client_prefs').select('client_id,followups_paused,paused_reason').eq('client_id', clientId).maybeSingle(); if(p.error) throw p.error; prefs = p.data || null;
+    const s = await sb.rpc('sms_sending_enabled'); if(!s.error) enabled = s.data === true;
+  }catch(e){ err = e; }
+  if(clientId !== currentClientId) return;
+  card.style.display = 'block';
+  const msg = document.getElementById('sms-msg'); msg.className = 'msg'; msg.textContent = '';
+  if(err){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
+    document.getElementById('sms-badge').textContent = '—'; document.getElementById('sms-status-line').textContent = '';
+    document.getElementById('sms-actions').innerHTML = ''; document.getElementById('sms-log').innerHTML = '<tr><td colspan="5">—</td></tr>'; document.getElementById('sms-consent-log').innerHTML = '<tr><td colspan="4">—</td></tr>';
+    smsMsg('error', missing ? 'Falta correr las migraciones de SMS en Supabase (migracion_sms_consentimiento.sql y migracion_sms_2_enlace_y_mensajes.sql).' : 'No se pudo cargar esta sección: ' + (err.message || err));
+    return;
+  }
+  SMS.client = client; SMS.last = events[0] || null; SMS.enabled = enabled; SMS.prefs = prefs;
+  SMS.status = !SMS.last ? 'none' : (SMS.last.event === 'opt_in' ? 'in' : 'out');
+  smsRender(events, msgs);
+}
+
+function smsRender(events, msgs){
+  const c = SMS.client || {}, digits = smsDigits(c.phone), last = SMS.last, paused = !!(SMS.prefs && SMS.prefs.followups_paused);
+  const badge = document.getElementById('sms-badge'), line = document.getElementById('sms-status-line');
+  if(SMS.status === 'in'){
+    badge.textContent = paused ? 'Autorizó · seguimiento en pausa' : 'Autorizó recibir textos'; badge.style.background = paused ? '#FFF1D6' : '#DDF3E8'; badge.style.color = paused ? '#8A5A00' : '#13633F';
+    line.textContent = 'Dio su permiso el ' + smsFmtTime(last.created_at) + ' · ' + (SMS_SOURCE_LABEL[last.source] || last.source) + ' · al ' + smsFmtPhone(last.phone) + '.';
+  } else if(SMS.status === 'out'){
+    badge.textContent = 'NO quiere textos'; badge.style.background = '#FBE3E3'; badge.style.color = '#9B2222';
+    line.textContent = 'Canceló el ' + smsFmtTime(last.created_at) + ' · ' + (SMS_SOURCE_LABEL[last.source] || last.source) + '. No se le puede enviar ningún mensaje hasta que dé permiso otra vez.';
+  } else {
+    badge.textContent = 'Sin permiso'; badge.style.background = '#EEF0F6'; badge.style.color = '#5B6478';
+    line.textContent = 'Todavía no ha dado permiso para recibir textos: no se le enviará ninguno. Puedes pedírselo por WhatsApp.';
+  }
+  if(digits.length !== 10) line.textContent += ' ⚠ El teléfono guardado no tiene 10 dígitos (' + (c.phone || 'vacío') + '): corrígelo para poder pedirle el permiso.';
+  const off = document.getElementById('sms-off-banner');
+  if(!SMS.enabled){ off.style.display = 'block'; off.textContent = 'Los envíos automáticos están APAGADOS (Twilio todavía no aprueba la campaña). Cuando se prendan, aquí verás cada mensaje.'; } else { off.style.display = 'none'; off.textContent = ''; }
+
+  const acts = [];
+  if(SMS.status !== 'in') acts.push('<button type="button" class="btn-primary" style="width:auto; padding:9px 16px; margin:0;" onclick="smsAskWhatsapp()"' + (digits.length !== 10 ? ' disabled' : '') + '>Pedir consentimiento por WhatsApp</button>');
+  if(SMS.status !== 'in') acts.push('<button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin:0;" onclick="smsOpenManual(\'opt_in\')"' + (digits.length !== 10 ? ' disabled' : '') + '>Registrar permiso por escrito</button>');
+  if(SMS.status !== 'out') acts.push('<button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin:0;" onclick="smsOpenManual(\'opt_out\')"' + (digits.length !== 10 ? ' disabled' : '') + '>Marcar: no quiere textos</button>');
+  if(SMS.status === 'in') acts.push('<button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin:0;" onclick="smsTogglePause()">' + (paused ? 'Reanudar seguimiento' : 'Pausar seguimiento') + '</button>');
+  document.getElementById('sms-actions').innerHTML = acts.join('');
+
+  document.getElementById('sms-log').innerHTML = msgs.length ? msgs.map(m => '<tr><td>' + smsEsc(smsFmtTime(m.sent_at || m.created_at)) + '</td><td>' + (m.direction === 'in' ? '⬇ Recibido' : '⬆ Enviado') + '</td><td>' + smsEsc(SMS_KIND_LABEL[m.kind] || m.kind) + '</td><td style="max-width:420px; white-space:pre-wrap;">' + smsEsc(m.body) + '</td><td>' + smsEsc(SMS_STATUS_LABEL[m.status] || m.status) + (m.error ? '<br><span style="color:#9B2222; font-size:12px;">' + smsEsc(m.error) + '</span>' : '') + '</td></tr>').join('')
+    : '<tr><td colspan="5">Aún no se ha enviado ni recibido ningún mensaje de este cliente.</td></tr>';
+  document.getElementById('sms-consent-log').innerHTML = events.length ? events.map(e => '<tr><td>' + smsEsc(smsFmtTime(e.created_at)) + '</td><td>' + (e.event === 'opt_in' ? '✅ Dio permiso' : '⛔ Canceló') + '</td><td>' + smsEsc(SMS_SOURCE_LABEL[e.source] || e.source) + '</td><td style="max-width:360px;">' + smsEsc(e.note || e.consent_version || '') + '</td></tr>').join('')
+    : '<tr><td colspan="4">Sin registros.</td></tr>';
+}
+
+// ---------- Pedir el permiso por WhatsApp (enlace personal; vence a los 14 días) ----------
+async function smsAskWhatsapp(){
+  if(SMS.busy || !SMS.client) return; const d = smsDigits(SMS.client.phone); if(d.length !== 10){ smsMsg('error', 'El teléfono del cliente no tiene 10 dígitos.'); return; }
+  SMS.busy = true; smsMsg('', '');
+  try{
+    const r = await sb.rpc('create_sms_consent_link', { p_client: SMS.clientId }); if(r.error) throw r.error;
+    const url = SMS_CONSENT_URL + '?t=' + r.data.token; SMS.link = { url, first: r.data.first_name || smsFirstName(SMS.client) };
+    const panel = document.getElementById('sms-panel'); panel.style.display = 'block';
+    panel.innerHTML = '<div style="border:1.5px solid #D9E2F5; background:#F5F8FF; border-radius:12px; padding:14px;"><p class="sub" style="margin:0 0 8px;">Este es el mensaje para ' + smsEsc(smsFmtPhone(d)) + '. El enlace es solo de esta persona y vence en 14 días. Puedes editarlo antes de enviarlo.</p>'
+      + '<textarea id="sms-wa-text" rows="4" style="width:100%;"></textarea>'
+      + '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;"><a id="sms-wa-open" class="btn-primary" style="width:auto; padding:9px 16px; margin:0; text-decoration:none; display:inline-block;" target="_blank" rel="noopener" href="#">Abrir WhatsApp</a><button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin:0;" onclick="smsCopyLink()">Copiar mensaje</button><button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin:0;" onclick="smsClosePanel()">Cerrar</button></div></div>';
+    const ta = document.getElementById('sms-wa-text'); ta.value = smsLinkMessage(SMS.link.first, url);
+    const upd = () => { document.getElementById('sms-wa-open').href = 'https://wa.me/1' + d + '?text=' + encodeURIComponent(ta.value); };
+    ta.addEventListener('input', upd); upd();
+  }catch(e){ smsMsg('error', 'No se pudo crear el enlace: ' + (e.message || e)); }
+  SMS.busy = false;
+}
+async function smsCopyLink(){
+  const ta = document.getElementById('sms-wa-text'); if(!ta) return;
+  try{ await navigator.clipboard.writeText(ta.value); smsMsg('success', 'Mensaje copiado.'); }catch(e){ ta.select(); smsMsg('success', 'Selecciónalo y cópialo (Ctrl+C).'); }
+}
+function smsClosePanel(){ const p = document.getElementById('sms-panel'); if(p){ p.style.display = 'none'; p.innerHTML = ''; } }
+
+// ---------- Registro manual (con prueba): permiso por escrito o «no quiere textos» ----------
+function smsOpenManual(kind){
+  const panel = document.getElementById('sms-panel'); panel.style.display = 'block'; const isIn = kind === 'opt_in';
+  panel.innerHTML = '<div style="border:1.5px solid ' + (isIn ? '#D9E2F5' : '#F0CACA') + '; background:' + (isIn ? '#F5F8FF' : '#FFF6F6') + '; border-radius:12px; padding:14px;">'
+    + '<p class="sub" style="margin:0 0 8px;">' + (isIn ? '<b>Solo si tienes la prueba por escrito</b> (captura de WhatsApp, documento firmado). Un «sí» de palabra no alcanza: para eso mejor mándale el enlace.' : 'Escribe cuándo y cómo pidió que no le escribas (por ejemplo: «me llamó el 10/18 y pidió que no le mande textos»).') + '</p>'
+    + '<textarea id="sms-manual-note" rows="3" maxlength="500" style="width:100%;" placeholder="' + (isIn ? 'Ej.: Respondió «SÍ acepto» por WhatsApp el 10/18; la captura está en Documentos.' : 'Ej.: Pidió por llamada el 10/18 que no le escriban.') + '"></textarea>'
+    + '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;"><button type="button" class="btn-primary" style="width:auto; padding:9px 16px; margin:0;" onclick="smsSaveManual(\'' + kind + '\')">' + (isIn ? 'Guardar permiso' : 'Guardar') + '</button><button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin:0;" onclick="smsClosePanel()">Cancelar</button></div></div>';
+}
+async function smsSaveManual(kind){
+  if(SMS.busy || !SMS.client) return; const note = (document.getElementById('sms-manual-note') || {}).value || ''; const d = smsDigits(SMS.client.phone);
+  if(note.trim().length < 5){ smsMsg('error', 'Escribe una nota de al menos 5 caracteres explicando cuándo y cómo.'); return; }
+  if(d.length !== 10){ smsMsg('error', 'El teléfono del cliente no tiene 10 dígitos.'); return; }
+  SMS.busy = true; smsMsg('', '');
+  try{
+    const r = await sb.from('sms_consent_events').insert({ client_id: SMS.clientId, event: kind, source: 'manual_written', phone: '+1' + d, note: note.trim().slice(0, 500) }); if(r.error) throw r.error;
+    smsClosePanel(); smsMsg('success', kind === 'opt_in' ? 'Permiso guardado.' : 'Listo: no se le enviarán textos.');
+    await smsLoadClientCard(SMS.clientId); smsMsg('success', kind === 'opt_in' ? 'Permiso guardado.' : 'Listo: no se le enviarán textos.');
+  }catch(e){ smsMsg('error', 'No se pudo guardar: ' + (e.message || e)); }
+  SMS.busy = false;
+}
+async function smsTogglePause(){
+  if(SMS.busy) return; SMS.busy = true; smsMsg('', ''); const to = !(SMS.prefs && SMS.prefs.followups_paused);
+  try{
+    const r = await sb.from('sms_client_prefs').upsert({ client_id: SMS.clientId, followups_paused: to, paused_reason: to ? 'Pausado desde el perfil' : null, updated_at: new Date().toISOString() }); if(r.error) throw r.error;
+    await smsLoadClientCard(SMS.clientId); smsMsg('success', to ? 'Seguimiento en pausa: no saldrá ningún mensaje automático a este cliente.' : 'Seguimiento reanudado.');
+  }catch(e){ smsMsg('error', 'No se pudo cambiar: ' + (e.message || e)); }
+  SMS.busy = false;
+}
+// ===== SMS-UI-END =====
 
 // ===== PAGINA-UI-START =====
 // Pestaña «Página»: visitas a la página pública + editor del contenido (aviso festivo, aseguradoras, equipo).
