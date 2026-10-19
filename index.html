@@ -11837,14 +11837,21 @@
     const showAgentAttribution = isAdminUser();
 
     list.innerHTML = pageItems.map(c => {
-      const agentLine = showAgentAttribution
+      // Igual que en la lista de Clientes: si el lead llegó por el formulario público de la página,
+      // se marca «🌐 Web» (con el código del agente si vino por la página de un agente).
+      const webBadge = c.source_public_form
+        ? (c.agente?.producer_code
+            ? ` <span class="badge blue" title="Este lead llegó por el formulario público, a través de la página del agente ${c.agente.producer_code}">🌐 Web — Agente ${c.agente.producer_code}</span>`
+            : ` <span class="badge blue" title="Este lead llegó por el formulario público de la página web">🌐 Web</span>`)
+        : '';
+      const agentLine = (showAgentAttribution && !c.source_public_form)
         ? (c.agente
             ? ` <span class="badge" style="background:#EDEFF5; color:#3A3F55;" title="Agente asignado">👤 ${c.agente.full_name}${c.agente.producer_code ? ' — ' + c.agente.producer_code : ''}</span>`
             : ` <span class="badge" style="background:#F5E9E9; color:#7A3030;" title="Sin agente asignado">👤 Sin agente asignado</span>`)
         : '';
       return `
       <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${agentLine}</div>
+        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${webBadge}${agentLine}</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:6px 10px; color:#8a3030; border-color:#E3B8B8;" onclick="markLeadNoContactar('${c.id}', event)">🚫 No contactar</button>
           <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
