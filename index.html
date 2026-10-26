@@ -260,6 +260,9 @@
 
 
 
+
+
+
 /* ===== MOVIL-CSS-START ===== */
 /* Versión celular del CRM: barra superior con botón ☰, menú lateral deslizable, tablas en tarjetas y formularios de una columna. */
 .dash-mbar, .dash-mover{display:none;}
@@ -717,6 +720,9 @@
     
     
     
+    
+    
+    
     <!-- ===== MOVIL-HTML-START ===== -->
     <div class="dash-mbar" id="dashMbar">
       <button type="button" class="dash-mbtn" id="dashMenuBtn" aria-label="Abrir menú" aria-expanded="false" aria-controls="dashSidebarMenu"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
@@ -748,6 +754,7 @@
         <button class="dash-nav-btn" data-tab="comisiones" id="navComisiones" onclick="switchTab('comisiones')" style="display:none;">Comisiones</button>
         <button class="dash-nav-btn" data-tab="pagina" id="navPagina" onclick="switchTab('pagina')" style="display:none;">Página</button>
         <button class="dash-nav-btn" data-tab="sms" id="navSms" onclick="switchTab('sms')" style="display:none;">SMS</button>
+        <button class="dash-nav-btn" data-tab="social" id="navSocial" onclick="switchTab('social')" style="display:none;">Redes sociales</button>
         <button class="dash-nav-btn" data-tab="underwriting" id="navUnderwriting" onclick="switchTab('underwriting')" style="display:none;">Underwriting</button>
         <button class="dash-nav-btn" data-tab="usuarios" id="navUsuarios" onclick="switchTab('usuarios')" style="display:none;">Usuarios</button>
         <button class="dash-nav-btn" data-tab="solicitudes" id="navSolicitudes" onclick="switchTab('solicitudes')" style="display:none;">Solicitudes de Agentes</button>
@@ -3327,6 +3334,45 @@
       </section>
 <!-- ===== SMS-ADMIN-HTML-END ===== -->
 
+<!-- ===== SOCIAL-HTML-START ===== -->
+      <section class="dash-tab" id="tab-social" style="display:none;">
+        <style>
+          #tab-social .sub{margin-bottom:6px; font-size:13px; color:var(--slate-light);}
+          #tab-social .dash-card{margin:14px 0; padding:18px;}
+          #tab-social .soc-pills{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0;}
+          #tab-social .soc-pill{border:1.5px solid var(--line); background:#fff; border-radius:100px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:'Poppins',sans-serif; color:var(--slate);}
+          #tab-social .soc-pill.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+          #tab-social .soc-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:12px 0;}
+          #tab-social .soc-kpi{border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; background:#fff;}
+          #tab-social .soc-kpi.warn{border-color:#E39C9C; background:#FFF5F5;}
+          #tab-social .soc-kpi .n{font-family:'Poppins',sans-serif; font-size:26px; font-weight:800; color:var(--navy); line-height:1.1;}
+          #tab-social .soc-kpi .l{font-size:12.5px; color:var(--slate-light); margin-top:4px;}
+          #tab-social .soc-filters{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+          #tab-social .soc-filters select, #tab-social .soc-filters input[type=search]{padding:8px 10px; border:1.5px solid var(--line); border-radius:9px; font-size:14px; background:#fff;}
+          #tab-social .soc-filters input[type=search]{flex:1; min-width:200px;}
+          #tab-social .soc-chk{font-size:13px; display:flex; gap:6px; align-items:center;}
+          #tab-social .soc-mini{width:auto; padding:6px 12px; margin:0; font-size:12.5px;}
+          #tab-social .soc-chip{display:inline-block; border:1px solid; border-radius:100px; padding:2px 10px; font-size:12px; font-weight:700; white-space:nowrap;}
+          #tab-social table.dash-table td, #tab-social table.dash-table th{padding:8px 10px; font-size:13px; vertical-align:top;}
+          #tab-social tr.soc-row{cursor:pointer;} #tab-social tr.soc-row:hover{background:#F3F6FC;} #tab-social tr.soc-row.sel{background:#EAF1FB;}
+          #tab-social .soc-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px;}
+          #tab-social label{display:block; font-size:13px; font-weight:600; margin-bottom:4px;}
+          #tab-social input[type=text], #tab-social input[type=tel], #tab-social input[type=email], #tab-social select, #tab-social textarea{width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:9px; font-size:14px; font-family:inherit; background:#fff;}
+          #tab-social .soc-filters select{width:auto;}
+          #tab-social .sa-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+          #tab-social .soc-alert{background:#FFF5F5; border:1px solid #E39C9C; color:#9B2222; border-radius:10px; padding:8px 12px; font-size:13px; margin:8px 0;}
+          #tab-social .soc-ev{padding:6px 0; border-bottom:1px dashed var(--line); font-size:13.5px;} #tab-social .soc-ev .when{color:var(--slate-light); font-size:12px; margin-right:6px;}
+          #tab-social .soc-steps{padding-left:20px; font-size:13.5px; line-height:1.55;} #tab-social .soc-steps li{margin:8px 0;}
+          #tab-social .soc-code{background:#F3F6FC; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; word-break:break-all; white-space:pre-wrap; margin:6px 0; overflow-x:auto;}
+        </style>
+        <h2>Redes sociales</h2>
+        <p class="sub">Personas que comentan tus videos o te escriben por Instagram, Facebook y WhatsApp: quién es, qué quiere y cuándo darle seguimiento. Cuando tengas su teléfono, pásala a lead del CRM.</p>
+        <div class="soc-pills" id="soc-views"></div>
+        <div id="soc-msg" class="msg"></div>
+        <div id="soc-body"></div>
+      </section>
+<!-- ===== SOCIAL-HTML-END ===== -->
+
       <!-- TAB: UNDERWRITING (administradores) -->
       <section class="dash-tab" id="tab-underwriting" style="display:none;">
         <h2>Underwriting</h2>
@@ -4431,6 +4477,12 @@
 
   
 
+  
+
+  
+
+  
+
   // ===== MOVIL-JS-START =====
 // Menú hamburguesa y tablas en tarjetas para el celular (≤ 820 px). En computadora no hace nada visible.
 (function(){
@@ -4481,6 +4533,7 @@
     if(tab === 'comisiones' && typeof cmOpen === 'function') cmOpen();
     if(tab === 'pagina' && typeof pwOpen === 'function') pwOpen();
     if(tab === 'sms' && typeof saOpen === 'function') saOpen();
+    if(tab === 'social' && typeof socOpen === 'function') socOpen();
   }
 
   // Libro de negocio + Conversión viven en un solo bloque (#libroWrap) que se muestra en
@@ -5046,6 +5099,7 @@
     await safeLoad(loadComisiones, 'Comisiones');
     await safeLoad(loadPagina, 'Página');
     await safeLoad(loadSmsAdmin, 'SMS');
+    await safeLoad(loadSocial, 'Redes sociales');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
     await safeLoad(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
     await safeLoad(loadDashboardAgentAlerts, 'Tareas de la administradora');
@@ -16044,6 +16098,277 @@ async function saSaveSettings(){
   SA.busy = false;
 }
 // ===== SMS-ADMIN-END =====
+
+// ===== SOCIAL-START =====
+// Pestaña «Redes sociales» (solo administradoras): personas que comentan tus videos o te escriben por Instagram, Facebook y WhatsApp.
+// Los contactos llegan solos por la función social-intake (ManyChat / Make / Zapier). Aquí se ven, se les da seguimiento y se pasan a lead del CRM.
+const SOC = { view: 'contactos', channels: [], contacts: [], events: [], f: { ch: '', st: '', it: '', q: '', due: false }, sel: null, busy: false, adding: false, rules: [], rulesMissing: false, ruleEdit: null };
+const SOC_VIEWS = [['contactos', 'Contactos'], ['respuestas', 'Respuestas automáticas'], ['canales', 'Canales y conexión']];
+const SOC_STATUS = { nuevo: 'Nuevo', conversando: 'Conversando', cotizando: 'Cotizando', cerrado: 'Cerrado (vendió)', no_interesado: 'No interesado', no_contactar: 'No contactar' };
+const SOC_STATUS_COLOR = { nuevo: '#1F4E9E', conversando: '#7A5A00', cotizando: '#5B3FA3', cerrado: '#13633F', no_interesado: '#6B7280', no_contactar: '#9B2222' };
+const SOC_INTEREST = { sin_definir: 'Sin definir', auto: 'Auto', hogar: 'Hogar', vida: 'Vida', salud: 'Salud', comercial: 'Comercial', clase_gratis: 'Clase gratis', cliente: 'Ya es cliente', otro: 'Otro' };
+const SOC_PLAT = { instagram: '📸 Instagram', facebook: '👍 Facebook', whatsapp: '💬 WhatsApp', tiktok: '🎵 TikTok' };
+const SOC_KIND = { comment: 'Comentó', dm_in: 'Escribió', menu_choice: 'Eligió en el menú', dm_out: 'Le escribimos', link_sent: 'Le mandamos el link', followup_sent: 'Seguimiento', note: 'Nota', status: 'Cambio', converted: 'Pasó al CRM' };
+const SOC_OPEN_STATES = ['nuevo', 'conversando', 'cotizando'];
+
+function socIsAdmin(){ try{ return isAdminUser(); }catch(e){ return false; } }
+function socIsSuper(){ try{ return isSuperAdminUser(); }catch(e){ return false; } }
+function socMsg(type, text){ const el = document.getElementById('soc-msg'); if(!el) return; el.className = 'msg' + (type ? ' ' + type : ''); el.textContent = text || ''; }
+function socToday(){ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }); }
+function socFmtPhone(p){ const d = String(p || '').replace(/\D/g, '').replace(/^1(?=\d{10}$)/, ''); return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (p || ''); }
+function socNormPhone(p){ const d = String(p || '').replace(/\D/g, ''); if(d.length === 10) return '+1' + d; if(d.length === 11 && d[0] === '1') return '+' + d; return null; }
+function socAgo(iso){
+  const t = Date.parse(iso); if(!t) return '—'; const m = Math.max(0, Math.round((Date.now() - t) / 60000));
+  if(m < 2) return 'ahora'; if(m < 60) return 'hace ' + m + ' min'; const h = Math.round(m / 60); if(h < 24) return 'hace ' + h + ' h'; const d = Math.round(h / 24); return d < 30 ? 'hace ' + d + ' d' : smsFmtTime(iso).split(',')[0];
+}
+function socChip(text, color){ return '<span class="soc-chip" style="color:' + color + '; border-color:' + color + '33; background:' + color + '14;">' + smsEsc(text) + '</span>'; }
+function socDue(c){ return !!c.next_followup_on && c.next_followup_on <= socToday() && SOC_OPEN_STATES.includes(c.status); }
+
+async function loadSocial(){ const b = document.getElementById('navSocial'); if(b) b.style.display = socIsAdmin() ? '' : 'none'; }
+async function socOpen(){ if(!socIsAdmin()) return; socRenderViews(); socMsg('', ''); await socShow(SOC.view); }
+function socRenderViews(){ const el = document.getElementById('soc-views'); if(el) el.innerHTML = SOC_VIEWS.map(v => '<button type="button" class="soc-pill' + (v[0] === SOC.view ? ' on' : '') + '" onclick="socShow(\'' + v[0] + '\')">' + smsEsc(v[1]) + '</button>').join(''); }
+async function socShow(view){
+  SOC.view = view; socRenderViews(); socMsg('', ''); const body = document.getElementById('soc-body'); if(!body) return; body.innerHTML = '<p class="sub">Cargando…</p>';
+  try{ await socLoad(); if(view === 'contactos') socRenderContacts(); else if(view === 'respuestas') socRenderRules(); else socRenderChannels(); }
+  catch(e){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String((e && (e.message || e.code)) || e));
+    body.innerHTML = ''; socMsg('error', missing ? 'Falta correr la migración migracion_redes_sociales.sql en Supabase.' : 'No se pudo cargar: ' + ((e && e.message) || e));
+  }
+}
+async function socLoad(){
+  const ch = await sb.from('social_channels').select('*').order('sort_order', { ascending: true }); if(ch.error) throw ch.error; SOC.channels = ch.data || [];
+  const r = await sb.from('social_contacts').select('*, channel:channel_id(key,platform,brand,handle), client:client_id(full_name)').order('last_interaction_at', { ascending: false }).limit(500); if(r.error) throw r.error; SOC.contacts = r.data || [];
+  const ru = await sb.from('social_rules').select('*').order('kind', { ascending: false }).order('keyword', { ascending: true });
+  SOC.rulesMissing = !!ru.error; SOC.rules = ru.error ? [] : (ru.data || []);
+}
+
+// ---------- Contactos ----------
+function socFiltered(){
+  const f = SOC.f, q = f.q.trim().toLowerCase();
+  return SOC.contacts.filter(c => (!f.ch || (c.channel && c.channel.key === f.ch)) && (!f.st || c.status === f.st) && (!f.it || c.interest === f.it) && (!f.due || socDue(c))
+    && (!q || [c.display_name, c.handle, c.phone, c.email, c.notes, c.first_keyword, c.first_post].some(x => String(x || '').toLowerCase().includes(q))));
+}
+function socRenderContacts(){
+  const all = SOC.contacts, rows = socFiltered(); const k = fn => all.filter(fn).length;
+  let h = '<div class="soc-kpis"><div class="soc-kpi"><div class="n">' + k(c => c.status === 'nuevo') + '</div><div class="l">Nuevos sin atender</div></div><div class="soc-kpi"><div class="n">' + k(c => c.status === 'conversando') + '</div><div class="l">Conversando</div></div>'
+    + '<div class="soc-kpi' + (k(socDue) ? ' warn' : '') + '"><div class="n">' + k(socDue) + '</div><div class="l">Seguimientos para hoy o vencidos</div></div><div class="soc-kpi"><div class="n">' + k(c => !!c.client_id) + '</div><div class="l">Ya pasaron al CRM</div></div></div>';
+  h += '<div class="dash-card"><div class="soc-filters">'
+    + '<select id="soc-f-ch" onchange="socFilter()"><option value="">Todos los canales</option>' + SOC.channels.map(c => '<option value="' + smsEsc(c.key) + '"' + (SOC.f.ch === c.key ? ' selected' : '') + '>' + smsEsc(SOC_PLAT[c.platform] + ' · ' + c.brand) + '</option>').join('') + '</select>'
+    + '<select id="soc-f-st" onchange="socFilter()"><option value="">Todos los estados</option>' + Object.keys(SOC_STATUS).map(s => '<option value="' + s + '"' + (SOC.f.st === s ? ' selected' : '') + '>' + SOC_STATUS[s] + '</option>').join('') + '</select>'
+    + '<select id="soc-f-it" onchange="socFilter()"><option value="">Todo interés</option>' + Object.keys(SOC_INTEREST).map(s => '<option value="' + s + '"' + (SOC.f.it === s ? ' selected' : '') + '>' + SOC_INTEREST[s] + '</option>').join('') + '</select>'
+    + '<input type="search" id="soc-f-q" placeholder="Buscar nombre, @usuario, teléfono, nota…" value="' + smsEsc(SOC.f.q) + '" oninput="socFilter()">'
+    + '<label class="soc-chk"><input type="checkbox" id="soc-f-due"' + (SOC.f.due ? ' checked' : '') + ' onchange="socFilter()"> Solo seguimientos de hoy o vencidos</label>'
+    + '<button type="button" class="btn-ghost soc-mini" onclick="socToggleAdd()">+ Agregar contacto a mano</button></div>'
+    + '<div id="soc-add"></div></div>';
+  h += '<div id="soc-detail"></div><div class="dash-card"><div class="sub" id="soc-count" style="margin:0 0 6px;"></div><div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Persona</th><th>Canal</th><th>Interés</th><th>Estado</th><th>Última actividad</th><th>Seguimiento</th></tr></thead><tbody id="soc-rows"></tbody></table></div></div>';
+  document.getElementById('soc-body').innerHTML = h; socPaintRows(); socPaintAdd(); if(SOC.sel) socPaintDetail();
+}
+function socFilter(){
+  SOC.f = { ch: document.getElementById('soc-f-ch').value, st: document.getElementById('soc-f-st').value, it: document.getElementById('soc-f-it').value, q: document.getElementById('soc-f-q').value, due: document.getElementById('soc-f-due').checked };
+  socPaintRows();
+}
+function socPaintRows(){
+  const rows = socFiltered(); const tb = document.getElementById('soc-rows'); if(!tb) return;
+  document.getElementById('soc-count').textContent = rows.length + ' de ' + SOC.contacts.length + ' contactos' + (SOC.contacts.length >= 500 ? ' (se muestran los 500 más recientes)' : '');
+  tb.innerHTML = rows.length ? rows.slice(0, 200).map(c => {
+    const nm = c.display_name || c.handle || 'Sin nombre'; const ch = c.channel || {};
+    return '<tr class="soc-row' + (SOC.sel === c.id ? ' sel' : '') + '" onclick="socSelect(\'' + smsEsc(c.id) + '\')"><td><b>' + smsEsc(nm) + '</b>' + (c.handle && c.display_name ? '<div class="sub" style="margin:0;">' + smsEsc(c.handle) + '</div>' : '') + (c.client_id ? '<div class="sub" style="margin:0;">✓ Ya es lead/cliente</div>' : '') + '</td>'
+      + '<td>' + smsEsc((SOC_PLAT[ch.platform] || '') + ' · ' + (ch.brand || '')) + '</td><td>' + smsEsc(SOC_INTEREST[c.interest] || c.interest) + '</td><td>' + socChip(SOC_STATUS[c.status] || c.status, SOC_STATUS_COLOR[c.status] || '#444') + '</td>'
+      + '<td>' + smsEsc(socAgo(c.last_interaction_at)) + '</td><td>' + (c.next_followup_on ? (socDue(c) ? '<b style="color:#9B2222;">' : '<span>') + smsEsc(formatDateUS(c.next_followup_on)) + (socDue(c) ? '</b>' : '</span>') : '—') + '</td></tr>';
+  }).join('') : '<tr><td colspan="6">' + (SOC.contacts.length ? 'Ningún contacto con esos filtros.' : 'Todavía no ha llegado nadie. Cuando conectes ManyChat (pestaña «Canales y conexión»), aquí aparecerán las personas que comenten tus videos o te escriban.') + '</td></tr>';
+}
+async function socSelect(id){
+  SOC.sel = id; SOC.events = []; socPaintRows(); socPaintDetail();
+  const r = await sb.from('social_events').select('id,kind,body,post_ref,created_at').eq('contact_id', id).order('created_at', { ascending: false }).limit(100);
+  if(SOC.sel !== id) return; if(r.error){ socMsg('error', 'No se pudo cargar la bitácora: ' + r.error.message); return; } SOC.events = r.data || []; socPaintTimeline();
+  const d = document.getElementById('soc-detail'); if(d && d.scrollIntoView) d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function socCur(){ return SOC.contacts.find(c => c.id === SOC.sel) || null; }
+function socPaintDetail(){
+  const c = socCur(), box = document.getElementById('soc-detail'); if(!box) return; if(!c){ box.innerHTML = ''; return; }
+  const ch = c.channel || {}; const opt = (map, cur) => Object.keys(map).map(k => '<option value="' + k + '"' + (cur === k ? ' selected' : '') + '>' + smsEsc(map[k]) + '</option>').join('');
+  box.innerHTML = '<div class="dash-card soc-detail"><div class="sa-row" style="justify-content:space-between;"><h4 style="margin:0;">' + smsEsc(c.display_name || c.handle || 'Sin nombre') + '</h4><button type="button" class="btn-ghost soc-mini" onclick="socCloseDetail()">Cerrar</button></div>'
+    + '<p class="sub" style="margin:4px 0 10px;">' + smsEsc((SOC_PLAT[ch.platform] || '') + ' · ' + (ch.brand || '') + (c.handle ? ' · ' + c.handle : '')) + (c.first_keyword ? ' · palabra: «' + smsEsc(c.first_keyword) + '»' : '') + (c.first_post ? ' · video: ' + smsEsc(c.first_post) : '') + '</p>'
+    + (socDue(c) ? '<div class="soc-alert">⏰ Tienes seguimiento pendiente con esta persona.</div>' : '')
+    + (c.status === 'no_contactar' ? '<div class="soc-alert">🚫 Pidió que no le escribamos. No le des seguimiento.</div>' : '')
+    + '<div class="soc-grid"><div><label>Nombre</label><input type="text" id="soc-d-name" maxlength="120" value="' + smsEsc(c.display_name) + '"></div>'
+    + '<div><label>Teléfono</label><input type="tel" id="soc-d-phone" maxlength="20" placeholder="(713) 555-0101" value="' + smsEsc(socFmtPhone(c.phone)) + '"></div>'
+    + '<div><label>Correo</label><input type="email" id="soc-d-email" maxlength="160" value="' + smsEsc(c.email) + '"></div>'
+    + '<div><label>Interés</label><select id="soc-d-interest">' + opt(SOC_INTEREST, c.interest) + '</select></div>'
+    + '<div><label>Estado</label><select id="soc-d-status">' + opt(SOC_STATUS, c.status) + '</select></div>'
+    + '<div><label>Próximo seguimiento (MM/DD/AAAA)</label><input type="text" id="soc-d-follow" maxlength="10" placeholder="MM/DD/AAAA" inputmode="numeric" oninput="maskDateInput(this)" value="' + smsEsc(c.next_followup_on ? formatDateUS(c.next_followup_on) : '') + '"></div></div>'
+    + '<label style="margin-top:10px; display:block;">Notas</label><textarea id="soc-d-notes" rows="3" maxlength="4000">' + smsEsc(c.notes) + '</textarea>'
+    + '<div class="sa-row" style="margin-top:10px;"><button type="button" class="btn-primary soc-mini" onclick="socSave()">Guardar cambios</button>'
+    + (c.client_id ? '<button type="button" class="btn-ghost soc-mini" onclick="socOpenClient()">Abrir su ficha de cliente' + (c.client && c.client.full_name ? ' (' + smsEsc(c.client.full_name) + ')' : '') + '</button>' : '<button type="button" class="btn-ghost soc-mini" onclick="socConvert()">Pasar a lead del CRM</button>') + '</div>'
+    + '<h4 style="margin:16px 0 6px;">Agregar nota rápida</h4><div class="sa-row"><input type="text" id="soc-d-note" maxlength="500" placeholder="Ej.: Le llamé y no contestó" style="flex:1; min-width:200px;"><button type="button" class="btn-ghost soc-mini" onclick="socAddNote()">Agregar</button></div>'
+    + '<h4 style="margin:16px 0 6px;">Historial</h4><div id="soc-timeline"><p class="sub">Cargando…</p></div></div>';
+  socPaintTimeline();
+}
+function socPaintTimeline(){
+  const el = document.getElementById('soc-timeline'); if(!el) return;
+  el.innerHTML = SOC.events.length ? SOC.events.map(e => '<div class="soc-ev"><span class="when">' + smsEsc(smsFmtTime(e.created_at)) + '</span> <b>' + smsEsc(SOC_KIND[e.kind] || e.kind) + '</b>' + (e.body ? ': ' + smsEsc(e.body) : '') + (e.post_ref ? ' <span class="sub">(' + smsEsc(e.post_ref) + ')</span>' : '') + '</div>').join('') : '<p class="sub">Sin movimientos todavía.</p>';
+}
+function socCloseDetail(){ SOC.sel = null; SOC.events = []; socPaintDetail(); socPaintRows(); }
+async function socSave(){
+  const c = socCur(); if(!c || SOC.busy) return; const g = id => document.getElementById(id).value.trim();
+  const phoneRaw = g('soc-d-phone'), phone = phoneRaw ? socNormPhone(phoneRaw) : null; const email = g('soc-d-email'); const followRaw = g('soc-d-follow'); const follow = followRaw ? mmddyyyyToISO(followRaw) : null;
+  if(phoneRaw && !phone){ socMsg('error', 'El teléfono debe tener 10 dígitos (ej. 713-555-0101).'); return; }
+  if(email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ socMsg('error', 'El correo no parece válido.'); return; }
+  if(followRaw && !follow){ socMsg('error', 'La fecha de seguimiento debe ser MM/DD/AAAA.'); return; }
+  const row = { display_name: g('soc-d-name') || null, phone, email: email || null, interest: g('soc-d-interest'), status: g('soc-d-status'), next_followup_on: follow, notes: g('soc-d-notes') || null };
+  SOC.busy = true; socMsg('', '');
+  try{
+    const r = await sb.from('social_contacts').update(row).eq('id', c.id); if(r.error) throw r.error;
+    if(row.status !== c.status){ const e = await sb.from('social_events').insert({ contact_id: c.id, kind: 'status', body: 'Estado: ' + (SOC_STATUS[c.status] || c.status) + ' → ' + SOC_STATUS[row.status] }); if(e.error) throw e.error; }
+    await socLoad(); socRenderContacts(); await socSelect(c.id); socMsg('success', 'Guardado.');
+  }catch(e){ socMsg('error', 'No se pudo guardar: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+async function socAddNote(){
+  const c = socCur(); if(!c || SOC.busy) return; const inp = document.getElementById('soc-d-note'); const t = inp.value.trim(); if(t.length < 2){ socMsg('error', 'Escribe la nota.'); return; }
+  SOC.busy = true; socMsg('', '');
+  try{ const r = await sb.from('social_events').insert({ contact_id: c.id, kind: 'note', body: t }); if(r.error) throw r.error; inp.value = ''; const ev = await sb.from('social_events').select('id,kind,body,post_ref,created_at').eq('contact_id', c.id).order('created_at', { ascending: false }).limit(100); SOC.events = ev.data || []; socPaintTimeline(); socMsg('success', 'Nota agregada.'); }
+  catch(e){ socMsg('error', 'No se pudo agregar: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+function socOpenClient(){ const c = socCur(); if(c && c.client_id && typeof goToClientFromUnderwriting === 'function') goToClientFromUnderwriting(c.client_id); }
+async function socConvert(){
+  const c = socCur(); if(!c || c.client_id || SOC.busy) return;
+  const name = (c.display_name || '').trim(); const phone = c.phone ? socFmtPhone(c.phone) : null;
+  if(name.length < 2 || (!phone && !c.email)){ socMsg('error', 'Antes de pasarla al CRM necesito su nombre y su teléfono o correo. Llénalos arriba y toca «Guardar cambios».'); return; }
+  SOC.busy = true; socMsg('', '');
+  try{
+    const { data: { session } } = await sb.auth.getSession(); const uid = session && session.user && session.user.id; if(!uid) throw new Error('Sesión vencida: vuelve a entrar.');
+    let clientId = null;
+    const dup = await sb.rpc('find_possible_duplicate_clients', { p_name: name, p_phone: phone, p_email: c.email || null });
+    const dupes = (dup && dup.data) || [];
+    if(dupes.length){
+      const d0 = dupes[0]; const list = dupes.slice(0, 3).map(d => '• ' + d.full_name + ' — ' + (d.phone || d.email || 'sin contacto')).join('\n');
+      if(d0.id && window.confirm('Ya existe en el CRM:\n' + list + '\n\n¿Ligar a esta persona de redes con «' + d0.full_name + '» (sin crear otro cliente)?')) clientId = d0.id;
+      else if(!window.confirm('¿Crear un cliente NUEVO de todos modos?')){ SOC.busy = false; return; }
+    }
+    if(!clientId){
+      const parts = name.split(/\s+/); const first = parts[0], last = parts.length > 1 ? parts.slice(1).join(' ') : null; const plat = c.channel && c.channel.platform;
+      const payload = { client_type: 'individual', first_name: first, last_name: last, full_name: name, phone, email: c.email || null, preferred_language: 'es', lead_source: plat === 'whatsapp' ? 'whatsapp' : 'campana', created_by: uid, assigned_agent_id: uid, client_status: 'lead_nuevo' };
+      const ins = await sb.from('clients').insert(payload).select().single(); if(ins.error) throw ins.error; clientId = ins.data.id;
+    }
+    const m = await sb.rpc('social_mark_converted', { p_contact: c.id, p_client: clientId }); if(m.error) throw m.error;
+    await socLoad(); socRenderContacts(); await socSelect(c.id); socMsg('success', 'Listo: quedó en Clientes como lead nuevo' + (dupes.length && clientId ? '' : '') + '. Puedes abrir su ficha desde aquí.');
+  }catch(e){ socMsg('error', 'No se pudo pasar al CRM: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+function socToggleAdd(){ SOC.adding = !SOC.adding; socPaintAdd(); }
+function socPaintAdd(){
+  const el = document.getElementById('soc-add'); if(!el) return; if(!SOC.adding){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="soc-grid" style="margin-top:12px;"><div><label>Canal</label><select id="soc-a-ch">' + SOC.channels.filter(c => c.active).map(c => '<option value="' + smsEsc(c.id) + '">' + smsEsc(SOC_PLAT[c.platform] + ' · ' + c.brand) + '</option>').join('') + '</select></div>'
+    + '<div><label>Nombre</label><input type="text" id="soc-a-name" maxlength="120"></div><div><label>Teléfono</label><input type="tel" id="soc-a-phone" maxlength="20" placeholder="(713) 555-0101"></div><div><label>Interés</label><select id="soc-a-interest">' + Object.keys(SOC_INTEREST).map(k => '<option value="' + k + '">' + SOC_INTEREST[k] + '</option>').join('') + '</select></div></div>'
+    + '<div class="sa-row" style="margin-top:10px;"><input type="text" id="soc-a-note" maxlength="500" placeholder="Nota (opcional): cómo la conociste" style="flex:1; min-width:200px;"><button type="button" class="btn-primary soc-mini" onclick="socAddManual()">Guardar contacto</button></div>';
+}
+async function socAddManual(){
+  if(SOC.busy) return; const name = document.getElementById('soc-a-name').value.trim(), phoneRaw = document.getElementById('soc-a-phone').value.trim(), phone = phoneRaw ? socNormPhone(phoneRaw) : null;
+  if(name.length < 2){ socMsg('error', 'Escribe el nombre.'); return; } if(phoneRaw && !phone){ socMsg('error', 'El teléfono debe tener 10 dígitos.'); return; }
+  const note = document.getElementById('soc-a-note').value.trim(); SOC.busy = true; socMsg('', '');
+  try{
+    const ext = 'manual:' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+    const r = await sb.from('social_contacts').insert({ channel_id: document.getElementById('soc-a-ch').value, external_id: ext, display_name: name, phone, interest: document.getElementById('soc-a-interest').value, status: 'nuevo' }).select('id').single(); if(r.error) throw r.error;
+    const e = await sb.from('social_events').insert({ contact_id: r.data.id, kind: 'note', body: 'Agregado a mano' + (note ? ': ' + note : '') }); if(e.error) throw e.error;
+    SOC.adding = false; await socLoad(); socRenderContacts(); await socSelect(r.data.id); socMsg('success', 'Contacto agregado.');
+  }catch(e){ socMsg('error', 'No se pudo agregar: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+
+// ---------- Respuestas automáticas (las lee la función meta-webhook) ----------
+const SOC_RULE_MAX = 900;
+function socChName(key){ const c = SOC.channels.find(x => x.key === key); return c ? (SOC_PLAT[c.platform] || '') + ' · ' + c.brand : key; }
+function socRenderRules(){
+  const ed = socIsSuper(); const body = document.getElementById('soc-body');
+  if(SOC.rulesMissing){ body.innerHTML = ''; socMsg('error', 'Falta correr la migración migracion_redes_sociales_2_respuestas.sql en Supabase.'); return; }
+  let h = '<div class="dash-card"><h4 style="margin:0 0 6px;">Respuestas automáticas</h4><p class="sub" style="margin:0 0 8px;">Cuando alguien <b>comenta</b> o te <b>escribe por DM</b> con una de estas palabras, el sistema le contesta solo con el mensaje que pongas aquí. Si alguien te escribe por DM <b>sin ninguna palabra</b>, recibe el <b>menú</b> (como máximo una vez cada 12 horas). '
+    + 'A quien comenta, Meta solo permite mandarle <b>un</b> mensaje privado por comentario. Pon el link de tu clase en el mensaje para que salga desde el primer DM. Nunca se le escribe a quien respondió STOP, ALTO o PARAR. ' + (ed ? '' : '<b>Solo la super administradora puede crear o cambiar respuestas.</b>') + '</p>';
+  h += '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cuándo</th><th>Cuenta</th><th>Interés</th><th>Mensaje</th><th>Activa</th><th></th></tr></thead><tbody id="soc-rules-rows">'
+    + (SOC.rules.length ? SOC.rules.map(r => '<tr><td><b>' + (r.kind === 'menu' ? 'Menú (sin palabra)' : smsEsc(r.keyword)) + '</b></td><td>' + (r.channel_key ? smsEsc(socChName(r.channel_key)) : 'Todas') + '</td><td>' + smsEsc(r.interest ? (SOC_INTEREST[r.interest] || r.interest) : '—') + '</td>'
+      + '<td style="max-width:360px; white-space:pre-wrap; word-break:break-word;">' + smsEsc(r.reply_text.length > 160 ? r.reply_text.slice(0, 160) + '…' : r.reply_text) + '</td><td>' + (r.active ? '<span class="soc-chip" style="color:#13633F; border-color:#13633F33; background:#13633F14;">Prendida</span>' : '<span class="soc-chip" style="color:#6B7280; border-color:#6B728033; background:#6B728014;">Apagada</span>') + '</td>'
+      + '<td>' + (ed ? '<button type="button" class="btn-ghost soc-mini" onclick="socRuleEdit(\'' + smsEsc(r.id) + '\')">Editar</button> <button type="button" class="btn-ghost soc-mini" onclick="socRuleToggle(\'' + smsEsc(r.id) + '\')">' + (r.active ? 'Apagar' : 'Prender') + '</button> <button type="button" class="btn-ghost soc-mini" onclick="socRuleDelete(\'' + smsEsc(r.id) + '\')">Borrar</button>' : '') + '</td></tr>').join('')
+      : '<tr><td colspan="6">Todavía no hay respuestas.</td></tr>')
+    + '</tbody></table></div>' + (ed ? '<div class="sa-row" style="margin-top:10px;"><button type="button" class="btn-primary soc-mini" onclick="socRuleEdit(\'new\')">+ Nueva respuesta</button></div>' : '') + '<div id="soc-rule-form"></div></div>';
+  body.innerHTML = h; socPaintRuleForm();
+}
+function socRuleEdit(id){
+  if(!socIsSuper()) return; if(id === 'new') SOC.ruleEdit = { id: null, kind: 'keyword', keyword: '', channel_key: '', interest: '', reply_text: '', active: true };
+  else { const r = SOC.rules.find(x => x.id === id); if(!r) return; SOC.ruleEdit = { id: r.id, kind: r.kind, keyword: r.keyword || '', channel_key: r.channel_key || '', interest: r.interest || '', reply_text: r.reply_text, active: !!r.active }; }
+  socPaintRuleForm(); const f = document.getElementById('soc-rule-form'); if(f && f.scrollIntoView) f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+function socRuleKindChange(){ const k = document.getElementById('soc-r-kind').value; document.getElementById('soc-r-kw-box').style.display = k === 'menu' ? 'none' : ''; }
+function socRuleCount(){ const t = document.getElementById('soc-r-text'), c = document.getElementById('soc-r-count'); if(t && c){ c.textContent = t.value.length + ' / ' + SOC_RULE_MAX; c.style.color = t.value.length > SOC_RULE_MAX ? '#9B2222' : ''; } }
+function socPaintRuleForm(){
+  const el = document.getElementById('soc-rule-form'); if(!el) return; const r = SOC.ruleEdit; if(!r){ el.innerHTML = ''; return; }
+  const chOpts = '<option value="">Todas mis cuentas</option>' + SOC.channels.map(c => '<option value="' + smsEsc(c.key) + '"' + (r.channel_key === c.key ? ' selected' : '') + '>' + smsEsc(SOC_PLAT[c.platform] + ' · ' + c.brand) + '</option>').join('');
+  const inOpts = '<option value="">Sin cambiar</option>' + Object.keys(SOC_INTEREST).filter(k => k !== 'sin_definir').map(k => '<option value="' + k + '"' + (r.interest === k ? ' selected' : '') + '>' + smsEsc(SOC_INTEREST[k]) + '</option>').join('');
+  el.innerHTML = '<div class="soc-detail" style="margin-top:14px; border-top:1px solid var(--line); padding-top:14px;"><h4 style="margin:0 0 8px;">' + (r.id ? 'Editar respuesta' : 'Nueva respuesta') + '</h4><div class="soc-grid">'
+    + '<div><label>Tipo</label><select id="soc-r-kind" onchange="socRuleKindChange()"' + (r.id ? ' disabled' : '') + '><option value="keyword"' + (r.kind === 'keyword' ? ' selected' : '') + '>Cuando escriban una palabra</option><option value="menu"' + (r.kind === 'menu' ? ' selected' : '') + '>Menú (DM sin palabra)</option></select></div>'
+    + '<div id="soc-r-kw-box"' + (r.kind === 'menu' ? ' style="display:none;"' : '') + '><label>Palabra o frase (ej. CLASE)</label><input type="text" id="soc-r-kw" maxlength="40" value="' + smsEsc(r.keyword) + '"></div>'
+    + '<div><label>Cuenta</label><select id="soc-r-ch">' + chOpts + '</select></div><div><label>Marcar el interés como</label><select id="soc-r-int">' + inOpts + '</select></div></div>'
+    + '<label style="margin-top:10px; display:block;">Mensaje que se manda <span id="soc-r-count" class="sub" style="margin-left:8px;"></span></label><textarea id="soc-r-text" rows="5" maxlength="1200" oninput="socRuleCount()">' + smsEsc(r.reply_text) + '</textarea>'
+    + '<label class="soc-chk" style="margin-top:8px;"><input type="checkbox" id="soc-r-active"' + (r.active ? ' checked' : '') + '> Prendida (si está apagada no se manda)</label>'
+    + '<div class="sa-row" style="margin-top:10px;"><button type="button" class="btn-primary soc-mini" onclick="socRuleSave()">Guardar respuesta</button><button type="button" class="btn-ghost soc-mini" onclick="socRuleCancel()">Cancelar</button></div></div>';
+  socRuleCount();
+}
+function socRuleCancel(){ SOC.ruleEdit = null; socPaintRuleForm(); }
+async function socRuleSave(){
+  const r = SOC.ruleEdit; if(!r || SOC.busy || !socIsSuper()) return; const g = id => document.getElementById(id).value.trim();
+  const kind = r.id ? r.kind : g('soc-r-kind'); const keyword = kind === 'menu' ? null : g('soc-r-kw'); const text = document.getElementById('soc-r-text').value.trim();
+  if(kind === 'keyword' && (!keyword || keyword.length < 2)){ socMsg('error', 'Escribe la palabra (mínimo 2 letras).'); return; }
+  if(text.length < 2){ socMsg('error', 'Escribe el mensaje.'); return; }
+  if(text.length > SOC_RULE_MAX){ socMsg('error', 'El mensaje es muy largo (máximo ' + SOC_RULE_MAX + ' caracteres; Instagram corta los mensajes largos).'); return; }
+  const row = { keyword, channel_key: g('soc-r-ch') || null, reply_text: text, interest: g('soc-r-int') || null, active: document.getElementById('soc-r-active').checked };
+  SOC.busy = true; socMsg('', '');
+  try{
+    const q = r.id ? await sb.from('social_rules').update(row).eq('id', r.id) : await sb.from('social_rules').insert(Object.assign({ kind }, row));
+    if(q.error) throw q.error; SOC.ruleEdit = null; await socLoad(); socRenderRules(); socMsg('success', 'Guardado.');
+  }catch(e){ const m = String((e && e.message) || e); socMsg('error', /duplicate key|unique/i.test(m) ? 'Ya existe una respuesta con esa palabra (o ese menú) para esa cuenta. Edítala en vez de crear otra.' : 'No se pudo guardar: ' + m); }
+  SOC.busy = false;
+}
+async function socRuleToggle(id){
+  if(SOC.busy || !socIsSuper()) return; const r = SOC.rules.find(x => x.id === id); if(!r) return; SOC.busy = true; socMsg('', '');
+  try{ const q = await sb.from('social_rules').update({ active: !r.active }).eq('id', id); if(q.error) throw q.error; await socLoad(); socRenderRules(); socMsg('success', r.active ? 'Apagada: ya no se manda.' : 'Prendida.'); }
+  catch(e){ socMsg('error', 'No se pudo cambiar: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+async function socRuleDelete(id){
+  if(SOC.busy || !socIsSuper()) return; const r = SOC.rules.find(x => x.id === id); if(!r) return;
+  if(!window.confirm('¿Borrar la respuesta «' + (r.kind === 'menu' ? 'Menú' : r.keyword) + '»? Dejará de mandarse.')) return;
+  SOC.busy = true; socMsg('', '');
+  try{ const q = await sb.from('social_rules').delete().eq('id', id); if(q.error) throw q.error; if(SOC.ruleEdit && SOC.ruleEdit.id === id) SOC.ruleEdit = null; await socLoad(); socRenderRules(); socMsg('success', 'Borrada.'); }
+  catch(e){ socMsg('error', 'No se pudo borrar: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+
+// ---------- Canales y conexión ----------
+function socRenderChannels(){
+  const ed = socIsSuper(); const url = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://TU-PROYECTO.supabase.co') + '/functions/v1/social-intake';
+  const murl = (typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'https://TU-PROYECTO.supabase.co') + '/functions/v1/meta-webhook';
+  const example = JSON.stringify({ channel_key: 'ig_gmax', external_id: '{{id de la persona}}', kind: 'comment', text: '{{lo que escribió}}', keyword: 'AUTO', post_ref: 'Reel: seguro de auto', handle: '{{usuario}}', name: '{{nombre}}', event_key: '{{id del comentario}}' }, null, 2);
+  let h = '<div class="dash-card"><h4 style="margin:0 0 6px;">Tus cuentas</h4><p class="sub" style="margin:0 0 8px;">Cada fila es una de tus cuentas. La «clave» es lo que ManyChat/Make manda en <code>channel_key</code> para decir de cuál cuenta viene la persona. ' + (ed ? 'Escribe el @usuario de cada una (solo para que tú te ubiques).' : 'Solo la super administradora puede editarlas.') + '</p>'
+    + '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cuenta</th><th>Clave (channel_key)</th><th>@usuario</th><th>Activa</th><th>Contactos</th><th></th></tr></thead><tbody>'
+    + SOC.channels.map(c => '<tr><td><b>' + smsEsc(SOC_PLAT[c.platform] + ' · ' + c.brand) + '</b></td><td><code>' + smsEsc(c.key) + '</code></td><td><input type="text" id="soc-c-h-' + smsEsc(c.key) + '" maxlength="80" value="' + smsEsc(c.handle) + '" placeholder="@usuario"' + (ed ? '' : ' disabled') + '></td>'
+      + '<td><input type="checkbox" id="soc-c-a-' + smsEsc(c.key) + '"' + (c.active ? ' checked' : '') + (ed ? '' : ' disabled') + '></td><td>' + SOC.contacts.filter(x => x.channel && x.channel.key === c.key).length + '</td><td>' + (ed ? '<button type="button" class="btn-ghost soc-mini" onclick="socSaveChannel(\'' + smsEsc(c.key) + '\')">Guardar</button>' : '') + '</td></tr>').join('')
+    + '</tbody></table></div></div>';
+  h += '<div class="dash-card"><h4 style="margin:0 0 6px;">Cómo conectar ManyChat (o Make / Zapier)</h4><ol class="soc-steps"><li>En Supabase → Edge Functions → Secrets crea <code>SOCIAL_INTAKE_SECRET</code> con una clave larga al azar (mínimo 16 caracteres) y despliega la función <code>social-intake</code> con «Verify JWT» apagado. <b>Esa clave nunca se pega en el CRM ni en el chat.</b></li>'
+    + '<li>En ManyChat, en el flujo de cada palabra clave y de cada botón del menú, agrega una acción <b>«External Request»</b> (POST) a esta dirección:<div class="soc-code" id="soc-url">' + smsEsc(url) + '</div></li>'
+    + '<li>Pon el encabezado <code>x-intake-secret</code> con tu clave (o, si no deja, un campo <code>secret</code> dentro del cuerpo). Cuerpo JSON de ejemplo:<pre class="soc-code">' + smsEsc(example) + '</pre></li>'
+    + '<li><code>kind</code> puede ser <code>comment</code> (comentó), <code>dm_in</code> (te escribió), <code>menu_choice</code> (eligió un botón), <code>link_sent</code> (le mandaste el link de la academia). <code>interest</code> puede ser auto, hogar, vida, salud, comercial, clase_gratis, cliente u otro.</li>'
+    + '<li>Prueba comentando tu propio video: en un minuto debe aparecer en «Contactos».</li></ol></div>';
+  h += '<div class="dash-card"><h4 style="margin:0 0 6px;">Conexión directa con Meta (sin ManyChat)</h4><p class="sub" style="margin:0 0 6px;">Meta le avisa a tu función <code>meta-webhook</code> cada vez que alguien comenta o te escribe; la función guarda la persona aquí y manda tus «Respuestas automáticas». Dirección del webhook (pégala en tu app de Meta):</p><div class="soc-code" id="soc-meta-url">' + smsEsc(murl) + '</div>'
+    + '<p class="sub" style="margin:6px 0 0;">Secretos en Supabase (nunca aquí ni en el chat): <code>META_APP_SECRET</code>, <code>META_VERIFY_TOKEN</code>, <code>META_ACCOUNTS</code> y, cuando todo esté probado, <code>META_SEND_ENABLED</code> = <code>1</code>. Mientras no esté en 1, la función solo guarda contactos y anota «[MODO PRUEBA]» en el historial lo que habría contestado.</p></div>';
+  document.getElementById('soc-body').innerHTML = h;
+}
+async function socSaveChannel(key){
+  if(SOC.busy || !socIsSuper()) return; const handle = document.getElementById('soc-c-h-' + key).value.trim(), active = document.getElementById('soc-c-a-' + key).checked; SOC.busy = true; socMsg('', '');
+  try{ const r = await sb.from('social_channels').update({ handle: handle || null, active }).eq('key', key); if(r.error) throw r.error; await socLoad(); socRenderChannels(); socMsg('success', 'Guardado.'); }
+  catch(e){ socMsg('error', 'No se pudo guardar: ' + ((e && e.message) || e)); }
+  SOC.busy = false;
+}
+// ===== SOCIAL-END =====
 
 // ===== PAGINA-UI-START =====
 // Pestaña «Página»: visitas a la página pública + editor del contenido (aviso festivo, aseguradoras, equipo).
