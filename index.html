@@ -979,6 +979,8 @@
 
 
 
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1019,6 +1021,8 @@
       #fmOverlay .fm-side #fm-props input[type="text"]{ width:100%; box-sizing:border-box; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; padding:8px 9px; font:inherit; font-size:14px; }
       #fmOverlay .fm-ti{ margin-right:4px; }
       #fmOverlay .fm-tplwrap{ display:contents; }
+      /* Los avisos del paso 2 (ej. error al crear el link) se quedan a la vista aunque estés abajo en el documento */
+      #fmOverlay #fm-msg2{ position:sticky; top:calc(var(--fm-top-h, 58px) + 8px); z-index:8; box-shadow:0 4px 14px rgba(13,20,36,.22); font-size:14.5px; font-weight:600; border:1.5px solid currentColor; }
       @media (max-width:820px){
         #fmOverlay .fm-body{ padding:10px; }
         #fmOverlay .fm-work{ gap:8px; }
@@ -1272,6 +1276,8 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
 
 
 
@@ -2723,6 +2729,8 @@
             <div id="fm-events-panel" style="display:none; margin-top:12px; padding:12px 14px; background:#F7F8FB; border:1px solid var(--line); border-radius:10px;"></div>
           </div>
 <!-- ===== FIRMAS-CARD-END ===== -->
+
+
 
 
 
@@ -16508,6 +16516,8 @@ async function saSaveSettings(){
 
 
 
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -16709,6 +16719,51 @@ async function fmDeleteTemplate(){
   catch(e){ fmMsg('fm-msg1', 'error', e.message); }
 }
 
+// PDF protegido → copia normal: cada página se dibuja como imagen JPEG dentro de un PDF nuevo (mismo tamaño de página).
+async function fmFlattenPdf(doc){
+  const MAX = 7.5 * 1024 * 1024;
+  for(const [scale, q] of [[2, 0.85], [1.5, 0.72], [1.2, 0.6]]){
+    const out = await fmBuildImagePdf(doc, scale, q);
+    if(out.length <= MAX) return out;
+  }
+  throw new Error('Ese PDF protegido es muy pesado para convertirlo. Abre el PDF, imprímelo como «Guardar como PDF» (más liviano) y sube esa copia.');
+}
+async function fmBuildImagePdf(doc, scale, quality){
+  const enc = new TextEncoder(); const parts = []; let len = 0; const offs = [];
+  const push = (u8) => { parts.push(u8); len += u8.length; };
+  const str = (t) => push(enc.encode(t));
+  const n = doc.numPages;
+  push(new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D, 0x31, 0x2E, 0x34, 0x0A, 0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A]));
+  const begin = (id) => { offs[id] = len; str(id + ' 0 obj\n'); };
+  const kids = []; for(let i = 0; i < n; i++) kids.push((3 + 3 * i) + ' 0 R');
+  begin(1); str('<</Type/Catalog/Pages 2 0 R>>\nendobj\n');
+  begin(2); str('<</Type/Pages/Count ' + n + '/Kids[' + kids.join(' ') + ']>>\nendobj\n');
+  for(let i = 0; i < n; i++){
+    const page = await doc.getPage(i + 1);
+    const v1 = page.getViewport({ scale: 1 });
+    const vp = page.getViewport({ scale });
+    const cv = document.createElement('canvas'); const pw = Math.max(1, Math.floor(vp.width)), ph = Math.max(1, Math.floor(vp.height)); cv.width = pw; cv.height = ph;
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, pw, ph);
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    const blob = await new Promise(res => cv.toBlob(res, 'image/jpeg', quality));
+    cv.width = 1; cv.height = 1;
+    if(!blob) throw new Error('No se pudo convertir el PDF protegido.');
+    const jpg = new Uint8Array(await blob.arrayBuffer());
+    const W = +v1.width.toFixed(2), H = +v1.height.toFixed(2); const pid = 3 + 3 * i, cid = pid + 1, iid = pid + 2;
+    begin(pid); str('<</Type/Page/Parent 2 0 R/MediaBox[0 0 ' + W + ' ' + H + ']/Resources<</XObject<</Im0 ' + iid + ' 0 R>>>>/Contents ' + cid + ' 0 R>>\nendobj\n');
+    const content = 'q ' + W + ' 0 0 ' + H + ' 0 0 cm /Im0 Do Q';
+    begin(cid); str('<</Length ' + content.length + '>>\nstream\n' + content + '\nendstream\nendobj\n');
+    begin(iid); str('<</Type/XObject/Subtype/Image/Width ' + pw + '/Height ' + ph + '/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ' + jpg.length + '>>\nstream\n');
+    push(jpg); str('\nendstream\nendobj\n');
+  }
+  const total = 3 * n + 3; const xref = len;
+  let x = 'xref\n0 ' + total + '\n0000000000 65535 f \n';
+  for(let id = 1; id < total; id++) x += String(offs[id]).padStart(10, '0') + ' 00000 n \n';
+  str(x + 'trailer\n<</Size ' + total + '/Root 1 0 R>>\nstartxref\n' + xref + '\n%%EOF\n');
+  const out = new Uint8Array(len); let o = 0; for(const u of parts){ out.set(u, o); o += u.length; }
+  return out;
+}
+
 async function fmStart(){
   if(FM.busy) return;
   fmMsg('fm-msg1', '', '');
@@ -16738,6 +16793,18 @@ async function fmStart(){
     try{ doc = await pdfjs.getDocument({ data: bytes.slice() }).promise; }
     catch(e){ throw new Error('No se pudo abrir ese PDF (puede estar dañado o protegido con contraseña).'); }
     if(doc.numPages > 30) throw new Error('El PDF tiene más de 30 páginas. Divídelo y manda solo las páginas que necesitan firma.');
+    // Muchos PDF legales vienen «protegidos» (permisos): se abren normal pero el servidor no los puede escribir.
+    // Se convierten aquí mismo en una copia normal (cada página como imagen) para poder ponerle campos y firmarlos.
+    let flattened = false;
+    if(!useTpl){
+      let prot = false; try{ prot = (await doc.getPermissions()) != null; }catch(e){}
+      if(prot){
+        btn.textContent = 'Preparando el PDF protegido…';
+        bytes = await fmFlattenPdf(doc);
+        try{ doc = await pdfjs.getDocument({ data: bytes.slice() }).promise; }catch(e){ throw new Error('No se pudo preparar ese PDF protegido. Abre el PDF, imprímelo como «Guardar como PDF» y sube esa copia.'); }
+        flattened = true;
+      }
+    }
     FM.title = title; FM.source = useTpl ? 'template' : 'upload'; FM.template = tpl; FM.bytes = useTpl ? null : bytes; FM.pdf = doc;
     FM.fields = fields; FM.sel = null; FM.templateDirty = false;
     document.getElementById('fm-pages').innerHTML = '';
@@ -16753,6 +16820,10 @@ async function fmStart(){
     fmStep(2);
     await fmRenderPages();
     fmRenderFields(); fmRenderProps(); fmSizeBars(); fmUpdateCurPage();
+    if(flattened){
+      fmMsg('fm-msg2', 'success', 'Este PDF venía protegido, así que lo convertí en una copia normal para poder firmarlo. Se ve igual (solo que el texto ya no se puede seleccionar).');
+      setTimeout(() => { const m = document.getElementById('fm-msg2'); if(m && m.classList.contains('success')) fmMsg('fm-msg2', '', ''); }, 12000);
+    }
   }catch(e){
     fmMsg('fm-msg1', 'error', e.message || String(e));
   }
