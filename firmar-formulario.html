@@ -34,6 +34,13 @@
   .pf{ position:absolute; border:2px solid var(--blue); background:rgba(37,99,235,.14); border-radius:5px; padding:0 4px; display:flex; align-items:center; overflow:hidden; cursor:pointer; font:inherit; color:var(--blue); text-align:left; }
   .pf.sigf{ border-color:var(--red); background:rgba(194,59,59,.13); color:var(--red); }
   .pf.opt{ border-style:dashed; }
+  .pf.ini{ border-color:#BE185D; background:rgba(190,24,93,.11); color:#BE185D; justify-content:center; }
+  .pf.chk{ border-color:#0891B2; background:rgba(8,145,178,.14); color:#0A1A5C; overflow:visible; justify-content:center; padding:0; }
+  .pf.chk .cx{ font-weight:800; line-height:1; color:#0A1A5C; }
+  .pf.chk .cl{ position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:6px; background:rgba(255,255,255,.95); border:1px solid #9EC9D6; border-radius:6px; padding:2px 7px; font-size:12px !important; font-weight:700; color:#0B5E73; white-space:nowrap; pointer-events:none; max-width:70vw; overflow:hidden; text-overflow:ellipsis; }
+  .pf.chk .cl.left{ left:auto; right:100%; margin-left:0; margin-right:6px; }
+  .pf.chk.done .cl{ opacity:.0; }
+  .pf.chk.done{ background:rgba(23,122,84,.10); border-color:var(--green); }
   .pf.done{ background:rgba(23,122,84,.10); border-color:var(--green); color:var(--ink); }
   .pf.next{ animation:pulse 1.2s infinite; }
   @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(37,99,235,.55);} 50%{ box-shadow:0 0 0 7px rgba(37,99,235,0);} }
@@ -73,7 +80,7 @@
   var API = SUPABASE_URL + '/functions/v1/sign-public';
   var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   var t0 = Date.now();
-  var S = { token: '', data: null, values: {}, sig: null, pages: [], busy: false, nextId: null };
+  var S = { token: '', data: null, values: {}, sig: null, initials: null, pages: [], busy: false, nextIds: [] };
 
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
@@ -148,7 +155,7 @@
     }
     S.data.fields.forEach(function(f){
       var pg = S.pages[f.page - 1]; if(!pg) return;
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'pf' + (f.type === 'signature' ? ' sigf' : '') + (f.required ? '' : ' opt'); b.dataset.id = f.id;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'pf' + (f.type === 'signature' ? ' sigf' : f.type === 'initials' ? ' ini' : f.type === 'check' ? ' chk' : '') + (f.required ? '' : ' opt'); b.dataset.id = f.id;
       b.style.left = (f.x * 100) + '%'; b.style.top = (f.y * 100) + '%'; b.style.width = (f.w * 100) + '%'; b.style.height = (f.h * 100) + '%';
       b.addEventListener('click', function(){ openField(f.id); });
       pg.appendChild(b);
@@ -156,20 +163,43 @@
   }
 
   function fieldList(){ return S.data.fields.slice().sort(function(a, b){ return a.page - b.page || a.y - b.y || a.x - b.x; }); }
-  function isFilled(f){ return f.type === 'signature' ? !!S.sig : !!(S.values[f.id] && String(S.values[f.id]).trim()); }
-  function requiredLeft(){ return fieldList().filter(function(f){ return f.required && !isFilled(f); }); }
+  function isFilled(f){
+    if(f.type === 'signature') return !!S.sig;
+    if(f.type === 'initials') return S.values[f.id] === '1' && !!S.initials;
+    if(f.type === 'check') return S.values[f.id] === '1';
+    return !!(S.values[f.id] && String(S.values[f.id]).trim());
+  }
+  // «Unidades» obligatorias: cada campo obligatorio, o un grupo de casillas «escoger una» completo.
+  function units(){
+    var out = [], seen = {};
+    fieldList().forEach(function(f){
+      if(f.type === 'check' && f.group){
+        var k = f.group.toLowerCase(); if(seen[k]) return; seen[k] = 1;
+        var mem = fieldList().filter(function(x){ return x.type === 'check' && x.group && x.group.toLowerCase() === k; });
+        if(mem.some(function(x){ return x.required; })) out.push({ ids: mem.map(function(x){ return x.id; }), f: mem[0], group: f.group, filled: mem.some(isFilled) });
+      } else if(f.required) out.push({ ids: [f.id], f: f, filled: isFilled(f) });
+    });
+    return out;
+  }
+  function requiredLeft(){ return units().filter(function(u){ return !u.filled; }); }
 
   function refresh(){
-    var req = S.data.fields.filter(function(f){ return f.required; }); var left = requiredLeft();
-    var done = req.length - left.length;
-    $('pbar').style.width = (req.length ? Math.round(done * 100 / req.length) : 100) + '%';
-    $('ptxt').textContent = req.length ? (done + ' de ' + req.length + ' campos obligatorios listos') : 'Revisa el documento y firma';
-    S.nextId = left.length ? left[0].id : null;
+    var us = units(); var left = us.filter(function(u){ return !u.filled; });
+    var done = us.length - left.length;
+    $('pbar').style.width = (us.length ? Math.round(done * 100 / us.length) : 100) + '%';
+    $('ptxt').textContent = us.length ? (done + ' de ' + us.length + ' campos obligatorios listos') : 'Revisa el documento y firma';
+    S.nextIds = left.length ? left[0].ids : [];
     document.querySelectorAll('.pf').forEach(function(b){
       var f = S.data.fields.find(function(x){ return x.id === b.dataset.id; });
-      var filled = isFilled(f); b.classList.toggle('done', filled); b.classList.toggle('next', !filled && f.id === S.nextId);
-      if(filled){
-        if(f.type === 'signature') b.innerHTML = '<img alt="Tu firma" src="' + S.sig + '">'; else b.innerHTML = '<span class="pv">' + esc(S.values[f.id]) + '</span>';
+      var filled = isFilled(f); b.classList.toggle('done', filled); b.classList.toggle('next', !filled && S.nextIds.indexOf(f.id) >= 0);
+      if(f.type === 'check'){
+        b.setAttribute('aria-label', f.label + (filled ? ' (marcada)' : ''));
+        b.setAttribute('aria-pressed', filled ? 'true' : 'false');
+        b.innerHTML = (filled ? '<span class="cx">✕</span>' : '') + '<span class="cl' + (f.x > 0.6 ? ' left' : '') + '">' + esc(f.label) + (f.required && !f.group ? ' *' : '') + '</span>';
+      } else if(filled){
+        if(f.type === 'signature') b.innerHTML = '<img alt="Tu firma" src="' + S.sig + '">';
+        else if(f.type === 'initials') b.innerHTML = '<img alt="Tus iniciales" src="' + S.initials + '">';
+        else b.innerHTML = '<span class="pv">' + esc(S.values[f.id]) + '</span>';
       } else b.innerHTML = '<span class="pl">' + esc(f.label) + (f.required ? ' *' : ' (opcional)') + '</span>';
     });
     $('nextbtn').textContent = left.length ? 'Siguiente campo →' : 'Revisar y firmar ✓';
@@ -177,15 +207,19 @@
     layout();
   }
   function layout(){
-    document.querySelectorAll('.pf').forEach(function(b){ var h = b.clientHeight; var fs = Math.max(9, Math.min(15, h * 0.58)); b.style.fontSize = fs + 'px'; });
+    document.querySelectorAll('.pf').forEach(function(b){ var h = b.clientHeight; var fs = Math.max(9, Math.min(b.classList.contains('chk') ? 22 : 15, h * 0.58)); b.style.fontSize = fs + 'px'; });
+  }
+  function note(text){ var m = $('msgbox'); if(!m) return; m.innerHTML = '<div class="err" style="background:#E8F3FB; color:#0B4F7A;">' + esc(text) + '</div>'; clearTimeout(note.t); note.t = setTimeout(function(){ m.innerHTML = ''; }, 4500); }
+  function goField(id){
+    var el = document.querySelector('.pf[data-id="' + id + '"]'); if(el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    var f = S.data.fields.find(function(x){ return x.id === id; }); if(!f) return;
+    if(f.type === 'check') note(f.group ? 'Escoge una opción de «' + f.group + '» tocando su casilla.' : 'Toca la casilla «' + f.label + '» para marcarla.');
+    else setTimeout(function(){ openField(id); }, 350);
   }
   function onNext(){
     if(S.busy) return;
     var left = requiredLeft();
-    if(left.length){
-      var el = document.querySelector('.pf[data-id="' + left[0].id + '"]'); if(el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      setTimeout(function(){ openField(left[0].id); }, 350);
-    } else openReview();
+    if(left.length) goField(left[0].f.id); else openReview();
   }
 
   // ---------- hoja inferior ----------
@@ -199,6 +233,8 @@
   function openField(id){
     var f = S.data.fields.find(function(x){ return x.id === id; }); if(!f || S.busy) return;
     if(f.type === 'signature') return openSignature(f);
+    if(f.type === 'initials') return openInitials(f);
+    if(f.type === 'check') return toggleCheck(f);
     var cur = S.values[id] || '';
     var hint = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : '';
     var extra = '';
@@ -229,6 +265,44 @@
     if(inp.tagName === 'INPUT') inp.addEventListener('keydown', function(ev){ if(ev.key === 'Enter'){ ev.preventDefault(); save(); } });
   }
 
+  // ---------- casillas ----------
+  function toggleCheck(f){
+    if(S.values[f.id] === '1'){ delete S.values[f.id]; refresh(); return; }
+    if(f.group){   // «escoger una»: al marcar una se quitan las otras del grupo
+      var k = f.group.toLowerCase();
+      S.data.fields.forEach(function(x){ if(x.type === 'check' && x.group && x.group.toLowerCase() === k) delete S.values[x.id]; });
+    }
+    S.values[f.id] = '1'; refresh();
+  }
+
+  // ---------- iniciales ----------
+  function openInitials(f){
+    if(S.initials && S.values[f.id] !== '1'){ S.values[f.id] = '1'; refresh(); return; }        // ya las dibujó: se ponen directo
+    if(S.initials && S.values[f.id] === '1'){
+      showSheet('<h2>Tus iniciales</h2><div style="text-align:center; border:1.5px solid var(--line); border-radius:12px; padding:10px;"><img alt="Tus iniciales" src="' + S.initials + '" style="max-width:100%; max-height:110px;"></div>'
+        + '<div class="row"><button type="button" class="btn ghost" id="iquit">Quitar de este recuadro</button><button type="button" class="btn ghost" id="iredo">Dibujar de nuevo</button></div>'
+        + '<div class="row"><button type="button" class="btn" id="iclose">Listo</button></div>');
+      $('iclose').addEventListener('click', closeSheet);
+      $('iquit').addEventListener('click', function(){ delete S.values[f.id]; closeSheet(); refresh(); });
+      $('iredo').addEventListener('click', function(){ drawInitials(f); });
+      return;
+    }
+    drawInitials(f);
+  }
+  function drawInitials(f){
+    var nReq = S.data.fields.filter(function(x){ return x.type === 'initials' && x.required; }).length;
+    showSheet('<h2>Tus iniciales</h2><p class="sub">Dibuja tus iniciales con el dedo (o el mouse).' + (nReq > 1 ? ' Se pondrán en todos los recuadros de iniciales obligatorios.' : '') + '</p><div class="err" id="ferr" style="display:none;"></div>'
+      + '<div id="padarea"><div id="padwrap"><canvas id="pad"></canvas><div id="padhint">Iniciales aquí</div></div>'
+      + '<div class="row"><button type="button" class="btn ghost" id="clr">Borrar</button><button type="button" class="btn" id="sigok">Guardar iniciales</button></div></div>'
+      + '<div class="row" style="margin-top:6px;"><button type="button" class="btn ghost" id="fcancel">Cancelar</button></div>');
+    $('fcancel').addEventListener('click', closeSheet);
+    setupPad({ h: 150, minLen: 12, minW: 8, minH: 8, maxOut: 420, bad: 'Dibuja tus iniciales dentro del recuadro.', onSave: function(url){
+      S.initials = url; S.values[f.id] = '1';
+      S.data.fields.forEach(function(x){ if(x.type === 'initials' && x.required) S.values[x.id] = '1'; });
+      closeSheet(); refresh();
+    } });
+  }
+
   // ---------- firma con el dedo ----------
   function openSignature(f){
     var had = !!S.sig;
@@ -238,12 +312,12 @@
       + '<div class="row"><button type="button" class="btn ghost" id="clr">Borrar</button><button type="button" class="btn" id="sigok">Guardar firma</button></div></div>'
       + '<div class="row" style="margin-top:6px;"><button type="button" class="btn ghost" id="fcancel">Cancelar</button></div>');
     $('fcancel').addEventListener('click', closeSheet);
-    if(had){ $('keep').addEventListener('click', closeSheet); $('redo').addEventListener('click', function(){ $('prev').style.display = 'none'; $('redo').parentNode.style.display = 'none'; $('padarea').style.display = 'block'; setupPad(); }); }
-    else setupPad();
+    if(had){ $('keep').addEventListener('click', closeSheet); $('redo').addEventListener('click', function(){ $('prev').style.display = 'none'; $('redo').parentNode.style.display = 'none'; $('padarea').style.display = 'block'; setupPad({ h: 200, minLen: 30, minW: 20, minH: 8, maxOut: 700, bad: 'Dibuja tu firma completa dentro del recuadro.', onSave: function(url){ S.sig = url; closeSheet(); refresh(); } }); }); }
+    else setupPad({ h: 200, minLen: 30, minW: 20, minH: 8, maxOut: 700, bad: 'Dibuja tu firma completa dentro del recuadro.', onSave: function(url){ S.sig = url; closeSheet(); refresh(); } });
   }
-  function setupPad(){
+  function setupPad(cfg){
     var cv = $('pad'); var dpr = Math.min(2, window.devicePixelRatio || 1);
-    var w = cv.clientWidth || 300, h = 200; cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr);
+    var w = cv.clientWidth || 300, h = cfg.h; cv.style.height = h + 'px'; cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr);
     var ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0A1A5C';
     var drawing = false, last = null, len = 0, minX = 1e9, minY = 1e9, maxX = -1, maxY = -1;
     function pt(e){ var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * (w / r.width), y: (e.clientY - r.top) * (h / r.height) }; }
@@ -255,18 +329,18 @@
     function track(p){ minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
     $('clr').addEventListener('click', function(){ ctx.clearRect(0, 0, w, h); len = 0; minX = minY = 1e9; maxX = maxY = -1; $('padhint').style.display = 'flex'; $('ferr').style.display = 'none'; });
     $('sigok').addEventListener('click', function(){
-      if(len < 30 || maxX - minX < 20 || maxY - minY < 8){ var e = $('ferr'); e.textContent = 'Dibuja tu firma completa dentro del recuadro.'; e.style.display = 'block'; return; }
+      if(len < cfg.minLen || maxX - minX < cfg.minW || maxY - minY < cfg.minH){ var e = $('ferr'); e.textContent = cfg.bad; e.style.display = 'block'; return; }
       var pad = 8, sx = Math.max(0, Math.floor((minX - pad) * dpr)), sy = Math.max(0, Math.floor((minY - pad) * dpr));
       var sw = Math.min(cv.width - sx, Math.ceil((maxX - minX + 2 * pad) * dpr)), sh = Math.min(cv.height - sy, Math.ceil((maxY - minY + 2 * pad) * dpr));
-      var out = document.createElement('canvas'); var sc = Math.min(1, 700 / sw); out.width = Math.max(20, Math.round(sw * sc)); out.height = Math.max(10, Math.round(sh * sc));
+      var out = document.createElement('canvas'); var sc = Math.min(1, cfg.maxOut / sw); out.width = Math.max(20, Math.round(sw * sc)); out.height = Math.max(10, Math.round(sh * sc));
       out.getContext('2d').drawImage(cv, sx, sy, sw, sh, 0, 0, out.width, out.height);
-      S.sig = out.toDataURL('image/png'); closeSheet(); refresh();
+      cfg.onSave(out.toDataURL('image/png'));
     });
   }
 
   // ---------- revisar y firmar ----------
   function openReview(){
-    var rows = fieldList().filter(function(f){ return f.type !== 'signature' && isFilled(f); }).map(function(f){ return '<div><b>' + esc(f.label) + '</b><span>' + esc(S.values[f.id]) + '</span></div>'; }).join('');
+    var rows = fieldList().filter(function(f){ return f.type !== 'signature' && isFilled(f); }).map(function(f){ return '<div><b>' + esc(f.type === 'check' && f.group ? f.group : f.label) + '</b><span>' + esc(f.type === 'check' ? (f.group ? f.label : '✕ Marcada') : f.type === 'initials' ? 'Iniciales puestas' : S.values[f.id]) + '</span></div>'; }).join('');
     var firstName = ''; var nf = fieldList().find(function(f){ return f.type === 'name' && S.values[f.id]; }); if(nf) firstName = S.values[nf.id]; else if(S.data.nameHint) firstName = S.data.nameHint;
     showSheet('<h2>Revisa y firma</h2><p class="sub">Este es el resumen de lo que llenaste. Si algo está mal, cierra esta ventana y toca el recuadro para corregirlo.</p>'
       + (rows ? '<div class="sum">' + rows + '</div>' : '') + (S.sig ? '<div style="text-align:center; margin:10px 0;"><img alt="Tu firma" src="' + S.sig + '" style="max-height:80px; max-width:80%;"></div>' : '')
@@ -288,7 +362,7 @@
     var ref = ''; try{ ref = document.referrer ? new URL(document.referrer).host : ''; }catch(e){}
     var browser = { tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } })(), lang: navigator.language || '', screen: screen.width + 'x' + screen.height, touch: ('ontouchstart' in window) || navigator.maxTouchPoints > 0, seconds: Math.round((Date.now() - t0) / 1000), ref: ref };
     var r;
-    try{ r = await api({ action: 'submit', token: S.token, values: values, signatureImage: S.sig, signerName: signerName, consent: true, browser: browser }); }
+    try{ r = await api({ action: 'submit', token: S.token, values: values, signatureImage: S.sig, initialsImage: fieldList().some(function(f){ return f.type === 'initials' && S.values[f.id] === '1'; }) ? S.initials : undefined, signerName: signerName, consent: true, browser: browser }); }
     catch(e){ S.busy = false; send.disabled = false; send.textContent = 'Firmar y enviar'; showErr(e.message); return; }
     S.busy = false;
     if(r.ok){ closeSheet(); document.querySelector('.bar') && document.querySelector('.bar').remove(); window.scrollTo(0, 0);
@@ -303,7 +377,7 @@
   }
   function showErr(text, fieldId){
     var e = $('ferr'); if(e){ e.textContent = text; e.style.display = 'block'; }
-    if(fieldId){ var b = $('rcancel'); if(b){ var go = document.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'Corregir ese campo'; go.addEventListener('click', function(){ closeSheet(); openField(fieldId); }); b.parentNode.insertBefore(go, b.nextSibling); } }
+    if(fieldId){ var b = $('rcancel'); if(b){ var go = document.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'Corregir ese campo'; go.addEventListener('click', function(){ closeSheet(); goField(fieldId); }); b.parentNode.insertBefore(go, b.nextSibling); } }
   }
 
   init();
