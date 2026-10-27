@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Firmar documento — GMAX All Insurance</title>
+<!--
+  Página PÚBLICA para que el cliente firme un documento (la que abre el link «Firmar documento» del CRM).
+  Se sube al MISMO lugar que index.html del CRM (repo gmax-agent-login), con este nombre exacto: firmar-formulario.html
+  No necesita cuenta: el enlace secreto (?t=...) es el permiso. Habla con la Edge Function «sign-public».
+-->
+<style>
+  :root{ --navy:#0B1F4B; --gold:#C9A24A; --ink:#0D1424; --slate:#5B6478; --line:#E3E6EE; --bg:#F4F6FB; --green:#177A54; --red:#C23B3B; --blue:#2563EB; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); line-height:1.45; -webkit-text-size-adjust:100%; }
+  header{ background:var(--navy); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; }
+  header b{ font-size:17px; letter-spacing:.2px; } header span{ font-size:12.5px; opacity:.75; }
+  main{ max-width:880px; margin:0 auto; padding:14px 14px 120px; }
+  h1{ font-size:20px; margin:6px 0 4px; } p{ margin:6px 0; } .sub{ color:var(--slate); font-size:14px; }
+  .card{ background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
+  .center{ text-align:center; padding:34px 16px; }
+  .big{ font-size:54px; line-height:1; margin-bottom:8px; }
+  .btn{ display:inline-block; border:0; border-radius:12px; padding:14px 22px; font-size:16px; font-weight:700; cursor:pointer; background:var(--navy); color:#fff; text-decoration:none; }
+  .btn:disabled{ opacity:.45; cursor:default; } .btn.ghost{ background:#fff; color:var(--navy); border:1.5px solid var(--line); } .btn.green{ background:var(--green); }
+  .err{ background:#FDEAEA; color:#B23A3A; border-radius:10px; padding:10px 12px; margin:10px 0; font-size:14.5px; } .okm{ background:#E9F7F0; color:var(--green); border-radius:10px; padding:10px 12px; margin:10px 0; }
+  .progress{ height:8px; background:#E7EAF2; border-radius:99px; overflow:hidden; margin:8px 0 2px; } .progress i{ display:block; height:100%; background:var(--green); width:0; transition:width .25s; }
+  #pages{ margin-top:10px; }
+  .page{ position:relative; margin:0 auto 14px; background:#fff; box-shadow:0 2px 10px rgba(13,20,36,.18); width:100%; max-width:820px; }
+  .page canvas{ display:block; width:100%; height:auto; }
+  .ptag{ position:absolute; top:0; left:0; background:var(--navy); color:#fff; font-size:11px; padding:2px 8px; border-radius:0 0 6px 0; opacity:.85; pointer-events:none; }
+  .pf{ position:absolute; border:2px solid var(--blue); background:rgba(37,99,235,.14); border-radius:5px; padding:0 4px; display:flex; align-items:center; overflow:hidden; cursor:pointer; font:inherit; color:var(--blue); text-align:left; }
+  .pf.sigf{ border-color:var(--red); background:rgba(194,59,59,.13); color:var(--red); }
+  .pf.opt{ border-style:dashed; }
+  .pf.done{ background:rgba(23,122,84,.10); border-color:var(--green); color:var(--ink); }
+  .pf.next{ animation:pulse 1.2s infinite; }
+  @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(37,99,235,.55);} 50%{ box-shadow:0 0 0 7px rgba(37,99,235,0);} }
+  .pl{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .pv{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#0A1A5C; }
+  .pf img{ max-width:100%; max-height:100%; display:block; margin:0 auto; }
+  .bar{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1.5px solid var(--line); padding:10px 14px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:10px; align-items:center; justify-content:center; z-index:20; }
+  .bar .btn{ flex:1; max-width:420px; }
+  .backdrop{ position:fixed; inset:0; background:rgba(13,20,36,.55); z-index:40; display:none; }
+  .sheet{ position:fixed; left:0; right:0; bottom:0; max-height:92vh; overflow-y:auto; background:#fff; border-radius:18px 18px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); z-index:41; display:none; max-width:640px; margin:0 auto; box-shadow:0 -6px 30px rgba(0,0,0,.25); }
+  .sheet h2{ font-size:18px; margin:0 0 4px; } label.l{ display:block; font-size:13px; font-weight:700; margin:12px 0 5px; }
+  input[type=text]{ width:100%; padding:13px 12px; border:1.5px solid #C9CEDB; border-radius:10px; font-size:17px; font-family:inherit; }
+  input[type=text]:focus{ outline:2px solid var(--blue); border-color:var(--blue); }
+  textarea{ width:100%; padding:12px; border:1.5px solid #C9CEDB; border-radius:10px; font-size:17px; font-family:inherit; min-height:110px; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; } .row .btn{ flex:1; min-width:130px; }
+  #padwrap{ border:2px dashed #9AA3B8; border-radius:12px; background:#FCFCFE; touch-action:none; position:relative; }
+  #pad{ display:block; width:100%; height:200px; touch-action:none; } #padhint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#A3AABB; font-size:16px; pointer-events:none; }
+  .sum{ border:1px solid var(--line); border-radius:10px; overflow:hidden; } .sum div{ display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); font-size:14px; } .sum div:last-child{ border-bottom:0; } .sum b{ color:var(--slate); font-weight:600; } .sum span{ text-align:right; word-break:break-word; }
+  .chk{ display:flex; gap:10px; align-items:flex-start; margin:14px 0 4px; font-size:14.5px; } .chk input{ width:22px; height:22px; margin-top:2px; flex:none; }
+  footer{ text-align:center; color:#8A93A6; font-size:12px; padding:0 14px 22px; }
+</style>
+</head>
+<body>
+<header><b>GMAX All Insurance</b><span>Firma electrónica segura</span></header>
+<main id="main">
+  <div class="card center" id="loading"><div class="big">⏳</div><p>Abriendo tu documento…</p></div>
+</main>
+<footer>¿Dudas? Llámanos al (832) 480-0217 · Tu información viaja cifrada y solo la ve la agencia.</footer>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+
+<script>
+(function(){
+  'use strict';
+  var SUPABASE_URL = 'https://gghsnbnnqkgcqriipgdz.supabase.co';
+  var SUPABASE_ANON_KEY = 'sb_publishable_phuifGp9qibdkiEoG3V-FA_6TmtFJCC';
+  var API = SUPABASE_URL + '/functions/v1/sign-public';
+  var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  var t0 = Date.now();
+  var S = { token: '', data: null, values: {}, sig: null, pages: [], busy: false, nextId: null };
+
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+  function setMain(html){ $('main').innerHTML = html; }
+  function msgScreen(icon, title, text, extra){ setMain('<div class="card center"><div class="big">' + icon + '</div><h1>' + esc(title) + '</h1><p class="sub">' + text + '</p>' + (extra || '') + '</div>'); document.querySelector('.bar') && document.querySelector('.bar').remove(); }
+
+  async function api(body){
+    var resp;
+    try{ resp = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY }, body: JSON.stringify(body) }); }
+    catch(e){ throw { message: 'No hay conexión. Revisa tu internet e intenta de nuevo.', network: true }; }
+    var data = null; try{ data = await resp.json(); }catch(e){}
+    if(!data) throw { message: 'No se pudo completar (error ' + resp.status + '). Intenta de nuevo.', status: resp.status };
+    if(!resp.ok && !data.error) throw { message: 'No se pudo completar (error ' + resp.status + ').', status: resp.status };
+    data.__status = resp.status;
+    return data;
+  }
+
+  function loadPdfJs(){
+    if(window.pdfjsLib && window.pdfjsLib.__ready) return Promise.resolve(window.pdfjsLib);
+    return new Promise(function(res, rej){
+      var s = document.createElement('script'); s.src = PDFJS + 'pdf.min.js';
+      s.onload = async function(){
+        try{
+          var t = await (await fetch(PDFJS + 'pdf.worker.min.js')).text();
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([t], { type: 'text/javascript' }));
+          window.pdfjsLib.__ready = true; res(window.pdfjsLib);
+        }catch(e){ rej(new Error('No se pudo cargar el visor del documento.')); }
+      };
+      s.onerror = function(){ rej(new Error('No se pudo cargar el visor del documento. Revisa tu internet.')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  // ---------- inicio ----------
+  async function init(){
+    S.token = new URLSearchParams(location.search).get('t') || '';
+    if(!/^[A-Za-z0-9_-]{30,80}$/.test(S.token)){ msgScreen('🔗', 'Este link no es válido', 'Revisa que hayas copiado el link completo, o pídele a tu agente que te mande uno nuevo.'); return; }
+    var d;
+    try{ d = await api({ action: 'get', token: S.token }); }
+    catch(e){ msgScreen('📡', 'No se pudo abrir', esc(e.message), '<p><button class="btn" onclick="location.reload()">Intentar de nuevo</button></p>'); return; }
+    if(d.__status === 404 || (d.error && !d.status)){ msgScreen('🔗', 'Este link ya no está activo', esc(d.error || 'Pídele a tu agente que te mande uno nuevo.')); return; }
+    if(d.status === 'firmado'){ msgScreen('✅', 'Este documento ya fue firmado', 'Gracias. No necesitas hacer nada más.'); return; }
+    if(d.status === 'cancelado'){ msgScreen('🚫', 'Este documento fue cancelado', 'Tu agente lo canceló. Si necesitas firmar algo, pídele que te mande uno nuevo.'); return; }
+    if(d.status === 'vencido'){ msgScreen('⌛', 'Este link venció', 'Pídele a tu agente que te mande uno nuevo.'); return; }
+    if(d.status === 'procesando'){ msgScreen('⏳', 'Tu firma se está guardando', 'Espera un momento y vuelve a abrir el link.'); return; }
+    if(d.status !== 'pendiente'){ msgScreen('⚠️', 'No se pudo abrir', esc(d.error || 'Intenta de nuevo.')); return; }
+    S.data = d;
+    d.fields.forEach(function(f){ if(f.type === 'date' && d.today) S.values[f.id] = d.today; });
+    setMain('<div class="card"><h1>' + esc(d.title) + '</h1><p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
+      + '<div class="progress"><i id="pbar"></i></div><div class="sub" id="ptxt"></div></div><div id="msgbox"></div><div id="pages"></div>');
+    var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<button class="btn" id="nextbtn">Siguiente →</button>'; document.body.appendChild(bar);
+    $('nextbtn').addEventListener('click', onNext);
+    try{
+      var pdfjs = await loadPdfJs();
+      var buf = await (await fetch(d.pdfUrl)).arrayBuffer();
+      var doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+      await renderPages(doc);
+    }catch(e){ msgScreen('📄', 'No se pudo mostrar el documento', esc(e.message || 'Intenta de nuevo.'), '<p><button class="btn" onclick="location.reload()">Intentar de nuevo</button></p>'); return; }
+    refresh();
+    window.addEventListener('resize', layout);
+  }
+
+  async function renderPages(doc){
+    var wrap = $('pages'); var cssW = Math.min(820, Math.max(260, wrap.clientWidth || 360)); var dpr = Math.min(2, window.devicePixelRatio || 1);
+    for(var i = 1; i <= doc.numPages; i++){
+      var page = await doc.getPage(i); var v1 = page.getViewport({ scale: 1 }); var vp = page.getViewport({ scale: (cssW * dpr) / v1.width });
+      var el = document.createElement('div'); el.className = 'page'; el.dataset.page = String(i);
+      var cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height); el.appendChild(cv);
+      var tg = document.createElement('div'); tg.className = 'ptag'; tg.textContent = 'Página ' + i + ' de ' + doc.numPages; el.appendChild(tg);
+      wrap.appendChild(el); S.pages.push(el);
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    }
+    S.data.fields.forEach(function(f){
+      var pg = S.pages[f.page - 1]; if(!pg) return;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'pf' + (f.type === 'signature' ? ' sigf' : '') + (f.required ? '' : ' opt'); b.dataset.id = f.id;
+      b.style.left = (f.x * 100) + '%'; b.style.top = (f.y * 100) + '%'; b.style.width = (f.w * 100) + '%'; b.style.height = (f.h * 100) + '%';
+      b.addEventListener('click', function(){ openField(f.id); });
+      pg.appendChild(b);
+    });
+  }
+
+  function fieldList(){ return S.data.fields.slice().sort(function(a, b){ return a.page - b.page || a.y - b.y || a.x - b.x; }); }
+  function isFilled(f){ return f.type === 'signature' ? !!S.sig : !!(S.values[f.id] && String(S.values[f.id]).trim()); }
+  function requiredLeft(){ return fieldList().filter(function(f){ return f.required && !isFilled(f); }); }
+
+  function refresh(){
+    var req = S.data.fields.filter(function(f){ return f.required; }); var left = requiredLeft();
+    var done = req.length - left.length;
+    $('pbar').style.width = (req.length ? Math.round(done * 100 / req.length) : 100) + '%';
+    $('ptxt').textContent = req.length ? (done + ' de ' + req.length + ' campos obligatorios listos') : 'Revisa el documento y firma';
+    S.nextId = left.length ? left[0].id : null;
+    document.querySelectorAll('.pf').forEach(function(b){
+      var f = S.data.fields.find(function(x){ return x.id === b.dataset.id; });
+      var filled = isFilled(f); b.classList.toggle('done', filled); b.classList.toggle('next', !filled && f.id === S.nextId);
+      if(filled){
+        if(f.type === 'signature') b.innerHTML = '<img alt="Tu firma" src="' + S.sig + '">'; else b.innerHTML = '<span class="pv">' + esc(S.values[f.id]) + '</span>';
+      } else b.innerHTML = '<span class="pl">' + esc(f.label) + (f.required ? ' *' : ' (opcional)') + '</span>';
+    });
+    $('nextbtn').textContent = left.length ? 'Siguiente campo →' : 'Revisar y firmar ✓';
+    $('nextbtn').className = 'btn' + (left.length ? '' : ' green');
+    layout();
+  }
+  function layout(){
+    document.querySelectorAll('.pf').forEach(function(b){ var h = b.clientHeight; var fs = Math.max(9, Math.min(15, h * 0.58)); b.style.fontSize = fs + 'px'; });
+  }
+  function onNext(){
+    if(S.busy) return;
+    var left = requiredLeft();
+    if(left.length){
+      var el = document.querySelector('.pf[data-id="' + left[0].id + '"]'); if(el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      setTimeout(function(){ openField(left[0].id); }, 350);
+    } else openReview();
+  }
+
+  // ---------- hoja inferior ----------
+  function showSheet(html){ $('sheet').innerHTML = html; $('sheet').style.display = 'block'; $('backdrop').style.display = 'block'; $('sheet').scrollTop = 0; document.body.style.overflow = 'hidden'; }
+  function closeSheet(){ $('sheet').style.display = 'none'; $('backdrop').style.display = 'none'; $('sheet').innerHTML = ''; document.body.style.overflow = ''; }
+  $('backdrop').addEventListener('click', closeSheet);
+
+  function maskDate(v){ var d = v.replace(/\D/g, '').slice(0, 8); var o = d.slice(0, 2); if(d.length > 2) o += '/' + d.slice(2, 4); if(d.length > 4) o += '/' + d.slice(4); return o; }
+  function validDate(s){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s); if(!m) return false; var mo = +m[1], da = +m[2], yr = +m[3]; if(yr < 1900 || yr > 2100 || mo < 1 || mo > 12 || da < 1) return false; return da <= new Date(yr, mo, 0).getDate(); }
+
+  function openField(id){
+    var f = S.data.fields.find(function(x){ return x.id === id; }); if(!f || S.busy) return;
+    if(f.type === 'signature') return openSignature(f);
+    var cur = S.values[id] || '';
+    var hint = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : '';
+    var extra = '';
+    if(f.type === 'name' && S.data.nameHint) extra = '<div class="row" style="margin-top:8px;"><button type="button" class="btn ghost" id="sugg">Usar «' + esc(S.data.nameHint) + '»</button></div>';
+    if(f.type === 'date') extra = '<div class="row" style="margin-top:8px;"><button type="button" class="btn ghost" id="today">Poner la fecha de hoy</button></div>';
+    var input = f.type === 'text' && f.h * (S.pages[f.page - 1].clientHeight) >= 40
+      ? '<textarea id="fin" maxlength="500" placeholder="' + esc(hint) + '">' + esc(cur) + '</textarea>'
+      : '<input type="text" id="fin" maxlength="' + (f.type === 'name' ? 120 : f.type === 'number' ? 40 : f.type === 'date' ? 10 : 500) + '" value="' + esc(cur) + '" placeholder="' + esc(hint) + '" autocomplete="off"' + (f.type === 'number' ? ' inputmode="decimal"' : f.type === 'date' ? ' inputmode="numeric"' : '') + '>';
+    showSheet('<h2>' + esc(f.label) + (f.required ? ' <span style="color:#C23B3B">*</span>' : ' <span class="sub">(opcional)</span>') + '</h2><div class="err" id="ferr" style="display:none;"></div>' + input + extra
+      + '<div class="row"><button type="button" class="btn ghost" id="fcancel">Cancelar</button><button type="button" class="btn" id="fok">Guardar</button></div>');
+    var inp = $('fin'); setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 80);
+    if(f.type === 'date') inp.addEventListener('input', function(){ inp.value = maskDate(inp.value); });
+    if(f.type === 'number') inp.addEventListener('input', function(){ inp.value = inp.value.replace(/[^0-9 .,\-\/$]/g, ''); });
+    if($('sugg')) $('sugg').addEventListener('click', function(){ inp.value = S.data.nameHint; });
+    if($('today')) $('today').addEventListener('click', function(){ inp.value = S.data.today || ''; });
+    $('fcancel').addEventListener('click', closeSheet);
+    function save(){
+      var v = inp.value.replace(/\s+/g, f.type === 'text' ? ' ' : ' ').trim(); if(f.type === 'text') v = inp.value.replace(/[ \t]+/g, ' ').trim();
+      var err = '';
+      if(!v && f.required) err = 'Este campo es obligatorio.';
+      else if(v && f.type === 'date' && !validDate(v)) err = 'Escribe una fecha válida: MM/DD/AAAA.';
+      else if(v && f.type === 'number' && !/^[0-9][0-9 .,\-\/$]*$/.test(v)) err = 'Escribe solo números.';
+      if(err){ var e = $('ferr'); e.textContent = err; e.style.display = 'block'; return; }
+      if(v) S.values[id] = v; else delete S.values[id];
+      closeSheet(); refresh();
+    }
+    $('fok').addEventListener('click', save);
+    if(inp.tagName === 'INPUT') inp.addEventListener('keydown', function(ev){ if(ev.key === 'Enter'){ ev.preventDefault(); save(); } });
+  }
+
+  // ---------- firma con el dedo ----------
+  function openSignature(f){
+    var had = !!S.sig;
+    showSheet('<h2>Tu firma</h2><p class="sub">Firma con el dedo (o el mouse) dentro del recuadro.</p><div class="err" id="ferr" style="display:none;"></div>'
+      + (had ? '<div id="prev" style="text-align:center; border:1.5px solid var(--line); border-radius:12px; padding:10px;"><img alt="Tu firma" src="' + S.sig + '" style="max-width:100%; max-height:140px;"><div class="sub">Esta es tu firma actual.</div></div><div class="row"><button type="button" class="btn ghost" id="redo">Dibujar de nuevo</button><button type="button" class="btn" id="keep">Usar esta firma</button></div>' : '')
+      + '<div id="padarea" style="' + (had ? 'display:none;' : '') + '"><div id="padwrap"><canvas id="pad"></canvas><div id="padhint">Firma aquí</div></div>'
+      + '<div class="row"><button type="button" class="btn ghost" id="clr">Borrar</button><button type="button" class="btn" id="sigok">Guardar firma</button></div></div>'
+      + '<div class="row" style="margin-top:6px;"><button type="button" class="btn ghost" id="fcancel">Cancelar</button></div>');
+    $('fcancel').addEventListener('click', closeSheet);
+    if(had){ $('keep').addEventListener('click', closeSheet); $('redo').addEventListener('click', function(){ $('prev').style.display = 'none'; $('redo').parentNode.style.display = 'none'; $('padarea').style.display = 'block'; setupPad(); }); }
+    else setupPad();
+  }
+  function setupPad(){
+    var cv = $('pad'); var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var w = cv.clientWidth || 300, h = 200; cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr);
+    var ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0A1A5C';
+    var drawing = false, last = null, len = 0, minX = 1e9, minY = 1e9, maxX = -1, maxY = -1;
+    function pt(e){ var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * (w / r.width), y: (e.clientY - r.top) * (h / r.height) }; }
+    cv.addEventListener('pointerdown', function(e){ e.preventDefault(); drawing = true; try{ cv.setPointerCapture(e.pointerId); }catch(_){} last = pt(e); $('padhint').style.display = 'none';
+      ctx.beginPath(); ctx.arc(last.x, last.y, 1.2, 0, 6.3); ctx.fillStyle = '#0A1A5C'; ctx.fill(); track(last); });
+    cv.addEventListener('pointermove', function(e){ if(!drawing) return; e.preventDefault(); var p = pt(e); var mid = { x: (last.x + p.x) / 2, y: (last.y + p.y) / 2 };
+      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.quadraticCurveTo(last.x, last.y, mid.x, mid.y); ctx.lineTo(p.x, p.y); ctx.stroke(); len += Math.hypot(p.x - last.x, p.y - last.y); track(p); last = p; });
+    function end(){ drawing = false; } cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); cv.addEventListener('pointerleave', end);
+    function track(p){ minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); }
+    $('clr').addEventListener('click', function(){ ctx.clearRect(0, 0, w, h); len = 0; minX = minY = 1e9; maxX = maxY = -1; $('padhint').style.display = 'flex'; $('ferr').style.display = 'none'; });
+    $('sigok').addEventListener('click', function(){
+      if(len < 30 || maxX - minX < 20 || maxY - minY < 8){ var e = $('ferr'); e.textContent = 'Dibuja tu firma completa dentro del recuadro.'; e.style.display = 'block'; return; }
+      var pad = 8, sx = Math.max(0, Math.floor((minX - pad) * dpr)), sy = Math.max(0, Math.floor((minY - pad) * dpr));
+      var sw = Math.min(cv.width - sx, Math.ceil((maxX - minX + 2 * pad) * dpr)), sh = Math.min(cv.height - sy, Math.ceil((maxY - minY + 2 * pad) * dpr));
+      var out = document.createElement('canvas'); var sc = Math.min(1, 700 / sw); out.width = Math.max(20, Math.round(sw * sc)); out.height = Math.max(10, Math.round(sh * sc));
+      out.getContext('2d').drawImage(cv, sx, sy, sw, sh, 0, 0, out.width, out.height);
+      S.sig = out.toDataURL('image/png'); closeSheet(); refresh();
+    });
+  }
+
+  // ---------- revisar y firmar ----------
+  function openReview(){
+    var rows = fieldList().filter(function(f){ return f.type !== 'signature' && isFilled(f); }).map(function(f){ return '<div><b>' + esc(f.label) + '</b><span>' + esc(S.values[f.id]) + '</span></div>'; }).join('');
+    var firstName = ''; var nf = fieldList().find(function(f){ return f.type === 'name' && S.values[f.id]; }); if(nf) firstName = S.values[nf.id]; else if(S.data.nameHint) firstName = S.data.nameHint;
+    showSheet('<h2>Revisa y firma</h2><p class="sub">Este es el resumen de lo que llenaste. Si algo está mal, cierra esta ventana y toca el recuadro para corregirlo.</p>'
+      + (rows ? '<div class="sum">' + rows + '</div>' : '') + (S.sig ? '<div style="text-align:center; margin:10px 0;"><img alt="Tu firma" src="' + S.sig + '" style="max-height:80px; max-width:80%;"></div>' : '')
+      + '<div class="err" id="ferr" style="display:none;"></div>'
+      + '<label class="l" for="sname">Escribe tu nombre completo <span style="color:#C23B3B">*</span></label><input type="text" id="sname" maxlength="120" value="' + esc(firstName) + '" autocomplete="name">'
+      + '<label class="chk"><input type="checkbox" id="consent"><span>Acepto firmar este documento de forma electrónica. Entiendo que mi firma electrónica tiene el mismo valor que mi firma a mano y que el documento firmado quedará guardado en el expediente de GMAX All Insurance.</span></label>'
+      + '<div class="row"><button type="button" class="btn ghost" id="rcancel">Volver</button><button type="button" class="btn green" id="rsend" disabled>Firmar y enviar</button></div>');
+    var chk = $('consent'), nm = $('sname'), send = $('rsend');
+    function upd(){ send.disabled = !(chk.checked && nm.value.trim().length >= 2); }
+    chk.addEventListener('change', upd); nm.addEventListener('input', upd); upd();
+    $('rcancel').addEventListener('click', closeSheet);
+    send.addEventListener('click', function(){ submit(nm.value.replace(/\s+/g, ' ').trim()); });
+  }
+
+  async function submit(signerName){
+    if(S.busy) return; S.busy = true;
+    var send = $('rsend'); send.disabled = true; send.textContent = 'Enviando…';
+    var values = {}; Object.keys(S.values).forEach(function(k){ values[k] = S.values[k]; });
+    var ref = ''; try{ ref = document.referrer ? new URL(document.referrer).host : ''; }catch(e){}
+    var browser = { tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } })(), lang: navigator.language || '', screen: screen.width + 'x' + screen.height, touch: ('ontouchstart' in window) || navigator.maxTouchPoints > 0, seconds: Math.round((Date.now() - t0) / 1000), ref: ref };
+    var r;
+    try{ r = await api({ action: 'submit', token: S.token, values: values, signatureImage: S.sig, signerName: signerName, consent: true, browser: browser }); }
+    catch(e){ S.busy = false; send.disabled = false; send.textContent = 'Firmar y enviar'; showErr(e.message); return; }
+    S.busy = false;
+    if(r.ok){ closeSheet(); document.querySelector('.bar') && document.querySelector('.bar').remove(); window.scrollTo(0, 0);
+      msgScreen('✅', '¡Firma enviada con éxito!', 'Gracias por hacer negocios con GMAX All Insurance. Tu agente ya recibió el documento firmado. Ya puedes cerrar esta página.',
+        r.downloadUrl ? '<p style="margin-top:16px;"><a class="btn" href="' + esc(r.downloadUrl) + '" target="_blank" rel="noopener">⬇ Descargar mi copia</a></p><p class="sub">El botón de descarga solo funciona unos minutos.</p>' : ''); return; }
+    if(r.__status === 404){ closeSheet(); msgScreen('🔗', 'Este link ya no está activo', 'Tu agente lo cambió o lo canceló. Pídele que te mande uno nuevo.'); return; }
+    if(r.status === 'firmado'){ closeSheet(); msgScreen('✅', 'Este documento ya fue firmado', 'Gracias. No necesitas hacer nada más.'); return; }
+    if(r.status === 'vencido'){ closeSheet(); msgScreen('⌛', 'Este link venció', 'Pídele a tu agente que te mande uno nuevo.'); return; }
+    if(r.status === 'cancelado'){ closeSheet(); msgScreen('🚫', 'Este documento fue cancelado', 'Pídele a tu agente que te mande uno nuevo.'); return; }
+    send.disabled = false; send.textContent = 'Firmar y enviar';
+    showErr(r.error || 'No se pudo guardar tu firma. Intenta de nuevo.', r.field);
+  }
+  function showErr(text, fieldId){
+    var e = $('ferr'); if(e){ e.textContent = text; e.style.display = 'block'; }
+    if(fieldId){ var b = $('rcancel'); if(b){ var go = document.createElement('button'); go.type = 'button'; go.className = 'btn'; go.textContent = 'Corregir ese campo'; go.addEventListener('click', function(){ closeSheet(); openField(fieldId); }); b.parentNode.insertBefore(go, b.nextSibling); } }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>

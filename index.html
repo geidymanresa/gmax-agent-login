@@ -969,6 +969,112 @@
       </div>
     </div>
 
+
+
+
+<!-- ===== FIRMAS-HTML-START ===== -->
+    <style>
+      #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+      #fmOverlay .fm-top{ position:sticky; top:0; z-index:5; background:var(--navy, #0B1F4B); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:12px; }
+      #fmOverlay .fm-top h3{ margin:0; font-size:16px; flex:1; color:#fff; }
+      #fmOverlay .fm-top small{ display:block; font-weight:400; opacity:.8; font-size:12.5px; }
+      #fmOverlay .fm-x{ background:rgba(255,255,255,.14); color:#fff; border:0; border-radius:8px; padding:8px 14px; font-size:14px; cursor:pointer; }
+      #fmOverlay .fm-body{ max-width:900px; margin:0 auto; padding:16px; }
+      #fmOverlay .fm-box{ background:#fff; border:1.5px solid var(--line, #E3E6EE); border-radius:12px; padding:16px; margin-bottom:14px; }
+      #fmOverlay .fm-tools{ display:flex; gap:8px; flex-wrap:wrap; }
+      #fmOverlay .fm-tool{ border:2px solid; background:#fff; border-radius:10px; padding:9px 13px; font-size:14px; font-weight:700; cursor:pointer; }
+      #fmOverlay .fm-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+      #fmOverlay .fm-chip{ border:1.5px solid; background:#fff; border-radius:999px; padding:5px 11px; font-size:12.5px; cursor:pointer; }
+      #fmOverlay .fm-chip.sel{ background:#0B1F4B; color:#fff; }
+      #fmOverlay .fm-chip small{ opacity:.7; }
+      #fmOverlay .fm-page{ position:relative; margin:0 auto 14px; background:#fff; box-shadow:0 2px 10px rgba(13,20,36,.18); touch-action:pan-y; }
+      #fmOverlay .fm-page canvas{ display:block; width:100%; height:auto; }
+      #fmOverlay .fm-pagetag{ position:absolute; top:-1px; left:0; background:#0B1F4B; color:#fff; font-size:11px; padding:2px 8px; border-radius:0 0 6px 0; opacity:.85; pointer-events:none; }
+      #fmOverlay .fm-field{ position:absolute; border:2px solid; border-radius:4px; display:flex; align-items:center; overflow:hidden; cursor:move; touch-action:none; user-select:none; -webkit-user-select:none; box-sizing:border-box; }
+      #fmOverlay .fm-field.sel{ outline:3px solid #0B1F4B; outline-offset:1px; }
+      #fmOverlay .fm-flabel{ font-size:11px; font-weight:700; padding:0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+      #fmOverlay .fm-handle{ position:absolute; right:0; bottom:0; width:20px; height:20px; background:#0B1F4B; border-radius:6px 0 0 0; cursor:nwse-resize; touch-action:none; opacity:.9; }
+      #fmOverlay .fm-bar{ position:sticky; bottom:0; background:#fff; border-top:1.5px solid var(--line, #E3E6EE); padding:10px 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; z-index:4; }
+      @media (max-width:820px){ #fmOverlay .fm-body{ padding:10px; } #fmOverlay .fm-tool{ padding:9px 10px; font-size:13px; } }
+    </style>
+    <div id="fmOverlay" role="dialog" aria-modal="true" aria-label="Firmar documento">
+      <div class="fm-top">
+        <h3>Firmar documento <small><span id="fm-client-name"></span> · <span id="fm-stepnum"></span></small></h3>
+        <button type="button" class="fm-x" onclick="fmClose(false)">✕ Cerrar</button>
+      </div>
+      <div class="fm-body">
+        <!-- Paso 1 -->
+        <div id="fm-step1">
+          <div class="fm-box">
+            <div class="msg" id="fm-msg1"></div>
+            <div class="form-row"><label>Título del documento <span style="color:#C23B3B;">*</span></label>
+              <input type="text" id="fm-title" maxlength="160" placeholder="Ej: Cambio de dirección — Progressive"></div>
+            <div style="display:flex; gap:18px; flex-wrap:wrap; margin:6px 0 10px;">
+              <label style="display:flex; gap:6px; align-items:center; cursor:pointer;"><input type="radio" name="fm-src" id="fm-src-template" onchange="fmOnSourceChange()"> Usar una plantilla guardada</label>
+              <label style="display:flex; gap:6px; align-items:center; cursor:pointer;"><input type="radio" name="fm-src" id="fm-src-upload" checked onchange="fmOnSourceChange()"> Subir un PDF nuevo</label>
+            </div>
+            <div id="fm-tpl-box" style="display:none;">
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                <select id="fm-tpl-select" onchange="fmOnTemplatePick()" style="flex:1; min-width:220px;"></select>
+                <button type="button" class="btn-ghost" id="fm-tpl-del" style="width:auto; padding:9px 14px; color:#B23A3A; display:none;" onclick="fmDeleteTemplate()">🗑️ Borrar plantilla</button>
+              </div>
+              <p class="sub" style="margin:8px 0 0;">Las plantillas guardan el PDF y dónde van los campos. Podrás ajustar los campos antes de mandarlo.</p>
+            </div>
+            <div id="fm-tpl-empty" class="sub" style="display:none;">Todavía no hay plantillas guardadas. Sube un PDF y, en el siguiente paso, tócale «Guardar como plantilla».</div>
+            <div id="fm-up-box">
+              <input type="file" id="fm-file" accept="application/pdf,.pdf">
+              <p class="sub" style="margin:8px 0 0;">PDF de hasta 8 MB y 30 páginas. Puede ser el formulario de la compañía tal cual.</p>
+            </div>
+            <button type="button" class="btn-primary" id="fm-start-btn" style="width:auto; padding:12px 24px; margin-top:12px;" onclick="fmStart()">Continuar →</button>
+          </div>
+        </div>
+        <!-- Paso 2 -->
+        <div id="fm-step2" style="display:none;">
+          <div class="fm-box">
+            <div style="font-weight:700; margin-bottom:4px;" id="fm-doc-title"></div>
+            <p class="sub" style="margin:0 0 10px;">Toca un botón para agregar un campo al documento, y luego arrástralo a su lugar. Con el cuadrito oscuro de la esquina le cambias el tamaño. <b>*</b> = obligatorio.</p>
+            <div class="fm-tools">
+              <button type="button" class="fm-tool" style="border-color:#C23B3B; color:#C23B3B;" onclick="fmAddField('signature')">✍️ Firma</button>
+              <button type="button" class="fm-tool" style="border-color:#2563EB; color:#2563EB;" onclick="fmAddField('name')">👤 Nombre</button>
+              <button type="button" class="fm-tool" style="border-color:#7C3AED; color:#7C3AED;" onclick="fmAddField('date')">📅 Fecha</button>
+              <button type="button" class="fm-tool" style="border-color:#0E8F6B; color:#0E8F6B;" onclick="fmAddField('text')">🔤 Texto</button>
+              <button type="button" class="fm-tool" style="border-color:#D97706; color:#D97706;" onclick="fmAddField('number')">🔢 Número</button>
+            </div>
+            <div style="margin-top:12px;"><span style="font-size:12.5px; font-weight:700;">Campos (<span id="fm-count">0 campos</span>)</span><div class="fm-chips" id="fm-chips" style="margin-top:6px;"></div></div>
+            <div id="fm-props" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--line, #E3E6EE);"></div>
+          </div>
+          <div class="msg" id="fm-msg2"></div>
+          <div id="fm-pages-holder"><div id="fm-pages"></div></div>
+          <div class="fm-bar">
+            <button type="button" class="btn-ghost" style="width:auto; padding:10px 16px;" onclick="if(FM.fields.length===0 || confirm('Volver al paso 1 pierde los campos que marcaste. ¿Volver?')){ fmStep(1); }">← Atrás</button>
+            <input type="text" id="fm-tpl-name" maxlength="120" placeholder="Nombre de la plantilla" style="width:200px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; display:none;">
+            <button type="button" class="btn-ghost" id="fm-tpl-save-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(false)">💾 Guardar como plantilla</button>
+            <button type="button" class="btn-ghost" id="fm-tpl-update-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(true)">💾 Actualizar plantilla</button>
+            <span style="flex:1;"></span>
+            <label style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-send-email"> <span id="fm-send-email-label"></span></label>
+            <button type="button" class="btn-primary" id="fm-create-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCreate()">Crear link de firma →</button>
+          </div>
+        </div>
+        <!-- Paso 3 -->
+        <div id="fm-step3" style="display:none;">
+          <div class="fm-box">
+            <h4 style="margin-top:0;">✅ Listo</h4>
+            <div class="msg" id="fm-msg3"></div>
+            <label style="font-size:13px; font-weight:700;">Link de firma para el cliente</label>
+            <input type="text" id="fm-link" readonly onclick="this.select()" style="width:100%; padding:10px; border:1.5px solid var(--line); border-radius:8px; font-size:13.5px; margin:6px 0 10px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button type="button" class="btn-primary" id="fm-copy-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCopyLink()">📋 Copiar link</button>
+              <button type="button" class="btn-ghost" id="fm-done-email-btn" style="width:auto; padding:11px 18px; display:none;" onclick="fmDoneEmail()">✉️ Enviar por correo al cliente</button>
+              <button type="button" class="btn-ghost" style="width:auto; padding:11px 18px;" onclick="fmClose(true)">Cerrar</button>
+            </div>
+            <p class="sub" id="fm-done-exp" style="margin:12px 0 0;"></p>
+            <p class="sub" style="margin:6px 0 0;">Cuando el cliente firme, te sale «✓ Firmado» en su perfil y en el Inicio, y el PDF firmado queda en Documentos.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+<!-- ===== FIRMAS-HTML-END ===== -->
+
     <!-- Aparece solo justo después de cobrar una Nueva Póliza -->
     <!-- Detalle de una cotización (lo que llenó el cliente en el formulario público) -->
     <div id="quoteDetailOverlay" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(13,20,36,0.6); z-index:999; align-items:center; justify-content:center;">
@@ -1087,6 +1193,20 @@
           </div>
           <div id="signatureNotificationsList" style="margin-top:8px;"></div>
         </div>
+
+<!-- ===== FIRMAS-NOTIF-START ===== -->
+        <!-- Aviso: un cliente firmó un documento que se le mandó con «Firmar documento» -->
+        <div class="dash-card" id="fmNotifCard" style="display:none; margin-bottom:20px; background:#E9F7F0; border:1.5px solid #A9DFC4;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+            <h4 style="margin:0; color:#177A54;">✍️ Documentos firmados por clientes</h4>
+            <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="fmDismissAll()">Marcar todos como vistos</button>
+          </div>
+          <div id="fmNotifList" style="margin-top:8px;"></div>
+        </div>
+<!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
+
 
         <!-- Retos y objetivos opcionales, creados por la administradora para
              TODOS los agentes (no obligatorios como la meta de 5 pólizas). Solo
@@ -2477,6 +2597,28 @@
             </form>
             <div id="cd-documentosList"><p class="sub">Cargando...</p></div>
           </div>
+
+<!-- ===== FIRMAS-CARD-START ===== -->
+          <!-- Firmar documento (tipo DocuSign): formularios de compañías para que el cliente firme desde su celular -->
+          <div class="dash-card" id="cd-firmasCard">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h4 style="margin:0;">✍️ Firmar documento</h4>
+              <button type="button" class="btn-primary" style="width:auto; padding:9px 18px; margin:0;" id="cd-firmasNewBtn" onclick="fmOpen(currentClientId)">Firmar documento</button>
+            </div>
+            <p class="sub">Manda un formulario de la compañía (cambio de dirección, aprobación de EFT, etc.) para que el cliente lo firme desde su celular. Tú decides qué se le pide y dónde. Cuando firma, aquí te sale «✓ Firmado» y el PDF queda guardado en Documentos.</p>
+            <div class="msg" id="fm-card-msg"></div>
+            <div class="dash-table-wrap">
+              <table class="dash-table">
+                <thead><tr><th>Fecha</th><th>Documento</th><th>Estado</th><th>Enviado a</th><th></th></tr></thead>
+                <tbody id="cd-firmasList"><tr><td colspan="5">—</td></tr></tbody>
+              </table>
+            </div>
+            <div id="fm-events-panel" style="display:none; margin-top:12px; padding:12px 14px; background:#F7F8FB; border:1px solid var(--line); border-radius:10px;"></div>
+          </div>
+<!-- ===== FIRMAS-CARD-END ===== -->
+
+
+
 
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
@@ -5197,7 +5339,7 @@
     'clients', 'client_policies', 'client_transactions', 'client_documents',
     'client_requirements', 'client_vehicles', 'client_quotes', 'signature_requests',
     'client_alerts', 'agent_alerts', 'client_auto_charges', 'policy_reminder_acks',
-    'client_notes', 'agent_applications', 'policy_contact_log'
+    'client_notes', 'agent_applications', 'policy_contact_log', 'sign_requests'
   ];
   let realtimeChannels = [];
   let realtimeStarted = false;
@@ -5285,7 +5427,7 @@
 
     // 2) Inicio: avisos y tarjetas del dashboard.
     if(isTabVisible('tab-inicio')){
-      if(has('signature_requests', 'client_documents')) await q(loadSignatureNotifications, 'Firmas recientes');
+      if(has('signature_requests', 'client_documents', 'sign_requests')) await q(loadSignatureNotifications, 'Firmas recientes');
       if(has('client_requirements', 'clients', 'client_policies', 'client_documents')) await q(loadDashboardAlerts, 'Alertas del dashboard');
       if(has('agent_alerts')) await q(loadDashboardAgentAlerts, 'Tareas de la administradora');
       if(has('client_policies', 'client_transactions')){
@@ -5323,7 +5465,7 @@
         await q(() => loadClientTransactions(cid), 'Transacciones del cliente');
         await q(() => loadPendingTransactions(cid), 'Pendientes del cliente');
       }
-      if(has('client_documents', 'signature_requests', 'client_transactions')) await q(() => loadClientDocuments(cid), 'Documentos del cliente');
+      if(has('client_documents', 'signature_requests', 'client_transactions', 'sign_requests')) await q(() => loadClientDocuments(cid), 'Documentos del cliente');
       if(has('client_requirements')) await q(() => loadClientRequirements(cid), 'Requisitos del cliente');
       if(has('client_vehicles')) await q(() => loadClientVehicles(cid), 'Vehículos del cliente');
       if(has('client_quotes')) await q(() => loadClientQuotes(cid), 'Cotizaciones del cliente');
@@ -16098,6 +16240,571 @@ async function saSaveSettings(){
   SA.busy = false;
 }
 // ===== SMS-ADMIN-END =====
+
+
+
+
+// ===== FIRMAS-JS-START =====
+// Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
+// Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
+// El servidor son 2 Edge Functions: sign-link (CRM) y sign-public (cliente). Las firmas se guardan en
+// sign_requests (la tabla la crea migracion_firma_formularios.sql).
+const FM_PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+const FM_TYPES = {
+  signature: { label: 'Firma',   icon: '✍️', color: '#C23B3B', def: 'Firma del cliente', req: true,  w: 190, h: 46 },
+  name:      { label: 'Nombre',  icon: '👤', color: '#2563EB', def: 'Nombre completo',   req: true,  w: 220, h: 26 },
+  date:      { label: 'Fecha',   icon: '📅', color: '#7C3AED', def: 'Fecha',             req: true,  w: 110, h: 26 },
+  text:      { label: 'Texto',   icon: '🔤', color: '#0E8F6B', def: 'Texto',             req: false, w: 240, h: 26 },
+  number:    { label: 'Número',  icon: '🔢', color: '#D97706', def: 'Número',            req: false, w: 170, h: 26 }
+};
+const FM_STATUS_UI = {
+  firmado:    { text: '✓ Firmado',            cls: 'active'  },
+  pendiente:  { text: '⏳ Esperando firma',    cls: 'pending' },
+  procesando: { text: '⏳ Procesando firma',   cls: 'pending' },
+  cancelado:  { text: 'Cancelado',            cls: 'gray'    }
+};
+const FM_EVENT_LABELS = {
+  created: 'Se creó la solicitud', link_issued: 'Se generó el link', emailed: 'Se mandó el link por correo',
+  email_failed: 'No se pudo mandar el correo', viewed: 'El cliente abrió el link', submitted: 'El cliente envió su firma',
+  completed: 'Documento firmado y guardado', failed: 'Falló al guardar la firma (se puede reintentar)', cancelled: 'Se canceló'
+};
+const FM = { clientId: null, client: null, source: 'upload', template: null, templates: [], bytes: null, pdf: null, pages: [], fields: [],
+  sel: null, title: '', created: null, pdfjsP: null, busy: false, cardTimer: null, step: 1, templateDirty: false };
+
+function fmEsc(s){ return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function fmClamp(n, a, b){ return Math.min(b, Math.max(a, n)); }
+function fmId(){ return 'f' + Math.random().toString(36).slice(2, 9); }
+function fmBytesToB64(u8){ let s = ''; const CH = 0x8000; for(let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
+function fmLinkBase(){ return window.location.origin + window.location.pathname.replace(/[^\/]*$/, '') + 'firmar-formulario.html'; }
+function fmMsg(id, type, text){ const el = document.getElementById(id); if(!el) return; el.className = 'msg' + (type ? ' ' + type : ''); el.textContent = text || ''; }
+
+async function fmCall(body){
+  const { data: { session } } = await sb.auth.getSession();
+  if(!session) throw new Error('Tu sesión venció. Entra de nuevo al CRM.');
+  let resp;
+  try{
+    resp = await fetch(SUPABASE_URL + '/functions/v1/sign-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify(body)
+    });
+  }catch(e){ throw new Error('No hay conexión con el servidor. Revisa tu internet.'); }
+  let data = null; try{ data = await resp.json(); }catch(e){}
+  if(!resp.ok || !data || data.error){
+    if(data && data.error) throw new Error(data.error);
+    if(resp.status === 404) throw new Error('Falta desplegar la función «sign-link» en Supabase (ver las instrucciones de despliegue).');
+    throw new Error('No se pudo completar (error ' + resp.status + ').');
+  }
+  return data;
+}
+
+function fmLoadPdfJs(){
+  if(window.pdfjsLib && window.pdfjsLib.__fmReady) return Promise.resolve(window.pdfjsLib);
+  if(FM.pdfjsP) return FM.pdfjsP;
+  FM.pdfjsP = new Promise((res, rej) => {
+    const fail = () => { FM.pdfjsP = null; rej(new Error('No se pudo cargar el visor de PDF. Revisa tu internet e intenta de nuevo.')); };
+    const s = document.createElement('script'); s.src = FM_PDFJS_BASE + 'pdf.min.js';
+    s.onload = async () => {
+      try{
+        const t = await (await fetch(FM_PDFJS_BASE + 'pdf.worker.min.js')).text();
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([t], { type: 'text/javascript' }));
+        window.pdfjsLib.__fmReady = true; res(window.pdfjsLib);
+      }catch(e){ fail(); }
+    };
+    s.onerror = fail;
+    document.head.appendChild(s);
+  });
+  return FM.pdfjsP;
+}
+
+// =============== VENTANA «FIRMAR DOCUMENTO» ===============
+function fmReset(){
+  FM.source = 'upload'; FM.template = null; FM.bytes = null; FM.pdf = null; FM.pages = []; FM.fields = []; FM.sel = null;
+  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false;
+  const pg = document.getElementById('fm-pages'); if(pg) pg.innerHTML = '';
+  ['fm-msg1', 'fm-msg2', 'fm-msg3'].forEach(id => fmMsg(id, '', ''));
+  const t = document.getElementById('fm-title'); if(t) t.value = '';
+  const f = document.getElementById('fm-file'); if(f) f.value = '';
+  const tn = document.getElementById('fm-tpl-name'); if(tn) tn.value = '';
+}
+
+async function fmOpen(clientId){
+  clientId = clientId || currentClientId;
+  if(!clientId) return;
+  fmReset();
+  FM.clientId = clientId;
+  document.getElementById('fmOverlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  fmStep(1);
+  try{
+    const { data: c } = await sb.from('clients').select('id,full_name,email').eq('id', clientId).single();
+    FM.client = c || null;
+  }catch(e){ FM.client = null; }
+  document.getElementById('fm-client-name').textContent = FM.client ? FM.client.full_name : '';
+  await fmLoadTemplates();
+}
+
+function fmClose(force){
+  if(!force && FM.step === 2 && FM.fields.length > 0 && !confirm('Vas a salir sin crear el link. Se pierden los campos que marcaste (si no los guardaste como plantilla). ¿Salir?')) return;
+  document.getElementById('fmOverlay').style.display = 'none';
+  document.body.style.overflow = '';
+  fmReset();
+  if(FM.clientId) fmRefreshCardSoon(FM.clientId);
+}
+
+function fmStep(n){
+  FM.step = n;
+  [1, 2, 3].forEach(i => { document.getElementById('fm-step' + i).style.display = (i === n) ? 'block' : 'none'; });
+  document.getElementById('fm-stepnum').textContent = n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar';
+  const ov = document.getElementById('fmOverlay'); if(ov) ov.scrollTop = 0;
+}
+
+async function fmLoadTemplates(){
+  const sel = document.getElementById('fm-tpl-select');
+  sel.innerHTML = '<option value="">Cargando…</option>';
+  let rows = [], err = null;
+  try{
+    const r = await sb.from('sign_templates').select('id,name,description,page_count,fields,updated_at').order('name', { ascending: true });
+    if(r.error) throw r.error; rows = r.data || [];
+  }catch(e){ err = e; }
+  FM.templates = rows;
+  if(err){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
+    sel.innerHTML = '<option value="">—</option>';
+    fmMsg('fm-msg1', 'error', missing ? 'Falta correr «migracion_firma_formularios.sql» en Supabase (SQL Editor) para poder usar esta función.' : 'No se pudieron cargar las plantillas: ' + (err.message || err));
+    document.getElementById('fm-src-template').disabled = true;
+    document.getElementById('fm-src-upload').checked = true; fmOnSourceChange();
+    return;
+  }
+  document.getElementById('fm-src-template').disabled = rows.length === 0;
+  sel.innerHTML = '<option value="">Elige una plantilla…</option>' + rows.map(t => `<option value="${t.id}">${fmEsc(t.name)} (${t.page_count} pág.)</option>`).join('');
+  document.getElementById('fm-tpl-empty').style.display = rows.length === 0 ? 'block' : 'none';
+  if(rows.length > 0){ document.getElementById('fm-src-template').checked = true; } else { document.getElementById('fm-src-upload').checked = true; }
+  fmOnSourceChange();
+}
+
+function fmOnSourceChange(){
+  const useTpl = document.getElementById('fm-src-template').checked;
+  document.getElementById('fm-tpl-box').style.display = useTpl ? 'block' : 'none';
+  document.getElementById('fm-up-box').style.display = useTpl ? 'none' : 'block';
+  document.getElementById('fm-tpl-del').style.display = (useTpl && typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none';
+}
+function fmOnTemplatePick(){
+  const id = document.getElementById('fm-tpl-select').value;
+  const t = FM.templates.find(x => x.id === id);
+  const ti = document.getElementById('fm-title');
+  if(t && !ti.value.trim()) ti.value = t.name;
+}
+
+async function fmDeleteTemplate(){
+  const id = document.getElementById('fm-tpl-select').value;
+  const t = FM.templates.find(x => x.id === id);
+  if(!t){ fmMsg('fm-msg1', 'error', 'Elige primero la plantilla que quieres borrar.'); return; }
+  if(!confirm('¿Borrar la plantilla «' + t.name + '»? Los documentos que ya mandaste a firmar con ella NO se afectan.')) return;
+  try{ await fmCall({ action: 'template_archive', id }); fmMsg('fm-msg1', 'success', 'Plantilla borrada.'); await fmLoadTemplates(); }
+  catch(e){ fmMsg('fm-msg1', 'error', e.message); }
+}
+
+async function fmStart(){
+  if(FM.busy) return;
+  fmMsg('fm-msg1', '', '');
+  const title = document.getElementById('fm-title').value.replace(/\s+/g, ' ').trim();
+  if(!title){ fmMsg('fm-msg1', 'error', 'Escribe el título del documento (por ejemplo: «Cambio de dirección»).'); return; }
+  const useTpl = document.getElementById('fm-src-template').checked;
+  FM.busy = true;
+  const btn = document.getElementById('fm-start-btn'); btn.disabled = true; btn.textContent = 'Abriendo el documento…';
+  try{
+    let bytes, tpl = null, fields = [];
+    if(useTpl){
+      tpl = FM.templates.find(x => x.id === document.getElementById('fm-tpl-select').value);
+      if(!tpl) throw new Error('Elige una plantilla.');
+      const { url } = await fmCall({ action: 'template_url', id: tpl.id });
+      const resp = await fetch(url); if(!resp.ok) throw new Error('No se pudo leer el PDF de la plantilla.');
+      bytes = new Uint8Array(await resp.arrayBuffer());
+      fields = JSON.parse(JSON.stringify(tpl.fields || []));
+    }else{
+      const file = document.getElementById('fm-file').files[0];
+      if(!file) throw new Error('Elige el archivo PDF.');
+      if(!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') throw new Error('El archivo tiene que ser un PDF.');
+      if(file.size > 8 * 1024 * 1024) throw new Error('El PDF pesa más de 8 MB. Comprímelo y vuelve a intentar.');
+      bytes = new Uint8Array(await file.arrayBuffer());
+    }
+    const pdfjs = await fmLoadPdfJs();
+    let doc;
+    try{ doc = await pdfjs.getDocument({ data: bytes.slice() }).promise; }
+    catch(e){ throw new Error('No se pudo abrir ese PDF (puede estar dañado o protegido con contraseña).'); }
+    if(doc.numPages > 30) throw new Error('El PDF tiene más de 30 páginas. Divídelo y manda solo las páginas que necesitan firma.');
+    FM.title = title; FM.source = useTpl ? 'template' : 'upload'; FM.template = tpl; FM.bytes = useTpl ? null : bytes; FM.pdf = doc;
+    FM.fields = fields; FM.sel = null; FM.templateDirty = false;
+    document.getElementById('fm-pages').innerHTML = '';
+    fmStep(2);
+    await fmRenderPages();
+    fmRenderFields(); fmRenderProps();
+    document.getElementById('fm-tpl-update-btn').style.display = (useTpl && tpl && typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none';
+    document.getElementById('fm-tpl-save-btn').style.display = (typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none';
+    document.getElementById('fm-tpl-name').style.display = (typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none';
+    document.getElementById('fm-tpl-name').value = useTpl ? '' : title;
+    const em = FM.client && FM.client.email ? FM.client.email : '';
+    const cb = document.getElementById('fm-send-email'), lb = document.getElementById('fm-send-email-label');
+    cb.checked = !!em; cb.disabled = !em;
+    lb.textContent = em ? ('Mandar también el link por correo a ' + em) : 'Este cliente no tiene correo registrado (podrás copiar el link)';
+    document.getElementById('fm-doc-title').textContent = title;
+  }catch(e){
+    fmMsg('fm-msg1', 'error', e.message || String(e));
+  }
+  FM.busy = false; btn.disabled = false; btn.textContent = 'Continuar →';
+}
+
+async function fmRenderPages(){
+  const wrap = document.getElementById('fm-pages');
+  const holder = document.getElementById('fm-pages-holder');
+  const cssW = Math.min(820, Math.max(260, holder.clientWidth - 8 || 600));
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  FM.pages = [];
+  for(let i = 1; i <= FM.pdf.numPages; i++){
+    const page = await FM.pdf.getPage(i);
+    const v1 = page.getViewport({ scale: 1 });
+    const scale = (cssW * dpr) / v1.width;
+    const vp = page.getViewport({ scale });
+    const el = document.createElement('div'); el.className = 'fm-page'; el.dataset.page = String(i);
+    el.style.maxWidth = cssW + 'px';
+    const cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+    el.appendChild(cv);
+    const tag = document.createElement('div'); tag.className = 'fm-pagetag'; tag.textContent = 'Página ' + i + ' de ' + FM.pdf.numPages; el.appendChild(tag);
+    wrap.appendChild(el);
+    FM.pages.push({ el, cv, n: i });
+    await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    el.addEventListener('pointerdown', ev => { if(ev.target === el || ev.target === cv) fmSelect(null); });
+  }
+}
+
+// ---- campos ----
+function fmPos(el, f){ el.style.left = (f.x * 100) + '%'; el.style.top = (f.y * 100) + '%'; el.style.width = (f.w * 100) + '%'; el.style.height = (f.h * 100) + '%'; }
+function fmRenderFields(){
+  document.querySelectorAll('#fm-pages .fm-field').forEach(e => e.remove());
+  FM.fields.forEach(f => {
+    const pg = FM.pages[f.page - 1]; if(!pg) return;
+    const t = FM_TYPES[f.type] || FM_TYPES.text;
+    const el = document.createElement('div'); el.className = 'fm-field' + (FM.sel === f.id ? ' sel' : ''); el.dataset.id = f.id; el.dataset.type = f.type;
+    el.style.borderColor = t.color; el.style.background = t.color + '26';
+    const lab = document.createElement('span'); lab.className = 'fm-flabel'; lab.style.color = t.color; lab.textContent = t.icon + ' ' + f.label + (f.required ? ' *' : '');
+    el.appendChild(lab);
+    const h = document.createElement('div'); h.className = 'fm-handle'; el.appendChild(h);
+    fmPos(el, f); pg.el.appendChild(el);
+    fmBindField(el, h, f, pg);
+  });
+  document.getElementById('fm-count').textContent = FM.fields.length + (FM.fields.length === 1 ? ' campo' : ' campos');
+  fmRenderChips();
+}
+function fmBindField(el, handle, f, pg){
+  el.addEventListener('pointerdown', ev => {
+    if(ev.target === handle) return;
+    ev.preventDefault(); ev.stopPropagation(); fmSelect(f.id);
+    const rect = pg.el.getBoundingClientRect(); const sx = ev.clientX, sy = ev.clientY, ox = f.x, oy = f.y;
+    try{ el.setPointerCapture(ev.pointerId); }catch(e){}
+    const mv = e => { f.x = fmClamp(ox + (e.clientX - sx) / rect.width, 0, 1 - f.w); f.y = fmClamp(oy + (e.clientY - sy) / rect.height, 0, 1 - f.h); fmPos(el, f); FM.templateDirty = true; };
+    const up = () => { el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+  handle.addEventListener('pointerdown', ev => {
+    ev.preventDefault(); ev.stopPropagation(); fmSelect(f.id);
+    const rect = pg.el.getBoundingClientRect(); const sx = ev.clientX, sy = ev.clientY, ow = f.w, oh = f.h;
+    try{ handle.setPointerCapture(ev.pointerId); }catch(e){}
+    const mv = e => { f.w = fmClamp(ow + (e.clientX - sx) / rect.width, 0.04, 1 - f.x); f.h = fmClamp(oh + (e.clientY - sy) / rect.height, 0.015, 1 - f.y); fmPos(el, f); FM.templateDirty = true; };
+    const up = () => { handle.removeEventListener('pointermove', mv); handle.removeEventListener('pointerup', up); handle.removeEventListener('pointercancel', up); };
+    handle.addEventListener('pointermove', mv); handle.addEventListener('pointerup', up); handle.addEventListener('pointercancel', up);
+  });
+}
+function fmRenderChips(){
+  const box = document.getElementById('fm-chips');
+  if(FM.fields.length === 0){ box.innerHTML = '<span class="sub" style="margin:0;">Todavía no hay campos. Toca un botón de arriba para agregar uno.</span>'; return; }
+  box.innerHTML = FM.fields.map((f, i) => {
+    const t = FM_TYPES[f.type] || FM_TYPES.text;
+    return `<button type="button" class="fm-chip${FM.sel === f.id ? ' sel' : ''}" style="border-color:${t.color};" onclick="fmSelect('${f.id}', true)">${t.icon} ${fmEsc(f.label)}${f.required ? ' *' : ''} <small>· pág. ${f.page}</small></button>`;
+  }).join('');
+}
+function fmSelect(id, scroll){
+  FM.sel = id || null;
+  document.querySelectorAll('#fm-pages .fm-field').forEach(e => e.classList.toggle('sel', e.dataset.id === FM.sel));
+  fmRenderChips(); fmRenderProps();
+  if(scroll && id){ const el = document.querySelector('#fm-pages .fm-field[data-id="' + id + '"]'); if(el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+}
+function fmAddField(type){
+  if(!FM_TYPES[type] || FM.pages.length === 0) return;
+  if(FM.fields.length >= 60){ fmMsg('fm-msg2', 'error', 'Máximo 60 campos por documento.'); return; }
+  fmMsg('fm-msg2', '', '');
+  const vh = window.innerHeight / 2;
+  let pg = FM.pages.find(p => { const r = p.el.getBoundingClientRect(); return r.top <= vh && r.bottom >= vh; }) || FM.pages.find(p => p.el.getBoundingClientRect().bottom > 0) || FM.pages[0];
+  const r = pg.el.getBoundingClientRect(); const t = FM_TYPES[type];
+  const w = fmClamp(t.w / r.width, 0.05, 0.9), h = fmClamp(t.h / r.height, 0.02, 0.5);
+  const cy = fmClamp((vh - r.top) / r.height, h / 2, 1 - h / 2);
+  const f = { id: fmId(), type, label: t.def, required: t.req, page: pg.n, x: fmClamp(0.5 - w / 2, 0, 1 - w), y: fmClamp(cy - h / 2, 0, 1 - h), w, h };
+  FM.fields.push(f); FM.templateDirty = true; FM.sel = f.id;
+  fmRenderFields(); fmRenderProps();
+}
+function fmRenderProps(){
+  const box = document.getElementById('fm-props');
+  const f = FM.fields.find(x => x.id === FM.sel);
+  if(!f){ box.innerHTML = '<span class="sub" style="margin:0;">Toca un campo en el documento para cambiarle el nombre, marcarlo obligatorio u opcional, o borrarlo.</span>'; return; }
+  const t = FM_TYPES[f.type];
+  box.innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+      <div style="flex:1; min-width:180px;"><label style="font-size:12px; font-weight:700;">${t.icon} ${t.label} — qué le vas a pedir al cliente</label>
+        <input type="text" id="fm-p-label" maxlength="80" value="${fmEsc(f.label)}" oninput="fmPropLabel(this.value)"></div>
+      <label style="display:flex; gap:6px; align-items:center; font-size:14px; cursor:pointer; margin-bottom:10px;"><input type="checkbox" id="fm-p-req" ${f.required ? 'checked' : ''} onchange="fmPropReq(this.checked)"> Obligatorio</label>
+      <button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin-bottom:10px; color:#B23A3A;" onclick="fmDeleteField()">🗑️ Quitar</button>
+    </div>`;
+}
+function fmPropLabel(v){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; f.label = v; FM.templateDirty = true; const el = document.querySelector('#fm-pages .fm-field[data-id="' + f.id + '"] .fm-flabel'); if(el){ const t = FM_TYPES[f.type]; el.textContent = t.icon + ' ' + (v || '…') + (f.required ? ' *' : ''); } fmRenderChips(); }
+function fmPropReq(v){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; f.required = !!v; FM.templateDirty = true; fmRenderFields(); }
+function fmDeleteField(){ if(!FM.sel) return; FM.fields = FM.fields.filter(x => x.id !== FM.sel); FM.sel = null; FM.templateDirty = true; fmRenderFields(); fmRenderProps(); }
+document.addEventListener('keydown', ev => {
+  const ov = document.getElementById('fmOverlay'); if(!ov || ov.style.display === 'none') return;
+  if(ev.key === 'Escape'){ fmClose(false); return; }
+  if((ev.key === 'Delete' || ev.key === 'Backspace') && FM.step === 2 && FM.sel && !/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || '')){ ev.preventDefault(); fmDeleteField(); }
+});
+
+function fmCleanFields(){
+  return FM.fields.map(f => ({ id: f.id, type: f.type, label: String(f.label || '').replace(/\s+/g, ' ').trim(), required: !!f.required, page: f.page,
+    x: +f.x.toFixed(6), y: +f.y.toFixed(6), w: +f.w.toFixed(6), h: +f.h.toFixed(6) }));
+}
+function fmValidate(){
+  if(FM.fields.length === 0) return 'Agrega al menos un campo (empieza por la firma).';
+  if(!FM.fields.some(f => f.type === 'signature')) return 'Falta un campo de firma: el cliente tiene que poder firmar.';
+  const bad = FM.fields.find(f => !String(f.label || '').trim());
+  if(bad){ fmSelect(bad.id, true); return 'Hay un campo sin nombre. Escribe qué le vas a pedir al cliente.'; }
+  const dup = FM.fields.filter(f => f.type === 'signature').length;
+  return dup > 6 ? 'Hay demasiados campos de firma.' : '';
+}
+
+async function fmSaveTemplate(update){
+  fmMsg('fm-msg2', '', '');
+  const err = fmValidate(); if(err){ fmMsg('fm-msg2', 'error', err); return; }
+  const name = document.getElementById('fm-tpl-name').value.replace(/\s+/g, ' ').trim();
+  if(!update && !name){ fmMsg('fm-msg2', 'error', 'Ponle un nombre a la plantilla (junto al botón).'); return; }
+  if(FM.busy) return; FM.busy = true;
+  try{
+    const body = { action: 'template_save', name: update ? FM.template.name : name, fields: fmCleanFields() };
+    if(update) body.id = FM.template.id;
+    else if(FM.bytes) body.pdfBase64 = fmBytesToB64(FM.bytes);
+    else throw new Error('No se pudo leer el PDF para guardarlo.');
+    const r = await fmCall(body);
+    FM.template = r.template; FM.source = 'template'; FM.templateDirty = false;
+    if(!update){ FM.bytes = null; document.getElementById('fm-tpl-update-btn').style.display = 'inline-block'; }
+    fmMsg('fm-msg2', 'success', update ? '✓ Plantilla actualizada.' : '✓ Plantilla «' + r.template.name + '» guardada. La próxima vez la eliges en el paso 1.');
+  }catch(e){ fmMsg('fm-msg2', 'error', e.message); }
+  FM.busy = false;
+}
+
+async function fmCreate(){
+  fmMsg('fm-msg2', '', '');
+  const err = fmValidate(); if(err){ fmMsg('fm-msg2', 'error', err); return; }
+  if(FM.busy) return; FM.busy = true;
+  const btn = document.getElementById('fm-create-btn'); btn.disabled = true; btn.textContent = 'Creando…';
+  try{
+    const body = { action: 'create', clientId: FM.clientId, title: FM.title, fields: fmCleanFields(), linkBase: fmLinkBase() };
+    if(FM.source === 'template' && FM.template) body.templateId = FM.template.id;
+    else body.pdfBase64 = fmBytesToB64(FM.bytes);
+    if(document.getElementById('fm-send-email').checked && FM.client && FM.client.email) body.emailTo = FM.client.email;
+    const r = await fmCall(body);
+    FM.created = r;
+    fmShowDone(r);
+  }catch(e){ fmMsg('fm-msg2', 'error', e.message); }
+  FM.busy = false; btn.disabled = false; btn.textContent = 'Crear link de firma →';
+}
+
+function fmShowDone(r){
+  fmStep(3);
+  document.getElementById('fm-link').value = r.link;
+  const exp = r.expiresAt ? new Date(r.expiresAt).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' }) : '';
+  document.getElementById('fm-done-exp').textContent = exp ? 'El link vence el ' + exp + '.' : '';
+  if(r.emailed) fmMsg('fm-msg3', 'success', '✓ Se mandó el link por correo a ' + r.emailedTo + '. También lo puedes copiar aquí abajo.');
+  else if(r.emailError) fmMsg('fm-msg3', 'error', 'El link se creó pero el correo no se pudo mandar: ' + r.emailError + ' Copia el link y mándaselo tú.');
+  else fmMsg('fm-msg3', 'success', '✓ Link creado. Cópialo y mándaselo al cliente (mensaje de texto, WhatsApp, etc.).');
+  const hasEmail = FM.client && FM.client.email;
+  document.getElementById('fm-done-email-btn').style.display = (r.emailed || !hasEmail) ? 'none' : 'inline-block';
+  fmCopyText(r.link).catch(() => {});
+}
+async function fmCopyText(text){
+  try{ await navigator.clipboard.writeText(text); return true; }
+  catch(e){ const ta = document.getElementById('fm-link'); if(ta){ ta.select(); try{ document.execCommand('copy'); return true; }catch(_){} } throw e; }
+}
+async function fmCopyLink(){
+  const v = document.getElementById('fm-link').value;
+  try{ await fmCopyText(v); const b = document.getElementById('fm-copy-btn'); const o = b.textContent; b.textContent = '✓ Copiado'; setTimeout(() => { b.textContent = o; }, 1800); }
+  catch(e){ document.getElementById('fm-link').select(); fmMsg('fm-msg3', 'error', 'No se pudo copiar solo: el link está seleccionado, usa Ctrl+C.'); }
+}
+// Desde el paso 3: mandar por correo (esto genera un link NUEVO; el que se copió antes deja de servir)
+async function fmDoneEmail(){
+  const to = FM.client && FM.client.email; if(!to || !FM.created) return;
+  if(!confirm('Se va a mandar el link a ' + to + '. Esto crea un link nuevo (el que ya copiaste deja de servir). ¿Continuar?')) return;
+  const b = document.getElementById('fm-done-email-btn'); b.disabled = true;
+  try{
+    const r = await fmCall({ action: 'issue_link', requestId: FM.created.requestId, linkBase: fmLinkBase(), emailTo: to });
+    FM.created = { ...FM.created, ...r }; fmShowDone({ ...FM.created, ...r });
+  }catch(e){ fmMsg('fm-msg3', 'error', e.message); }
+  b.disabled = false;
+}
+
+// =============== TARJETA EN EL PERFIL DEL CLIENTE ===============
+function fmRefreshCardSoon(clientId){ clearTimeout(FM.cardTimer); FM.cardTimer = setTimeout(() => { fmLoadCard(clientId).catch(() => {}); }, 250); }
+
+async function fmLoadCard(clientId){
+  const tb = document.getElementById('cd-firmasList'); if(!tb) return;
+  let rows = [], err = null;
+  try{
+    const r = await sb.from('sign_requests').select('id,title,status,created_at,expires_at,emailed_to,emailed_at,first_viewed_at,signer_name,signed_at,signed_path,created_by_name,link_issued_at')
+      .eq('client_id', clientId).order('created_at', { ascending: false });
+    if(r.error) throw r.error; rows = r.data || [];
+  }catch(e){ err = e; }
+  if(clientId !== currentClientId) return;
+  const btn = document.getElementById('cd-firmasNewBtn');
+  if(err){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
+    fmMsg('fm-card-msg', 'error', missing ? 'Falta correr «migracion_firma_formularios.sql» en Supabase (SQL Editor) para poder mandar documentos a firmar.' : 'No se pudo cargar esta sección: ' + (err.message || err));
+    tb.innerHTML = '<tr><td colspan="5">—</td></tr>'; if(btn) btn.disabled = missing; return;
+  }
+  if(btn) btn.disabled = false;
+  const keepMsg = document.getElementById('fm-card-msg'); if(keepMsg && keepMsg.classList.contains('error') && /migracion_firma|No se pudo cargar/.test(keepMsg.textContent)) fmMsg('fm-card-msg', '', '');
+  if(rows.length === 0){ tb.innerHTML = '<tr><td colspan="5">Todavía no le has mandado ningún documento a firmar a este cliente. Toca «Firmar documento».</td></tr>'; return; }
+  const now = Date.now(); const isAdm = typeof isAdminUser === 'function' && isAdminUser();
+  tb.innerHTML = rows.map(r => {
+    let ui = FM_STATUS_UI[r.status] || { text: r.status, cls: 'gray' };
+    let sub = '';
+    if(r.status === 'pendiente' && new Date(r.expires_at).getTime() < now){ ui = { text: '⌛ Link vencido', cls: 'gray' }; }
+    else if(r.status === 'pendiente' && r.first_viewed_at){ ui = { text: '👁 Lo abrió, falta que firme', cls: 'pending' }; sub = 'Abierto ' + formatDateTimeUS(r.first_viewed_at); }
+    if(r.status === 'firmado') sub = 'Firmó ' + fmEsc(r.signer_name || '') + ' · ' + formatDateTimeUS(r.signed_at);
+    const sent = r.emailed_to ? ('✉️ ' + fmEsc(r.emailed_to) + (r.emailed_at ? '<div class="sub" style="margin:0;">' + formatDateTimeUS(r.emailed_at) + '</div>' : '')) : '<span class="sub" style="margin:0;">Link copiado / sin enviar</span>';
+    let acts = '';
+    if(r.status === 'pendiente'){
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardCopy('${r.id}')">📋 Link nuevo</button> `;
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardEmail('${r.id}')">✉️ Enviar por correo</button> `;
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px; color:#B23A3A;" onclick="fmCardCancel('${r.id}')">Cancelar</button> `;
+    }
+    if(r.status === 'firmado') acts += `<button class="btn-primary" style="width:auto; padding:6px 12px; margin:0;" onclick="fmCardDownload('${r.id}')">⬇ Descargar firmado</button> `;
+    acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardEvents('${r.id}')">Historial</button>`;
+    return `<tr>
+      <td data-label="Fecha">${formatDateTimeUS(r.created_at)}${r.created_by_name ? '<div class="sub" style="margin:0;">por ' + fmEsc(r.created_by_name) + '</div>' : ''}</td>
+      <td data-label="Documento"><strong>${fmEsc(r.title)}</strong></td>
+      <td data-label="Estado"><span class="badge ${ui.cls}">${ui.text}</span>${sub ? '<div class="sub" style="margin:4px 0 0;">' + sub + '</div>' : ''}</td>
+      <td data-label="Enviado a">${sent}</td>
+      <td data-label="">${acts}</td></tr>`;
+  }).join('');
+}
+
+function fmCardLinkBox(r, note){
+  const el = document.getElementById('fm-card-msg'); if(!el) return;
+  el.className = 'msg success';
+  el.innerHTML = '✓ ' + fmEsc(note) + '<br><input type="text" id="fm-card-link" readonly style="width:100%; margin-top:6px; padding:8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px;" onclick="this.select()">';
+  document.getElementById('fm-card-link').value = r.link;
+}
+async function fmCardCopy(id){
+  if(!confirm('Esto crea un link NUEVO para este documento. Si ya le mandaste un link al cliente, ese deja de servir. ¿Continuar?')) return;
+  fmMsg('fm-card-msg', 'success', 'Generando link…');
+  try{
+    const r = await fmCall({ action: 'issue_link', requestId: id, linkBase: fmLinkBase() });
+    fmCardLinkBox(r, 'Link nuevo copiado — mándaselo al cliente por donde quieras (mensaje de texto, WhatsApp, etc.):');
+    fmCopyText(r.link).catch(() => {});
+    fmRefreshCardSoon(currentClientId);
+  }catch(e){ fmMsg('fm-card-msg', 'error', e.message); }
+}
+async function fmCardEmail(id){
+  let c = null;
+  try{ const r = await sb.from('clients').select('email').eq('id', currentClientId).single(); c = r.data; }catch(e){}
+  let to = c && c.email ? c.email.trim() : '';
+  if(to){ if(!confirm('Se le va a mandar el link de firma a ' + to + '.\nEsto crea un link nuevo (si ya mandaste otro, deja de servir). ¿Enviar?')) return; }
+  else { to = (prompt('Este cliente no tiene correo registrado. ¿A qué correo le mando el link?', '') || '').trim(); if(!to) return; }
+  fmMsg('fm-card-msg', 'success', 'Enviando el link de firma…');
+  try{
+    const r = await fmCall({ action: 'issue_link', requestId: id, linkBase: fmLinkBase(), emailTo: to });
+    if(r.emailed) fmCardLinkBox(r, 'Se le mandó el link de firma a ' + to + '. (Aquí abajo también lo tienes por si lo quieres copiar.)');
+    else { fmCardLinkBox(r, 'El link se generó, pero el correo NO se pudo mandar (' + (r.emailError || 'error') + '). Cópialo y mándaselo tú:'); document.getElementById('fm-card-msg').className = 'msg error'; }
+    fmRefreshCardSoon(currentClientId);
+  }catch(e){ fmMsg('fm-card-msg', 'error', e.message); }
+}
+async function fmCardCancel(id){
+  if(!confirm('¿Cancelar este documento? El link que se le mandó al cliente dejará de funcionar.')) return;
+  try{ await fmCall({ action: 'cancel', requestId: id }); fmMsg('fm-card-msg', 'success', 'Documento cancelado.'); fmRefreshCardSoon(currentClientId); }
+  catch(e){ fmMsg('fm-card-msg', 'error', e.message); }
+}
+async function fmCardDownload(id){
+  // Se abre la pestaña ANTES de pedir el link (si no, Safari/iPhone bloquean la ventana emergente).
+  let win = null; try{ win = window.open('', '_blank'); }catch(e){}
+  try{
+    const r = await fmCall({ action: 'signed_url', requestId: id, kind: 'signed' });
+    if(win){ win.location.href = r.url; } else { window.location.href = r.url; }
+  }catch(e){ if(win){ try{ win.close(); }catch(_){} } fmMsg('fm-card-msg', 'error', e.message); }
+}
+async function fmCardEvents(id){
+  const panel = document.getElementById('fm-events-panel'); if(!panel) return;
+  if(panel.dataset.id === id && panel.style.display === 'block'){ panel.style.display = 'none'; return; }
+  panel.dataset.id = id; panel.style.display = 'block'; panel.innerHTML = '<p class="sub">Cargando…</p>';
+  try{
+    const r = await sb.from('sign_events').select('event,at,ip,user_agent').eq('request_id', id).order('at', { ascending: true });
+    if(r.error) throw r.error;
+    const isAdm = typeof isAdminUser === 'function' && isAdminUser();
+    panel.innerHTML = '<h5 style="margin:0 0 8px;">Historial de este documento</h5>' + ((r.data || []).map(e =>
+      `<div style="display:flex; gap:10px; padding:5px 0; border-bottom:1px solid var(--line); font-size:13.5px; flex-wrap:wrap;"><span style="min-width:150px; color:var(--slate-light);">${formatDateTimeUS(e.at)}</span><span>${fmEsc(FM_EVENT_LABELS[e.event] || e.event)}</span>${isAdm && e.ip ? '<span style="color:var(--slate-light);">· IP ' + fmEsc(e.ip) + '</span>' : ''}</div>`).join('') || '<p class="sub">Sin movimientos.</p>')
+      + '<p class="sub" style="margin:8px 0 0; font-size:12.5px;">La constancia de firma (nombre, fecha y hora, IP, dispositivo y huella del documento) viene en la última página del PDF firmado.</p>';
+  }catch(e){ panel.innerHTML = '<p class="sub" style="color:#B23A3A;">No se pudo cargar el historial: ' + fmEsc(e.message || e) + '</p>'; }
+}
+
+// =============== AVISO EN EL DASHBOARD: «ya se firmó» ===============
+function fmSeenIds(){ try{ return JSON.parse(localStorage.getItem('fm_seen_ids') || '[]'); }catch(e){ return []; } }
+function fmSaveSeen(ids){ try{ localStorage.setItem('fm_seen_ids', JSON.stringify(ids.slice(-300))); }catch(e){} }
+let fmLastNotifIds = [];
+async function fmLoadNotifications(){
+  const card = document.getElementById('fmNotifCard'); if(!card) return;
+  let rows = [];
+  try{
+    const r = await sb.from('sign_requests').select('id,title,signer_name,signed_at,client_id,client:client_id(full_name)')
+      .eq('status', 'firmado').order('signed_at', { ascending: false }).limit(25);
+    if(r.error) throw r.error; rows = r.data || [];
+  }catch(e){ card.style.display = 'none'; return; }
+  const seen = new Set(fmSeenIds());
+  const list = rows.filter(r => !seen.has(r.id)).slice(0, 8);
+  fmLastNotifIds = list.map(r => r.id);
+  if(list.length === 0){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('fmNotifList').innerHTML = list.map(r => `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #A9DFC4; flex-wrap:wrap;">
+      <div><strong>${fmEsc(r.client ? r.client.full_name : 'Cliente')}</strong> firmó — ${fmEsc(r.title)}
+        <div class="sub" style="margin:2px 0 0;">${formatDateTimeUS(r.signed_at)}</div></div>
+      <div style="white-space:nowrap; display:flex; gap:6px;">
+        <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="goToClientFromUnderwriting('${r.client_id}')">Ver</button>
+        <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="fmDismiss('${r.id}')">Marcar vista</button>
+      </div></div>`).join('');
+}
+function fmDismiss(id){ const s = fmSeenIds(); s.push(id); fmSaveSeen(s); fmLoadNotifications(); }
+function fmDismissAll(){ const s = fmSeenIds().concat(fmLastNotifIds); fmSaveSeen(s); fmLoadNotifications(); }
+
+// ---- enganches con el CRM (sin tocar el código de otros módulos) ----
+(function(){
+  // Al volver a «Inicio» se refresca el aviso de firmas (si el cliente firmó mientras ella estaba en otra pestaña).
+  if(typeof switchTab === 'function'){
+    const origTab = switchTab;
+    switchTab = function(tab){
+      const out = origTab.apply(this, arguments);
+      if(tab === 'inicio'){ try{ if(typeof loadSignatureNotifications === 'function') loadSignatureNotifications(); }catch(e){} }
+      return out;
+    };
+  }
+  if(typeof loadClientDocuments === 'function'){
+    const orig = loadClientDocuments;
+    loadClientDocuments = async function(clientId){
+      try{ fmRefreshCardSoon(clientId); }catch(e){}
+      return await orig.apply(this, arguments);
+    };
+  }
+  if(typeof loadSignatureNotifications === 'function'){
+    const orig2 = loadSignatureNotifications;
+    loadSignatureNotifications = async function(){
+      try{ return await orig2.apply(this, arguments); }
+      finally{ try{ await fmLoadNotifications(); }catch(e){} }
+    };
+  }
+})();
+// ===== FIRMAS-JS-END =====
 
 // ===== SOCIAL-START =====
 // Pestaña «Redes sociales» (solo administradoras): personas que comentan tus videos o te escriben por Instagram, Facebook y WhatsApp.
