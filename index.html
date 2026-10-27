@@ -975,6 +975,10 @@
 
 
 
+
+
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1001,7 +1005,51 @@
       #fmOverlay .fm-field[data-type="check"] .fm-flabel{ position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:5px; background:rgba(255,255,255,.92); border:1px solid #CBD5E1; border-radius:5px; padding:1px 6px; overflow:visible; max-width:260px; }
       #fmOverlay .fm-field[data-type="check"] .fm-handle{ width:14px; height:14px; right:-9px; bottom:-9px; border-radius:50%; }
       #fmOverlay .fm-bar{ position:sticky; bottom:0; background:#fff; border-top:1.5px solid var(--line, #E3E6EE); padding:10px 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; z-index:4; }
-      @media (max-width:820px){ #fmOverlay .fm-body{ padding:10px; } #fmOverlay .fm-tool{ padding:9px 10px; font-size:13px; } }
+      /* Paso 2: barra de herramientas fija a la IZQUIERDA (no se mueve al bajar por el documento) */
+      #fmOverlay .fm-body.fm-wide{ max-width:1180px; }
+      #fmOverlay .fm-work{ display:flex; gap:14px; align-items:flex-start; }
+      #fmOverlay .fm-main{ flex:1 1 auto; min-width:0; }
+      #fmOverlay .fm-side{ position:sticky; top:calc(var(--fm-top-h, 58px) + 10px); z-index:6; flex:0 0 250px; width:250px; max-height:calc(100vh - var(--fm-top-h, 58px) - var(--fm-bar-h, 64px) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; background:#fff; border:1.5px solid var(--line, #E3E6EE); border-radius:12px; padding:12px; box-sizing:border-box; }
+      #fmOverlay .fm-side .fm-tools{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+      #fmOverlay .fm-side .fm-tool{ padding:9px 6px; font-size:13px; text-align:center; }
+      #fmOverlay .fm-side-title{ font-weight:700; font-size:13px; margin:0 0 8px; }
+      #fmOverlay .fm-curpage{ background:#EEF2FB; color:#0B1F4B; border-radius:8px; padding:6px 8px; font-size:12.5px; font-weight:700; margin:0 0 10px; text-align:center; }
+      #fmOverlay .fm-side .fm-chips{ margin-top:6px; }
+      #fmOverlay .fm-side #fm-props{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line, #E3E6EE); }
+      #fmOverlay .fm-side #fm-props input[type="text"]{ width:100%; box-sizing:border-box; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; padding:8px 9px; font:inherit; font-size:14px; }
+      #fmOverlay .fm-ti{ margin-right:4px; }
+      #fmOverlay .fm-tplwrap{ display:contents; }
+      @media (max-width:820px){
+        #fmOverlay .fm-body{ padding:10px; }
+        #fmOverlay .fm-work{ gap:8px; }
+        #fmOverlay .fm-side{ flex:0 0 60px; width:60px; padding:6px 4px; border-radius:10px; }
+        #fmOverlay .fm-side .fm-tools{ display:flex; flex-direction:column; gap:6px; }
+        #fmOverlay .fm-side .fm-tool{ display:flex; flex-direction:column; align-items:center; width:100%; padding:6px 0; font-size:10px; line-height:1.15; border-width:1.5px; }
+        #fmOverlay .fm-side .fm-tool .fm-ti{ font-size:20px; margin:0 0 2px; }
+        #fmOverlay .fm-body.fm-wide{ padding-bottom:calc(var(--fm-bar-h, 64px) + 12px); }
+        #fmOverlay #fm-step2 .fm-bar{ position:fixed; left:0; right:0; bottom:0; padding:8px 10px; gap:6px; box-shadow:0 -2px 10px rgba(13,20,36,.10); }
+        #fmOverlay #fm-step2 .fm-bar .btn-ghost, #fmOverlay #fm-step2 .fm-bar .btn-primary{ padding:8px 12px !important; font-size:13px !important; }
+        #fmOverlay #fm-step2 .fm-bar #fm-tpl-name{ width:100% !important; flex:1 1 100%; box-sizing:border-box; }
+        #fmOverlay #fm-step2 .fm-bar #fm-create-btn{ flex:1 1 auto; order:3; }
+        #fmOverlay #fm-step2 .fm-bar .fm-tplwrap{ display:none; order:4; width:100%; gap:6px; flex-wrap:wrap; }
+        #fmOverlay #fm-step2 .fm-bar.fm-open .fm-tplwrap{ display:flex; }
+        #fmOverlay #fm-step2 .fm-bar.fm-has-tpl #fm-bar-more{ display:inline-block !important; order:2; }
+        #fmOverlay #fm-step2 .fm-bar > label{ order:5; width:100%; font-size:12.5px !important; }
+        #fmOverlay #fm-step2 .fm-bar > span[style*="flex:1"]{ display:none; }
+        #fmOverlay .fm-top{ padding:8px 12px; }
+        #fmOverlay .fm-top h3{ font-size:15px; min-width:0; }
+        #fmOverlay .fm-top h3 small{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px; }
+        #fmOverlay .fm-x{ padding:7px 10px; }
+        #fmOverlay .fm-side #fm-props .btn-ghost{ padding:6px 10px !important; margin-bottom:0 !important; }
+        #fmOverlay .fm-side #fm-props > div{ gap:6px !important; }
+        #fmOverlay .fm-side #fm-props input[type="text"]{ padding:7px 8px; font-size:14px; }
+        #fmOverlay .fm-side #fm-props label{ margin-bottom:0 !important; }
+        #fmOverlay .fm-side-title, #fmOverlay .fm-side .fm-listbox{ display:none; }
+        #fmOverlay .fm-curpage{ font-size:10.5px; padding:4px 2px; margin-bottom:6px; }
+        /* el panel del campo seleccionado queda fijo abajo, encima de la barra de acciones */
+        #fmOverlay .fm-side #fm-props{ position:fixed; left:0; right:0; bottom:var(--fm-bar-h, 64px); z-index:7; margin:0; padding:10px 12px; background:#fff; border-top:2px solid #0B1F4B; box-shadow:0 -4px 14px rgba(13,20,36,.18); max-height:42vh; overflow-y:auto; box-sizing:border-box; }
+        #fmOverlay .fm-side #fm-props.fm-empty{ display:none; }
+      }
     </style>
     <div id="fmOverlay" role="dialog" aria-modal="true" aria-label="Firmar documento">
       <div class="fm-top">
@@ -1036,28 +1084,39 @@
         </div>
         <!-- Paso 2 -->
         <div id="fm-step2" style="display:none;">
-          <div class="fm-box">
-            <div style="font-weight:700; margin-bottom:4px;" id="fm-doc-title"></div>
-            <p class="sub" style="margin:0 0 10px;">Toca un botón para agregar un campo al documento, y luego arrástralo a su lugar. Con el cuadrito oscuro de la esquina le cambias el tamaño. <b>*</b> = obligatorio.</p>
-            <div class="fm-tools">
-              <button type="button" class="fm-tool" style="border-color:#C23B3B; color:#C23B3B;" onclick="fmAddField('signature')">✍️ Firma</button>
-              <button type="button" class="fm-tool" style="border-color:#2563EB; color:#2563EB;" onclick="fmAddField('name')">👤 Nombre</button>
-              <button type="button" class="fm-tool" style="border-color:#7C3AED; color:#7C3AED;" onclick="fmAddField('date')">📅 Fecha</button>
-              <button type="button" class="fm-tool" style="border-color:#0E8F6B; color:#0E8F6B;" onclick="fmAddField('text')">🔤 Texto</button>
-              <button type="button" class="fm-tool" style="border-color:#D97706; color:#D97706;" onclick="fmAddField('number')">🔢 Número</button>
-              <button type="button" class="fm-tool" style="border-color:#0891B2; color:#0891B2;" onclick="fmAddField('check')">☑️ Casilla</button>
-              <button type="button" class="fm-tool" style="border-color:#BE185D; color:#BE185D;" onclick="fmAddField('initials')">🖊️ Iniciales</button>
+          <div class="fm-work">
+            <aside class="fm-side" id="fm-side" aria-label="Herramientas para agregar campos">
+              <div class="fm-side-title">Agregar campo</div>
+              <div class="fm-curpage" id="fm-curpage" title="Página que estás viendo: ahí se agrega el campo">Pág. 1</div>
+              <div class="fm-tools">
+                <button type="button" class="fm-tool" style="border-color:#C23B3B; color:#C23B3B;" onclick="fmAddField('signature')"><span class="fm-ti">✍️</span><span class="fm-tl">Firma</span></button>
+                <button type="button" class="fm-tool" style="border-color:#2563EB; color:#2563EB;" onclick="fmAddField('name')"><span class="fm-ti">👤</span><span class="fm-tl">Nombre</span></button>
+                <button type="button" class="fm-tool" style="border-color:#7C3AED; color:#7C3AED;" onclick="fmAddField('date')"><span class="fm-ti">📅</span><span class="fm-tl">Fecha</span></button>
+                <button type="button" class="fm-tool" style="border-color:#0E8F6B; color:#0E8F6B;" onclick="fmAddField('text')"><span class="fm-ti">🔤</span><span class="fm-tl">Texto</span></button>
+                <button type="button" class="fm-tool" style="border-color:#D97706; color:#D97706;" onclick="fmAddField('number')"><span class="fm-ti">🔢</span><span class="fm-tl">Número</span></button>
+                <button type="button" class="fm-tool" style="border-color:#0891B2; color:#0891B2;" onclick="fmAddField('check')"><span class="fm-ti">☑️</span><span class="fm-tl">Casilla</span></button>
+                <button type="button" class="fm-tool" style="border-color:#BE185D; color:#BE185D;" onclick="fmAddField('initials')"><span class="fm-ti">🖊️</span><span class="fm-tl">Iniciales</span></button>
+              </div>
+              <div class="fm-listbox" style="margin-top:12px;"><span style="font-size:12.5px; font-weight:700;">Campos (<span id="fm-count">0 campos</span>)</span><div class="fm-chips" id="fm-chips" style="margin-top:6px;"></div></div>
+              <div id="fm-props"></div>
+            </aside>
+            <div class="fm-main">
+              <div class="fm-box">
+                <div style="font-weight:700; margin-bottom:4px;" id="fm-doc-title"></div>
+                <p class="sub" style="margin:0;">Baja hasta la página que quieras y toca un botón de la barra: el campo aparece en la página que estás viendo. Arrástralo a su lugar y, con el cuadrito oscuro de la esquina, cámbiale el tamaño. <b>*</b> = obligatorio. La barra se queda fija mientras bajas por el documento.</p>
+              </div>
+              <div class="msg" id="fm-msg2"></div>
+              <div id="fm-pages-holder"><div id="fm-pages"></div></div>
             </div>
-            <div style="margin-top:12px;"><span style="font-size:12.5px; font-weight:700;">Campos (<span id="fm-count">0 campos</span>)</span><div class="fm-chips" id="fm-chips" style="margin-top:6px;"></div></div>
-            <div id="fm-props" style="margin-top:12px; padding-top:10px; border-top:1px solid var(--line, #E3E6EE);"></div>
           </div>
-          <div class="msg" id="fm-msg2"></div>
-          <div id="fm-pages-holder"><div id="fm-pages"></div></div>
           <div class="fm-bar">
             <button type="button" class="btn-ghost" style="width:auto; padding:10px 16px;" onclick="if(FM.fields.length===0 || confirm('Volver al paso 1 pierde los campos que marcaste. ¿Volver?')){ fmStep(1); }">← Atrás</button>
-            <input type="text" id="fm-tpl-name" maxlength="120" placeholder="Nombre de la plantilla" style="width:200px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; display:none;">
-            <button type="button" class="btn-ghost" id="fm-tpl-save-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(false)">💾 Guardar como plantilla</button>
-            <button type="button" class="btn-ghost" id="fm-tpl-update-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(true)">💾 Actualizar plantilla</button>
+            <button type="button" class="btn-ghost fm-bar-more" id="fm-bar-more" style="width:auto; padding:10px 14px; display:none;" onclick="this.closest('.fm-bar').classList.toggle('fm-open')">💾 Plantilla ▾</button>
+            <span class="fm-tplwrap">
+              <input type="text" id="fm-tpl-name" maxlength="120" placeholder="Nombre de la plantilla" style="width:170px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; display:none;">
+              <button type="button" class="btn-ghost" id="fm-tpl-save-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(false)">💾 Guardar como plantilla</button>
+              <button type="button" class="btn-ghost" id="fm-tpl-update-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(true)">💾 Actualizar plantilla</button>
+            </span>
             <span style="flex:1;"></span>
             <label style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-send-email"> <span id="fm-send-email-label"></span></label>
             <button type="button" class="btn-primary" id="fm-create-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCreate()">Crear link de firma →</button>
@@ -1130,14 +1189,15 @@
 
         <div id="rn-renewBox" style="display:none;">
           <div class="form-row-2">
-            <div class="form-row"><label>Nueva fecha efectiva</label><input type="date" id="rn-neweff" oninput="updateRenewalNewExpiration()"></div>
+            <div class="form-row"><label>Nueva fecha efectiva</label><input type="text" id="rn-neweff" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateRenewalNewExpiration()"></div>
             <div class="form-row"><label>Término (meses)</label><input type="number" min="1" max="36" id="rn-term" oninput="updateRenewalNewExpiration()"></div>
           </div>
-          <div class="form-row"><label>Nueva fecha de expiración (automática)</label><input type="date" id="rn-newexp"></div>
+          <div class="form-row"><label>Nueva fecha de expiración (automática)</label><input type="text" id="rn-newexp" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
           <div class="form-row-2">
             <div class="form-row"><label>Nuevo número de póliza <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="text" id="rn-newnumber" placeholder="Dejar vacío = el mismo"></div>
             <div class="form-row"><label>Nueva mensualidad ($) <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="number" min="0" step="0.01" id="rn-newpay" placeholder="Dejar vacío = la misma"></div>
           </div>
+          <div class="form-row"><label>Fecha del primer pago de esta renovación <span class="sub" style="font-weight:400;">(solo si paga mensual y cambió; vacío = el mismo día de la fecha efectiva)</span></label><input type="text" id="rn-firstpay" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
           <p class="sub" style="margin-top:0;">La nueva fecha efectiva empieza igual que la fecha de expiración anterior (puedes cambiarla). La póliza sigue activa y vuelve a entrar a los recordatorios de pago y de revisión.</p>
           <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
             <button type="button" class="btn-primary" style="width:auto; padding:11px 20px;" onclick="confirmPolicyRenewed()">✅ Confirmar renovación</button>
@@ -1212,6 +1272,10 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
+
+
 
 
 
@@ -1783,15 +1847,25 @@
                 </div>
                 <div class="form-row-2">
                   <div class="form-row"><label>Número de póliza</label><input type="text" id="nc-act-numero"></div>
-                  <div class="form-row"><label>Fecha efectiva</label><input type="text" id="nc-act-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateNewPolicyExpiration();"></div>
+                  <div class="form-row"><label>Fecha efectiva</label><input type="text" id="nc-act-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateNewPolicyExpiration(); updateFirstPayPreview('nc-act');"></div>
                 </div>
                 <div class="form-row-2">
                   <div class="form-row"><label>Depósito que pidió la aseguradora ($)</label><input type="number" min="0" step="0.01" id="nc-act-deposito"></div>
-                  <div class="form-row"><label>Pago mensual ($) <span style="color:#C23B3B;">*</span></label><input type="number" min="0" step="0.01" id="nc-act-pago"></div>
+                  <div class="form-row"><label>Pago mensual ($) <span style="color:#C23B3B;">*</span></label><input type="number" min="0" step="0.01" id="nc-act-pago" oninput="updateFirstPayPreview('nc-act')"></div>
+                </div>
+                <div class="form-row" id="nc-act-primerPagoRow">
+                  <label>Fecha del primer pago (después del depósito) <span style="color:#C23B3B;">* (si paga mensual)</span></label>
+                  <input type="text" id="nc-act-primer-pago" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateFirstPayPreview('nc-act');">
+                  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('nc-act', 20)">+20 días</button>
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('nc-act', 30)">+30 días</button>
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('nc-act', 0)">Mismo día de la fecha efectiva</button>
+                  </div>
+                  <div class="sub" id="nc-act-primer-pago-preview" style="margin-top:6px; font-size:12.5px;">Las aseguradoras cobran el primer pago en fechas distintas (ej. 20 días después). Pon aquí la fecha exacta; los siguientes pagos caen el mismo día de cada mes.</div>
                 </div>
                 <div class="form-row-2">
                   <div class="form-row"><label>Término</label>
-                    <select id="nc-act-termino" onchange="updateNewPolicyExpiration()">
+                    <select id="nc-act-termino" onchange="updateNewPolicyExpiration(); updateFirstPayPreview('nc-act')">
                       <option value="">—</option>
                       <option value="1">1 mes</option>
                       <option value="3">3 meses</option>
@@ -1899,12 +1973,12 @@
                 </div>
                 <div class="form-row">
                   <label>Fecha efectiva</label>
-                  <input type="text" id="tx-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateTxExpiration();">
+                  <input type="text" id="tx-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateTxExpiration(); updateFirstPayPreview('tx');">
                 </div>
                 <div class="form-row-2">
                   <div class="form-row">
                     <label>Término</label>
-                    <select id="tx-termino" onchange="updateTxExpiration()">
+                    <select id="tx-termino" onchange="updateTxExpiration(); updateFirstPayPreview('tx')">
                       <option value="">—</option>
                       <option value="1">1 mes</option>
                       <option value="3">3 meses</option>
@@ -1953,6 +2027,18 @@
                 <div class="form-row" id="tx-pagoMensualBlock" style="display:none;">
                   <label>Monto del pago mensual ($) <span style="color:#C23B3B;">*obligatorio</span></label>
                   <input type="number" step="0.01" min="0" id="tx-pago-mensual">
+                  <div style="margin-top:12px;">
+                  <div class="form-row" id="tx-primerPagoRow">
+                  <label>Fecha del primer pago (después del depósito) <span style="color:#C23B3B;">*obligatorio</span></label>
+                  <input type="text" id="tx-primer-pago" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateFirstPayPreview('tx');">
+                  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('tx', 20)">+20 días</button>
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('tx', 30)">+30 días</button>
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('tx', 0)">Mismo día de la fecha efectiva</button>
+                  </div>
+                  <div class="sub" id="tx-primer-pago-preview" style="margin-top:6px; font-size:12.5px;">Las aseguradoras cobran el primer pago en fechas distintas (ej. 20 días después). Pon aquí la fecha exacta; los siguientes pagos caen el mismo día de cada mes.</div>
+                </div>
+                  </div>
                 </div>
               </div>
 
@@ -2255,12 +2341,12 @@
               </div>
               <div class="form-row-2">
                 <div class="form-row"><label>Número de póliza</label><input type="text" id="ep-numero"></div>
-                <div class="form-row"><label>Fecha efectiva</label><input type="text" id="ep-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateEditPolicyExpiration();"></div>
+                <div class="form-row"><label>Fecha efectiva</label><input type="text" id="ep-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateEditPolicyExpiration(); updateFirstPayPreview('ep');"></div>
               </div>
               <div class="form-row-2">
                 <div class="form-row">
                   <label>Término</label>
-                  <select id="ep-termino" onchange="updateEditPolicyExpiration()">
+                  <select id="ep-termino" onchange="updateEditPolicyExpiration(); updateFirstPayPreview('ep')">
                     <option value="">—</option>
                     <option value="1">1 mes</option>
                     <option value="3">3 meses</option>
@@ -2273,6 +2359,16 @@
               <div class="form-row-2">
                 <div class="form-row"><label>Depósito ($) <span title="Si lo pones o lo corriges aquí, se vuelve a calcular la prima total de esta póliza (depósito + pago mensual × término)." style="cursor:help; color:#8A96AC; font-weight:700;">?</span></label><input type="number" min="0" step="0.01" id="ep-deposito"></div>
                 <div class="form-row"><label>Pago mensual ($) <span title="Si lo pones o lo corriges aquí, se vuelve a calcular la prima total de esta póliza (depósito + pago mensual × término) — útil para corregir pólizas viejas que se registraron sin este dato." style="cursor:help; color:#8A96AC; font-weight:700;">?</span></label><input type="number" min="0" step="0.01" id="ep-pago"></div>
+              </div>
+              <div class="form-row" id="ep-primerPagoRow">
+                <label>Fecha del primer pago (después del depósito) <span class="sub" style="font-weight:400;">(para pólizas con pago mensual)</span></label>
+                <input type="text" id="ep-primer-pago" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateFirstPayPreview('ep');">
+                <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                  <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('ep', 20)">+20 días</button>
+                  <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('ep', 30)">+30 días</button>
+                  <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('ep', 0)">Mismo día de la fecha efectiva</button>
+                </div>
+                <div class="sub" id="ep-primer-pago-preview" style="margin-top:6px; font-size:12.5px;">Sirve para que los avisos de pago salgan el día correcto. Los siguientes pagos caen el mismo día de cada mes.</div>
               </div>
               <div class="form-row"><label>Notas</label><textarea id="ep-notas" rows="2" style="width:100%; padding:12px; border:1.5px solid var(--line); border-radius:10px; font-family:inherit;"></textarea></div>
               <button type="submit" class="btn-primary">Guardar cambios</button>
@@ -2634,6 +2730,10 @@
 
 
 
+
+
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -2685,11 +2785,21 @@
                   </div>
                   <div class="form-row-2">
                     <div class="form-row"><label>Depósito que pidió la aseguradora ($)</label><input type="number" min="0" step="0.01" id="ec-act-deposito"></div>
-                    <div class="form-row"><label>Pago mensual ($) <span style="color:#C23B3B;">*</span></label><input type="number" min="0" step="0.01" id="ec-act-pago"></div>
+                    <div class="form-row"><label>Pago mensual ($) <span style="color:#C23B3B;">*</span></label><input type="number" min="0" step="0.01" id="ec-act-pago" oninput="updateFirstPayPreview('ec-act')"></div>
                   </div>
+                  <div class="form-row" id="ec-act-primerPagoRow">
+                  <label>Fecha del primer pago (después del depósito) <span style="color:#C23B3B;">* (si paga mensual)</span></label>
+                  <input type="text" id="ec-act-primer-pago" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateFirstPayPreview('ec-act');">
+                  <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:6px;">
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('ec-act', 20)">+20 días</button>
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('ec-act', 30)">+30 días</button>
+                    <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="setFirstPaymentOffset('ec-act', 0)">Mismo día de la fecha efectiva</button>
+                  </div>
+                  <div class="sub" id="ec-act-primer-pago-preview" style="margin-top:6px; font-size:12.5px;">Las aseguradoras cobran el primer pago en fechas distintas (ej. 20 días después). Pon aquí la fecha exacta; los siguientes pagos caen el mismo día de cada mes.</div>
+                </div>
                   <div class="form-row-2">
                     <div class="form-row"><label>Término de la póliza <span style="color:#C23B3B;">*</span></label>
-                      <select id="ec-act-termino" onchange="updateEcActivaExpiration()">
+                      <select id="ec-act-termino" onchange="updateEcActivaExpiration(); updateFirstPayPreview('ec-act')">
                         <option value="">—</option>
                         <option value="1">1 mes</option>
                         <option value="3">3 meses</option>
@@ -2699,7 +2809,7 @@
                     </div>
                     <div class="form-row">
                       <label>Fecha de inicio de la cobertura <span style="color:#C23B3B;">*</span></label>
-                      <input type="text" id="ec-act-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateEcActivaExpiration();">
+                      <input type="text" id="ec-act-efectiva" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this); updateEcActivaExpiration(); updateFirstPayPreview('ec-act');">
                     </div>
                   </div>
                   <div class="form-row">
@@ -6275,7 +6385,8 @@
 
       const tipoOk = tipo && (tipo !== '__otro__' || tipoOtro);
       const companyOk = companySelect && (companySelect !== '__otra__' || companyOther);
-      return tipoOk && companyOk && numero && efectivaISO && termino && pago;
+      const ncFpOk = !(parseFloat(pago) > 0) || !!document.getElementById('nc-act-primer-pago').value.trim();   // paga mensual → fecha del primer pago obligatoria
+      return tipoOk && companyOk && numero && efectivaISO && termino && pago && ncFpOk;
     }
 
     // mode === 'lead'
@@ -6329,11 +6440,20 @@
     if(!validatePolicyRequired()){
       const mode = document.querySelector('input[name="nc-registro-tipo"]:checked').value;
       const msg = mode === 'activa'
-        ? 'Para registrar como póliza activa, completa tipo de seguro, compañía, número de póliza, fecha efectiva y término.'
+        ? 'Para registrar como póliza activa, completa tipo de seguro, compañía, número de póliza, fecha efectiva, término y (si paga mensual) la fecha del primer pago.'
         : 'Si vas a registrar una cotización, completa al menos el tipo de seguro y la compañía.';
       showMsg('newClientMsg','error',msg);
       document.getElementById('newClientMsg').scrollIntoView({ behavior: 'smooth' });
       return;
+    }
+    // Póliza activa con pago mensual: la fecha del primer pago tiene que ser válida, y la migración corrida.
+    if(!venderPolizaMode && document.querySelector('input[name="nc-registro-tipo"]:checked').value === 'activa' && (parseFloat(document.getElementById('nc-act-pago').value) || 0) > 0){
+      const ncFpCheck = validateFirstPayment('nc-act', true);
+      if(ncFpCheck.error || !(await firstPaymentColumnReady())){
+        showMsg('newClientMsg','error', ncFpCheck.error || FIRST_PAY_MIGRATION_MSG);
+        document.getElementById('newClientMsg').scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
     }
 
     const { data: { session } } = await sb.auth.getSession();
@@ -6414,6 +6534,8 @@
       const polDeposito = parseFloat(document.getElementById('nc-act-deposito').value) || 0;
       const polPagoMensual = parseFloat(document.getElementById('nc-act-pago').value) || 0;
       const polTerminoMeses = polTermino ? parseInt(polTermino, 10) : 0;
+      // Fecha del primer pago: ya se revisó arriba (antes de guardar al cliente).
+      const ncFpIso = polPagoMensual > 0 ? mmddyyyyToISO(document.getElementById('nc-act-primer-pago').value.trim()) : null;
 
       if(polTipo === '__otro__'){
         const newProductName = document.getElementById('nc-act-tipo-otro').value.trim();
@@ -6437,6 +6559,7 @@
         monthly_payment: polPagoMensual,
         deposit_amount: polDeposito || null,
         total_premium: calcPolicyPremium(polDeposito, polPagoMensual, polTerminoMeses),
+        ...(ncFpIso ? { first_payment_date: ncFpIso } : {}),
         notes: polNotas || null,
         created_by: session.user.id
       };
@@ -6704,7 +6827,17 @@
       // poder verlos sin tener que entrar a "Ver historial" ni a "Editar".
       const depositoTxt = (p.deposit_amount !== null && p.deposit_amount !== undefined) ? '$' + Number(p.deposit_amount).toFixed(2) : '—';
       const pagoMensualTxt = (p.monthly_payment !== null && p.monthly_payment !== undefined) ? '$' + Number(p.monthly_payment).toFixed(2) : '—';
-      const pagoInfoHtml = `<div class="sub" style="font-size:11px; margin-top:3px; white-space:nowrap;">💰 Depósito: ${depositoTxt} · Mensual: ${pagoMensualTxt}</div>`;
+      let primerPagoHtml = '';
+      if(!cancelled && Number(p.monthly_payment) > 0){
+        if(p.first_payment_date){
+          const todayIso = toISODateLocal(new Date());
+          const next = paymentSchedule(p).find(d => d >= todayIso);
+          primerPagoHtml = `<div class="sub" style="font-size:11px; margin-top:2px; white-space:nowrap;">📅 1er pago: ${formatDateUS(p.first_payment_date)} · día ${paymentDayOf(p)} de cada mes${next ? ' · próximo: ' + formatDateUS(next) : ''}</div>`;
+        } else {
+          primerPagoHtml = `<div class="sub" style="font-size:11px; margin-top:2px; white-space:nowrap; color:#9a5518;" title="Toca Editar y pon la fecha del primer pago para que los avisos de pago salgan el día correcto.">📅 Falta la fecha del primer pago (Editar)</div>`;
+        }
+      }
+      const pagoInfoHtml = `<div class="sub" style="font-size:11px; margin-top:3px; white-space:nowrap;">💰 Depósito: ${depositoTxt} · Mensual: ${pagoMensualTxt}</div>` + primerPagoHtml;
       const mainRow = `
       <tr${cancelled ? ' style="opacity:0.7;"' : ''}>
         <td>${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '—'}</td>
@@ -6995,6 +7128,8 @@
     document.getElementById('ep-deposito').value = (p.deposit_amount !== null && p.deposit_amount !== undefined) ? p.deposit_amount : '';
     document.getElementById('ep-notas').value = p.notes || '';
     document.getElementById('ep-expiracion').value = formatDateUS(p.expiration_date) || '';
+    document.getElementById('ep-primer-pago').value = p.first_payment_date ? formatDateUS(p.first_payment_date) : '';
+    updateFirstPayPreview('ep');
 
     const epCompany = document.getElementById('ep-companyid');
     epCompany.innerHTML = '<option value="">—</option>' + allCompanies.map(co => `<option value="${co.id}">${co.name}</option>`).join('');
@@ -7037,6 +7172,13 @@
     };
     if(epPagoRaw !== '') payload.monthly_payment = parseFloat(epPagoRaw) || 0;
     if(epDepositoRaw !== '') payload.deposit_amount = parseFloat(epDepositoRaw) || 0;
+    // Fecha del primer pago (opcional aquí; sirve para corregir pólizas viejas)
+    const epFp = validateFirstPayment('ep', false);
+    if(epFp.error){ showMsg('editPolicyMsg','error', epFp.error); return; }
+    if(epFp.iso){
+      if(!(await firstPaymentColumnReady())){ showMsg('editPolicyMsg','error', FIRST_PAY_MIGRATION_MSG); return; }
+      payload.first_payment_date = epFp.iso;
+    }
     // Si se tocó el depósito o el pago mensual, se vuelve a calcular la prima
     // total (depósito + mensualidad × término) — útil para corregir pólizas
     // viejas que se registraron sin uno de los dos datos.
@@ -7238,6 +7380,10 @@
         showMsg('clientDetailMsg','error','Para marcar este cliente como Activo, completa compañía, número de póliza, pago mensual, término y fecha de inicio de la póliza.');
         return;
       }
+      if((parseFloat(ecPago) || 0) > 0){
+        const ecFpCheck = validateFirstPayment('ec-act', true);
+        if(ecFpCheck.error || !(await firstPaymentColumnReady())){ showMsg('clientDetailMsg','error', ecFpCheck.error || FIRST_PAY_MIGRATION_MSG); return; }
+      }
     }
 
     const tipo = document.getElementById('ec-tipo').value;
@@ -7355,6 +7501,7 @@
         deposit_amount: ecDeposito || null,
         term_months: ecTerminoMeses,
         total_premium: calcPolicyPremium(ecDeposito, ecPagoMensual, ecTerminoMeses),
+        ...(ecPagoMensual > 0 ? { first_payment_date: mmddyyyyToISO(document.getElementById('ec-act-primer-pago').value.trim()) } : {}),
         effective_date: efectivaISO,
         created_by: session.user.id
       });
@@ -8659,6 +8806,7 @@
     if(modalidad === 'full'){
       document.getElementById('tx-pagoMensualBlock').style.display = 'none';
       document.getElementById('tx-pago-mensual').value = '';
+      document.getElementById('tx-primer-pago').value = '';
       label.innerHTML = 'Monto total de la póliza — pago en full ($) <span style="color:#C23B3B;">*obligatorio</span>';
     } else if(modalidad === 'mensual'){
       document.getElementById('tx-pagoMensualBlock').style.display = 'block';
@@ -9016,6 +9164,10 @@
           showMsg('newTransactionMsg','error','Completa el monto del pago mensual.');
           return;
         }
+        // Fecha del primer pago (después del depósito): obligatoria. Se revisa ANTES de cobrar la tarjeta.
+        const txFpCheck = validateFirstPayment('tx', true);
+        if(txFpCheck.error){ showMsg('newTransactionMsg','error', txFpCheck.error); return; }
+        if(!(await firstPaymentColumnReady())){ showMsg('newTransactionMsg','error', FIRST_PAY_MIGRATION_MSG); return; }
       }
     }
 
@@ -9344,6 +9496,7 @@
         monthly_payment: txModalidadPago === 'mensual' ? txPagoMensualVal : null,
         deposit_amount: txCargoVal || null,
         total_premium: totalPremiumCalc,
+        ...(txModalidadPago === 'mensual' ? { first_payment_date: mmddyyyyToISO(document.getElementById('tx-primer-pago').value.trim()) } : {}),
         notes: document.getElementById('tx-notas').value || null,
         created_by: session.user.id
       }).select().single();
@@ -11174,6 +11327,78 @@
     return toISODateLocal(target);
   }
 
+  // ===== FECHA DEL PRIMER PAGO + CALENDARIO DE PAGOS =====
+  // Después del depósito, cada aseguradora cobra el primer pago en una fecha distinta
+  // (ej. 20 días después); por eso se captura la fecha exacta (client_policies.first_payment_date,
+  // migracion_primer_pago.sql). Los siguientes pagos caen el MISMO DÍA de cada mes, hasta que vence
+  // la póliza. Las pólizas viejas sin esa fecha siguen usando el día de su fecha efectiva.
+  function paymentSchedule(p){
+    if(!p || !p.first_payment_date || !(Number(p.monthly_payment) > 0)) return [];
+    const out = [];
+    for(let i = 0; i < 36; i++){
+      const d = addMonthsISO(p.first_payment_date, i);
+      if(p.expiration_date && d >= p.expiration_date) break;
+      if(!p.expiration_date && i >= 12) break;
+      out.push(d);
+    }
+    return out;
+  }
+  function paymentDayOf(p){ return parseInt(((p && (p.first_payment_date || p.effective_date)) || '').slice(8, 10), 10) || null; }
+  const FP_PREFIX_IDS = {
+    'tx': { eff: 'tx-efectiva', term: 'tx-termino' }, 'nc-act': { eff: 'nc-act-efectiva', term: 'nc-act-termino' },
+    'ec-act': { eff: 'ec-act-efectiva', term: 'ec-act-termino' }, 'ep': { eff: 'ep-efectiva', term: 'ep-termino' }
+  };
+  function fpFormInfo(prefix){
+    const ids = FP_PREFIX_IDS[prefix];
+    const eff = mmddyyyyToISO(document.getElementById(ids.eff).value);
+    const term = parseInt(document.getElementById(ids.term).value, 10) || 0;
+    const raw = document.getElementById(prefix + '-primer-pago').value.trim();
+    return { eff, term, raw, first: raw ? mmddyyyyToISO(raw) : null, exp: (eff && term) ? addMonthsISO(eff, term) : null };
+  }
+  // Revisa la fecha del primer pago de un formulario. required = obligatoria (pago mensual).
+  function validateFirstPayment(prefix, required){
+    const i = fpFormInfo(prefix);
+    if(!i.raw){
+      return required ? { error: 'Falta la fecha del primer pago (MM/DD/AAAA): la fecha en que el cliente debe hacer su primer pago después del depósito.' } : { iso: null };
+    }
+    if(!i.first) return { error: 'La fecha del primer pago no es válida. Escríbela como MM/DD/AAAA.' };
+    if(i.eff && i.first < i.eff) return { error: 'La fecha del primer pago no puede ser antes de la fecha efectiva de la póliza.' };
+    if(i.exp && i.first >= i.exp) return { error: 'La fecha del primer pago cae después de que vence la póliza. Revísala.' };
+    return { iso: i.first };
+  }
+  function setFirstPaymentOffset(prefix, days){
+    const i = fpFormInfo(prefix);
+    if(!i.eff){ alert('Primero pon la fecha efectiva de la póliza.'); return; }
+    const d = new Date(i.eff + 'T00:00:00'); d.setDate(d.getDate() + days);
+    document.getElementById(prefix + '-primer-pago').value = formatDateUS(toISODateLocal(d));
+    updateFirstPayPreview(prefix);
+  }
+  function updateFirstPayPreview(prefix){
+    const el = document.getElementById(prefix + '-primer-pago-preview'); if(!el) return;
+    const i = fpFormInfo(prefix);
+    const base = 'Las aseguradoras cobran el primer pago en fechas distintas (ej. 20 días después). Pon aquí la fecha exacta; los siguientes pagos caen el mismo día de cada mes.';
+    el.style.color = '';
+    if(!i.raw){ el.textContent = base; return; }
+    if(!i.first){ el.textContent = i.raw.length < 10 ? base : 'Esa fecha no es válida. Escríbela como MM/DD/AAAA.'; if(i.raw.length >= 10) el.style.color = '#B23A3A'; return; }
+    const v = validateFirstPayment(prefix, true);
+    if(v.error){ el.textContent = v.error; el.style.color = '#B23A3A'; return; }
+    const dates = paymentSchedule({ first_payment_date: i.first, monthly_payment: 1, expiration_date: i.exp });
+    el.textContent = 'Pagos del cliente: ' + dates.map(formatDateUS).join(' · ') + (i.exp ? ' (la póliza vence el ' + formatDateUS(i.exp) + ')' : '');
+  }
+  // Antes de COBRAR o guardar con la fecha del primer pago, se comprueba que ya se corrió la migración
+  // (si no, el guardado fallaría DESPUÉS de cobrar la tarjeta).
+  let firstPayColumnOk = false;
+  async function firstPaymentColumnReady(){
+    if(firstPayColumnOk) return true;
+    try{
+      const { error } = await sb.from('client_policies').select('first_payment_date').limit(1);
+      if(!error){ firstPayColumnOk = true; return true; }
+    }catch(e){}
+    return false;
+  }
+  const FIRST_PAY_MIGRATION_MSG = 'Falta correr «migracion_primer_pago.sql» en Supabase (SQL Editor) para poder guardar la fecha del primer pago. No se guardó ni se cobró nada.';
+  // ===== FIN FECHA DEL PRIMER PAGO =====
+
   function lastMonthlyCycleDate(targetDay, hoy){
     let best = null;
     [0, -1].forEach(offset => {
@@ -11375,7 +11600,8 @@
         term = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
       }
       if(!term || term < 1 || term > 36) term = DEFAULT_RENEWAL_TERM_MONTHS;
-      document.getElementById('rn-neweff').value = p.expiration_date;
+      document.getElementById('rn-neweff').value = formatDateUS(p.expiration_date);
+      document.getElementById('rn-firstpay').value = '';
       document.getElementById('rn-term').value = term;
       document.getElementById('rn-newnumber').value = '';
       document.getElementById('rn-newpay').value = '';
@@ -11391,22 +11617,22 @@
   }
 
   function updateRenewalNewExpiration(){
-    const eff = document.getElementById('rn-neweff').value;
+    const eff = mmddyyyyToISO(document.getElementById('rn-neweff').value);
     const term = parseInt(document.getElementById('rn-term').value, 10);
     if(!eff || !term) return;
-    document.getElementById('rn-newexp').value = addMonthsISO(eff, term);
+    document.getElementById('rn-newexp').value = formatDateUS(addMonthsISO(eff, term));
   }
 
   async function confirmPolicyRenewed(){
     const policyId = document.getElementById('rn-policy-id').value;
     const p = renewalFollowupCache[policyId];
     if(!p) return;
-    const newEff = document.getElementById('rn-neweff').value;
-    const newExp = document.getElementById('rn-newexp').value;
+    const newEff = mmddyyyyToISO(document.getElementById('rn-neweff').value);
+    const newExp = mmddyyyyToISO(document.getElementById('rn-newexp').value);
     const term = parseInt(document.getElementById('rn-term').value, 10);
     const newNumber = document.getElementById('rn-newnumber').value.trim();
     const newPayRaw = document.getElementById('rn-newpay').value;
-    if(!newEff || !newExp || !term){ showMsg('rn-msg', 'error', 'Completa la fecha efectiva, el término y la fecha de expiración.'); return; }
+    if(!newEff || !newExp || !term){ showMsg('rn-msg', 'error', 'Completa la fecha efectiva, el término y la fecha de expiración (MM/DD/AAAA).'); return; }
     if(newExp <= newEff){ showMsg('rn-msg', 'error', 'La fecha de expiración tiene que ser después de la fecha efectiva.'); return; }
 
     const payload = {
@@ -11419,6 +11645,14 @@
     };
     if(newNumber) payload.policy_number = newNumber;
     if(newPayRaw !== '') payload.monthly_payment = parseFloat(newPayRaw);
+    // Fecha del primer pago de la nueva vigencia: la que se escriba, o vacía (= el mismo día de la fecha efectiva).
+    // Así la fecha de la vigencia anterior no se arrastra a la renovación.
+    const fpRaw = document.getElementById('rn-firstpay').value.trim();
+    const fpIso = fpRaw ? mmddyyyyToISO(fpRaw) : null;
+    if(fpRaw && !fpIso){ showMsg('rn-msg', 'error', 'La fecha del primer pago no es válida. Escríbela como MM/DD/AAAA.'); return; }
+    if(fpIso && (fpIso < newEff || fpIso >= newExp)){ showMsg('rn-msg', 'error', 'La fecha del primer pago tiene que estar dentro de la nueva vigencia.'); return; }
+    if(fpIso && !(await firstPaymentColumnReady())){ showMsg('rn-msg', 'error', FIRST_PAY_MIGRATION_MSG); return; }
+    if(fpIso || (p.first_payment_date && await firstPaymentColumnReady())) payload.first_payment_date = fpIso;
 
     const { error } = await sb.from('client_policies').update(payload).eq('id', policyId);
     if(error){ showMsg('rn-msg', 'error', 'No se pudo renovar: ' + error.message); return; }
@@ -11475,12 +11709,21 @@
       if(p.auto_pay_enabled) return;                                                   // lo cobra el sistema
       const isVenture = (p.company || '').toLowerCase().includes('venture');
       if(isVenture && !p.eft_enrolled) return;                                         // ya tiene su propio aviso
-      const day = parseInt(p.effective_date.slice(8, 10), 10);
-      const cycle = lastMonthlyCycleDate(day, hoy);
-      if(!cycle) return;
-      const cycleISO = toISODateLocal(cycle);
-      if(cycleISO <= p.effective_date) return;                                         // el primer pago ya se hizo al vender
-      if(p.expiration_date && cycleISO >= p.expiration_date) return;                   // ahí manda el aviso de renovación
+      let cycle, cycleISO;
+      if(p.first_payment_date){
+        // Con fecha del primer pago: calendario exacto (ese día y el mismo día de cada mes, hasta que vence).
+        const todayISO = toISODateLocal(hoy);
+        const past = paymentSchedule(p).filter(d => d <= todayISO);
+        if(past.length === 0) return;                                                  // todavía no llega el primer pago
+        cycleISO = past[past.length - 1]; cycle = isoToLocalDate(cycleISO);
+      } else {
+        const day = parseInt(p.effective_date.slice(8, 10), 10);
+        cycle = lastMonthlyCycleDate(day, hoy);
+        if(!cycle) return;
+        cycleISO = toISODateLocal(cycle);
+        if(cycleISO <= p.effective_date) return;                                       // el primer pago ya se hizo al vender
+        if(p.expiration_date && cycleISO >= p.expiration_date) return;                 // ahí manda el aviso de renovación
+      }
       const diff = Math.round((hoy - cycle) / 86400000);
       if(diff < 0 || diff > PAYMENT_CHECK_WINDOW_DAYS) return;
       if(acked.has(p.id + '|' + cycleISO)) return;
@@ -11562,7 +11805,7 @@
     const hoy = new Date(); hoy.setHours(0,0,0,0);
     const due = data
       .filter(p => !p.eft_enrolled && p.effective_date)
-      .map(p => ({ p, diff: nearestMonthlyOccurrenceDiff(parseInt(p.effective_date.slice(8, 10), 10), hoy) }))
+      .map(p => ({ p, diff: nearestMonthlyOccurrenceDiff(paymentDayOf(p), hoy) }))
       .filter(x => Math.abs(x.diff) <= 3)
       .sort((a, b) => a.diff - b.diff);
 
@@ -14088,7 +14331,7 @@ function trViewTransfer(){
   </div>
   <div class="dash-card"><h4 style="margin-top:0;">Historial de transferencias</h4>
     <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Propuesta</th><th style="text-align:right;">Monto</th><th>Estado</th><th>Detalle</th><th></th></tr></thead><tbody>
-    ${(d.transfers || []).length ? d.transfers.map(t => `<tr><td>${new Date(t.proposed_at).toLocaleDateString()}</td><td style="text-align:right;">${trFmt(t.proposed_cents)}</td><td>${trChip(st[t.status][0], st[t.status][1])}</td>
+    ${(d.transfers || []).length ? d.transfers.map(t => `<tr><td>${new Date(t.proposed_at).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' })}</td><td style="text-align:right;">${trFmt(t.proposed_cents)}</td><td>${trChip(st[t.status][0], st[t.status][1])}</td>
       <td class="sub">${trE(t.justification || '')}${t.executed_reference ? `<br>Ref. Bluevine: ${trE(t.executed_reference)}` : ''}${t.cancel_reason ? `<br>Cancelada: ${trE(t.cancel_reason)}` : ''}${t.status === 'posted' ? `<br>Conciliada por ${trFmt(t.posted_cents)}` : ''}</td>
       <td style="white-space:nowrap;">
         ${t.status === 'proposed' ? `<button class="btn-primary" style="width:auto; padding:5px 12px; font-size:12px;" onclick="trApproveTransfer('${trE(t.id)}')">Aprobar</button>` : ''}
@@ -14190,7 +14433,7 @@ function trViewExcepciones(){
     ${(d.audit || []).slice(0, 150).map(a => `<tr><td style="white-space:nowrap;">${new Date(a.at).toLocaleString()}</td><td>${trE(a.action)}</td><td class="sub" style="max-width:420px; word-break:break-word;">${trE(a.entity || '')} ${trE(a.entity_id || '')} ${a.detail ? trE(JSON.stringify(a.detail).slice(0, 220)) : ''}</td></tr>`).join('') || '<tr><td colspan="3">Sin registros.</td></tr>'}
     </tbody></table></div></div>
   <div class="dash-card"><h4 style="margin-top:0;">Excepciones ya resueltas (${(d.resolutions || []).length})</h4>
-    ${(d.resolutions || []).length ? `<table class="dash-table"><tbody>${d.resolutions.slice(0, 50).map(r => `<tr><td><code>${trE(r.exception_key)}</code></td><td>${trE(r.justification)}</td><td class="sub">${new Date(r.resolved_at).toLocaleDateString()}</td></tr>`).join('')}</tbody></table>` : '<p class="sub">Ninguna todavía.</p>'}</div>`;
+    ${(d.resolutions || []).length ? `<table class="dash-table"><tbody>${d.resolutions.slice(0, 50).map(r => `<tr><td><code>${trE(r.exception_key)}</code></td><td>${trE(r.justification)}</td><td class="sub">${new Date(r.resolved_at).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' })}</td></tr>`).join('')}</tbody></table>` : '<p class="sub">Ninguna todavía.</p>'}</div>`;
 }
 function trOpenResolve(key){
   const e = TR.pos.exceptions.find(x => x.key === key); if(!e) return;
@@ -14230,7 +14473,7 @@ function trViewConfig(){
       ${check(!!opening, 'Saldo inicial (apertura) conciliado y aprobado')}
       ${check(TR.closesCount >= 2, `Al menos 2 cierres diarios de prueba que cuadran con Bluevine y Stripe (${TR.closesCount}/2)`)}
       ${check(!!balFresh, 'Saldo verificado de Agency Sweep al día')}
-      ${check(!!s.activated, 'Cálculo activado por la administración' + (s.activated_at ? ' (' + new Date(s.activated_at).toLocaleDateString() + ')' : ''))}
+      ${check(!!s.activated, 'Cálculo activado por la administración' + (s.activated_at ? ' (' + new Date(s.activated_at).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' }) + ')' : ''))}
     </ul>
     ${s.activated ? '<button class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="trSetActivated(false)">Desactivar</button>' : `<button class="btn-primary" style="width:auto; padding:8px 18px;" ${canActivate ? '' : 'disabled'} onclick="trSetActivated(true)">Activar cálculo</button>`}
   </div>
@@ -14246,7 +14489,7 @@ function trViewConfig(){
     <button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trSaveSettings()">Guardar parámetros</button>
   </div>
   <div class="dash-card"><h4 style="margin-top:0;">Saldo inicial (apertura)</h4>
-    ${opening ? `<p>✅ Apertura aprobada el ${new Date(opening.approved_at).toLocaleDateString()}: corte ${formatDateUS(opening.cutoff_date)}, Sweep ${trFmt(opening.sweep_balance_cents)}, primas pendientes ${trFmt(opening.carrier_obligations_cents)}, fees propios ${trFmt(opening.own_fees_pending_cents)}${opening.unreconciled_cents ? `, sin conciliar ${trFmt(opening.unreconciled_cents)} (retenido)` : ''}.</p><button class="btn-ghost" style="width:auto; padding:7px 14px; font-size:12.5px;" onclick="trRedoOpening()">Me equivoqué: rehacer apertura</button>`
+    ${opening ? `<p>✅ Apertura aprobada el ${new Date(opening.approved_at).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' })}: corte ${formatDateUS(opening.cutoff_date)}, Sweep ${trFmt(opening.sweep_balance_cents)}, primas pendientes ${trFmt(opening.carrier_obligations_cents)}, fees propios ${trFmt(opening.own_fees_pending_cents)}${opening.unreconciled_cents ? `, sin conciliar ${trFmt(opening.unreconciled_cents)} (retenido)` : ''}.</p><button class="btn-ghost" style="width:auto; padding:7px 14px; font-size:12.5px;" onclick="trRedoOpening()">Me equivoqué: rehacer apertura</button>`
       : draft ? `<p>📝 Hay un borrador (corte ${formatDateUS(draft.cutoff_date)}): Sweep ${trFmt(draft.sweep_balance_cents)}, primas ${trFmt(draft.carrier_obligations_cents)}, fees propios ${trFmt(draft.own_fees_pending_cents)}, diferencia ${trFmt(draft.unreconciled_cents)}.</p>
         <button class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="trOpenOpening()">Editar borrador</button> <button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trApproveOpening('${trE(draft.id)}')">Aprobar apertura</button>`
       : `<p class="sub">Todavía no hay apertura. Registra con qué dinero parte el sistema: saldo real de Sweep al corte, cuánto de eso es de aseguradoras y cuánto es ingreso propio.</p><button class="btn-primary" style="width:auto; padding:8px 18px;" onclick="trOpenOpening()">Crear apertura</button>`}
@@ -16261,6 +16504,10 @@ async function saSaveSettings(){
 
 
 
+
+
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -16376,6 +16623,44 @@ function fmStep(n){
   [1, 2, 3].forEach(i => { document.getElementById('fm-step' + i).style.display = (i === n) ? 'block' : 'none'; });
   document.getElementById('fm-stepnum').textContent = n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar';
   const ov = document.getElementById('fmOverlay'); if(ov) ov.scrollTop = 0;
+  const body = ov && ov.querySelector('.fm-body'); if(body) body.classList.toggle('fm-wide', n === 2);
+  if(n === 2){
+    fmSizeBars();
+    if(ov && !ov.dataset.fmScroll){
+      ov.dataset.fmScroll = '1';
+      let tick = false;
+      ov.addEventListener('scroll', () => { if(tick) return; tick = true; requestAnimationFrame(() => { tick = false; fmUpdateCurPage(); }); }, { passive: true });
+      window.addEventListener('resize', () => { if(FM.step === 2) fmSizeBars(); });
+    }
+    const bar = ov && ov.querySelector('#fm-step2 .fm-bar');
+    if(bar && window.ResizeObserver && !bar.dataset.fmRo){ bar.dataset.fmRo = '1'; new ResizeObserver(() => fmSizeBars()).observe(bar); }
+    fmUpdateCurPage();
+  }
+}
+// La barra de arriba y la de abajo pueden cambiar de alto (celular): el panel fijo se acomoda entre las dos.
+function fmSizeBars(){
+  const ov = document.getElementById('fmOverlay'); if(!ov) return;
+  const top = ov.querySelector('.fm-top'), bar = ov.querySelector('#fm-step2 .fm-bar');
+  if(top) ov.style.setProperty('--fm-top-h', top.offsetHeight + 'px');
+  if(bar && bar.offsetHeight) ov.style.setProperty('--fm-bar-h', bar.offsetHeight + 'px');
+  if(bar){
+    const sv = document.getElementById('fm-tpl-save-btn'), up = document.getElementById('fm-tpl-update-btn');
+    const has = [sv, up].some(b => b && b.style.display !== 'none');
+    bar.classList.toggle('fm-has-tpl', has); if(!has) bar.classList.remove('fm-open');
+  }
+}
+// Página que se está viendo (la que cruza la mitad de la pantalla): ahí se agregan los campos nuevos.
+function fmCurrentPage(){
+  if(!FM.pages || FM.pages.length === 0) return null;
+  const vh = window.innerHeight / 2;
+  return FM.pages.find(p => { const r = p.el.getBoundingClientRect(); return r.top <= vh && r.bottom >= vh; })
+    || FM.pages.find(p => p.el.getBoundingClientRect().bottom > 0) || FM.pages[0];
+}
+function fmUpdateCurPage(){
+  const el = document.getElementById('fm-curpage'); if(!el || !FM.pages || FM.pages.length === 0) return;
+  const pg = fmCurrentPage(); if(!pg) return;
+  const mobile = window.matchMedia && window.matchMedia('(max-width:820px)').matches;
+  el.textContent = mobile ? ('Pág. ' + pg.n + '/' + FM.pages.length) : ('Estás en la página ' + pg.n + ' de ' + FM.pages.length);
 }
 
 async function fmLoadTemplates(){
@@ -16467,7 +16752,7 @@ async function fmStart(){
     document.getElementById('fm-doc-title').textContent = title;
     fmStep(2);
     await fmRenderPages();
-    fmRenderFields(); fmRenderProps();
+    fmRenderFields(); fmRenderProps(); fmSizeBars(); fmUpdateCurPage();
   }catch(e){
     fmMsg('fm-msg1', 'error', e.message || String(e));
   }
@@ -16536,7 +16821,7 @@ function fmBindField(el, handle, f, pg){
 }
 function fmRenderChips(){
   const box = document.getElementById('fm-chips');
-  if(FM.fields.length === 0){ box.innerHTML = '<span class="sub" style="margin:0;">Todavía no hay campos. Toca un botón de arriba para agregar uno.</span>'; return; }
+  if(FM.fields.length === 0){ box.innerHTML = '<span class="sub" style="margin:0;">Todavía no hay campos. Toca un botón de la barra para agregar uno.</span>'; return; }
   box.innerHTML = FM.fields.map((f, i) => {
     const t = FM_TYPES[f.type] || FM_TYPES.text;
     return `<button type="button" class="fm-chip${FM.sel === f.id ? ' sel' : ''}" style="border-color:${t.color};" onclick="fmSelect('${f.id}', true)">${t.icon} ${fmEsc(f.label)}${f.required ? ' *' : ''} <small>· pág. ${f.page}</small></button>`;
@@ -16553,7 +16838,7 @@ function fmAddField(type){
   if(FM.fields.length >= 60){ fmMsg('fm-msg2', 'error', 'Máximo 60 campos por documento.'); return; }
   fmMsg('fm-msg2', '', '');
   const vh = window.innerHeight / 2;
-  let pg = FM.pages.find(p => { const r = p.el.getBoundingClientRect(); return r.top <= vh && r.bottom >= vh; }) || FM.pages.find(p => p.el.getBoundingClientRect().bottom > 0) || FM.pages[0];
+  const pg = fmCurrentPage();
   const r = pg.el.getBoundingClientRect(); const t = FM_TYPES[type];
   const w = fmClamp(t.w / r.width, type === 'check' ? 0.022 : 0.05, 0.9), h = fmClamp(t.h / r.height, 0.02, 0.5);
   const cy = fmClamp((vh - r.top) / r.height, h / 2, 1 - h / 2);
@@ -16565,6 +16850,7 @@ function fmGroups(){ const g = []; FM.fields.forEach(f => { if(f.type === 'check
 function fmRenderProps(){
   const box = document.getElementById('fm-props');
   const f = FM.fields.find(x => x.id === FM.sel);
+  box.classList.toggle('fm-empty', !f);
   if(!f){ box.innerHTML = '<span class="sub" style="margin:0;">Toca un campo en el documento para cambiarle el nombre, marcarlo obligatorio u opcional, o borrarlo.</span>'; return; }
   const t = FM_TYPES[f.type];
   const isCheck = f.type === 'check';
@@ -18473,6 +18759,9 @@ function pwBusy(b){ PW.busy = b; document.querySelectorAll('#tab-pagina button, 
     const m = str.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if(!m) return null;
     const [, mm, dd, yyyy] = m;
+    // Siempre mes/día/año: un mes > 12 (p. ej. 20/10/2026 escrito día/mes) o un día que no existe NO es fecha válida.
+    const mo = +mm, da = +dd, yr = +yyyy;
+    if(yr < 1900 || yr > 2200 || mo < 1 || mo > 12 || da < 1 || da > new Date(yr, mo, 0).getDate()) return null;
     return `${yyyy}-${mm}-${dd}`;
   }
 
