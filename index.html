@@ -981,6 +981,7 @@
 
 
 
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1276,6 +1277,7 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
 
 
 
@@ -2729,6 +2731,7 @@
             <div id="fm-events-panel" style="display:none; margin-top:12px; padding:12px 14px; background:#F7F8FB; border:1px solid var(--line); border-radius:10px;"></div>
           </div>
 <!-- ===== FIRMAS-CARD-END ===== -->
+
 
 
 
@@ -16518,6 +16521,7 @@ async function saSaveSettings(){
 
 
 
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -16539,6 +16543,14 @@ const FM_STATUS_UI = {
   procesando: { text: '⏳ Procesando firma',   cls: 'pending' },
   cancelado:  { text: 'Cancelado',            cls: 'gray'    }
 };
+function fmEventLabel(e){
+  const d = e.detail || {};
+  if(d.kind === 'signed_copy'){
+    const who = d.to === 'cliente' ? 'al cliente' : 'a la agencia';
+    return (e.event === 'emailed' ? 'Se mandó la copia del documento firmado ' : 'No se pudo mandar la copia del firmado ') + who + (d.emails && d.emails.length ? ' (' + d.emails.join(', ') + ')' : '');
+  }
+  return FM_EVENT_LABELS[e.event] || e.event;
+}
 const FM_EVENT_LABELS = {
   created: 'Se creó la solicitud', link_issued: 'Se generó el link', emailed: 'Se mandó el link por correo',
   email_failed: 'No se pudo mandar el correo', viewed: 'El cliente abrió el link', submitted: 'El cliente envió su firma',
@@ -16596,7 +16608,7 @@ function fmLoadPdfJs(){
 // =============== VENTANA «FIRMAR DOCUMENTO» ===============
 function fmReset(){
   FM.source = 'upload'; FM.template = null; FM.bytes = null; FM.pdf = null; FM.pages = []; FM.fields = []; FM.sel = null;
-  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false;
+  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false; FM.reopen = null;
   const pg = document.getElementById('fm-pages'); if(pg) pg.innerHTML = '';
   ['fm-msg1', 'fm-msg2', 'fm-msg3'].forEach(id => fmMsg(id, '', ''));
   const t = document.getElementById('fm-title'); if(t) t.value = '';
@@ -16769,12 +16781,15 @@ async function fmStart(){
   fmMsg('fm-msg1', '', '');
   const title = document.getElementById('fm-title').value.replace(/\s+/g, ' ').trim();
   if(!title){ fmMsg('fm-msg1', 'error', 'Escribe el título del documento (por ejemplo: «Cambio de dirección»).'); return; }
-  const useTpl = document.getElementById('fm-src-template').checked;
+  const useTpl = !FM.reopen && document.getElementById('fm-src-template').checked;
   FM.busy = true;
   const btn = document.getElementById('fm-start-btn'); btn.disabled = true; btn.textContent = 'Abriendo el documento…';
   try{
     let bytes, tpl = null, fields = [];
-    if(useTpl){
+    if(FM.reopen){
+      bytes = FM.reopen.bytes.slice();
+      fields = JSON.parse(JSON.stringify(FM.reopen.fields || []));
+    }else if(useTpl){
       tpl = FM.templates.find(x => x.id === document.getElementById('fm-tpl-select').value);
       if(!tpl) throw new Error('Elige una plantilla.');
       const { url } = await fmCall({ action: 'template_url', id: tpl.id });
@@ -16796,7 +16811,7 @@ async function fmStart(){
     // Muchos PDF legales vienen «protegidos» (permisos): se abren normal pero el servidor no los puede escribir.
     // Se convierten aquí mismo en una copia normal (cada página como imagen) para poder ponerle campos y firmarlos.
     let flattened = false;
-    if(!useTpl){
+    if(!useTpl && !FM.reopen){
       let prot = false; try{ prot = (await doc.getPermissions()) != null; }catch(e){}
       if(prot){
         btn.textContent = 'Preparando el PDF protegido…';
@@ -16820,6 +16835,10 @@ async function fmStart(){
     fmStep(2);
     await fmRenderPages();
     fmRenderFields(); fmRenderProps(); fmSizeBars(); fmUpdateCurPage();
+    if(FM.reopen){
+      fmMsg('fm-msg2', 'success', 'Reabierto desde «' + FM.reopen.from + '». Cambia lo que necesites (campos, nombres, obligatorios…) y toca «Crear link de firma»: se crea un documento NUEVO para firmar. ' + (FM.reopen.replaces ? 'El link anterior (que no se había firmado) se cancela solo.' : 'El documento anterior se conserva tal cual en Documentos.'));
+      setTimeout(() => { const m = document.getElementById('fm-msg2'); if(m && m.classList.contains('success')) fmMsg('fm-msg2', '', ''); }, 20000);
+    }
     if(flattened){
       fmMsg('fm-msg2', 'success', 'Este PDF venía protegido, así que lo convertí en una copia normal para poder firmarlo. Se ve igual (solo que el texto ya no se puede seleccionar).');
       setTimeout(() => { const m = document.getElementById('fm-msg2'); if(m && m.classList.contains('success')) fmMsg('fm-msg2', '', ''); }, 12000);
@@ -17014,6 +17033,7 @@ async function fmCreate(){
     if(document.getElementById('fm-send-email').checked && FM.client && FM.client.email) body.emailTo = FM.client.email;
     const r = await fmCall(body);
     FM.created = r;
+    if(FM.reopen && FM.reopen.replaces){ try{ await fmCall({ action: 'cancel', requestId: FM.reopen.replaces }); r.replacedOld = true; }catch(e){ r.replacedOld = false; } }
     fmShowDone(r);
   }catch(e){ fmMsg('fm-msg2', 'error', e.message); }
   FM.busy = false; btn.disabled = false; btn.textContent = 'Crear link de firma →';
@@ -17029,6 +17049,7 @@ function fmShowDone(r){
   else fmMsg('fm-msg3', 'success', '✓ Link creado. Cópialo y mándaselo al cliente (mensaje de texto, WhatsApp, etc.).');
   const hasEmail = FM.client && FM.client.email;
   document.getElementById('fm-done-email-btn').style.display = (r.emailed || !hasEmail) ? 'none' : 'inline-block';
+  if(r.replacedOld) fmMsg('fm-msg3', document.getElementById('fm-msg3').className.includes('error') ? 'error' : 'success', document.getElementById('fm-msg3').textContent + ' (El link anterior sin firmar se canceló.)');
   fmCopyText(r.link).catch(() => {});
 }
 async function fmCopyText(text){
@@ -17088,6 +17109,8 @@ async function fmLoadCard(clientId){
       acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px; color:#B23A3A;" onclick="fmCardCancel('${r.id}')">Cancelar</button> `;
     }
     if(r.status === 'firmado') acts += `<button class="btn-primary" style="width:auto; padding:6px 12px; margin:0;" onclick="fmCardDownload('${r.id}')">⬇ Descargar firmado</button> `;
+    acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardDownload('${r.id}', 'original')" title="El PDF tal cual se mandó, sin firmar, por si lo quieres editar por fuera">⬇ Original</button> `;
+    acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardReopen('${r.id}')" title="Abre el documento otra vez para cambiar los campos y mandarlo de nuevo">✏️ Reabrir y editar</button> `;
     acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardEvents('${r.id}')">Historial</button>`;
     return `<tr>
       <td data-label="Fecha">${formatDateTimeUS(r.created_at)}${r.created_by_name ? '<div class="sub" style="margin:0;">por ' + fmEsc(r.created_by_name) + '</div>' : ''}</td>
@@ -17133,24 +17156,44 @@ async function fmCardCancel(id){
   try{ await fmCall({ action: 'cancel', requestId: id }); fmMsg('fm-card-msg', 'success', 'Documento cancelado.'); fmRefreshCardSoon(currentClientId); }
   catch(e){ fmMsg('fm-card-msg', 'error', e.message); }
 }
-async function fmCardDownload(id){
+async function fmCardDownload(id, kind){
   // Se abre la pestaña ANTES de pedir el link (si no, Safari/iPhone bloquean la ventana emergente).
   let win = null; try{ win = window.open('', '_blank'); }catch(e){}
   try{
-    const r = await fmCall({ action: 'signed_url', requestId: id, kind: 'signed' });
+    const r = await fmCall({ action: 'signed_url', requestId: id, kind: kind === 'original' ? 'original' : 'signed' });
     if(win){ win.location.href = r.url; } else { window.location.href = r.url; }
   }catch(e){ if(win){ try{ win.close(); }catch(_){} } fmMsg('fm-card-msg', 'error', e.message); }
+}
+// Reabrir un documento (firmado, pendiente, cancelado o vencido) para editar sus campos y mandarlo de nuevo.
+// Lo firmado NUNCA se modifica (es la prueba): se crea una solicitud nueva con el mismo PDF original.
+async function fmCardReopen(id){
+  const clientId = currentClientId; if(!clientId) return;
+  fmMsg('fm-card-msg', 'success', 'Abriendo el documento para editarlo…');
+  try{
+    const q = await sb.from('sign_requests').select('id,title,status,fields,client_id').eq('id', id).single();
+    if(q.error || !q.data) throw new Error('No se pudo leer el documento.');
+    const row = q.data;
+    if(row.status === 'pendiente' && !confirm('Este documento todavía NO se ha firmado. Si lo reabres y creas el link nuevo, el link anterior se cancela y deja de servir. ¿Continuar?')) { fmMsg('fm-card-msg', '', ''); return; }
+    const u = await fmCall({ action: 'signed_url', requestId: id, kind: 'original' });
+    const resp = await fetch(u.url); if(!resp.ok) throw new Error('No se pudo leer el PDF original.');
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    await fmOpen(clientId);
+    FM.reopen = { bytes, fields: row.fields || [], replaces: row.status === 'pendiente' ? id : null, from: row.title };
+    document.getElementById('fm-title').value = row.title;
+    fmMsg('fm-card-msg', '', '');
+    await fmStart();
+  }catch(e){ fmMsg('fm-card-msg', 'error', e.message || String(e)); }
 }
 async function fmCardEvents(id){
   const panel = document.getElementById('fm-events-panel'); if(!panel) return;
   if(panel.dataset.id === id && panel.style.display === 'block'){ panel.style.display = 'none'; return; }
   panel.dataset.id = id; panel.style.display = 'block'; panel.innerHTML = '<p class="sub">Cargando…</p>';
   try{
-    const r = await sb.from('sign_events').select('event,at,ip,user_agent').eq('request_id', id).order('at', { ascending: true });
+    const r = await sb.from('sign_events').select('event,at,ip,user_agent,detail').eq('request_id', id).order('at', { ascending: true });
     if(r.error) throw r.error;
     const isAdm = typeof isAdminUser === 'function' && isAdminUser();
     panel.innerHTML = '<h5 style="margin:0 0 8px;">Historial de este documento</h5>' + ((r.data || []).map(e =>
-      `<div style="display:flex; gap:10px; padding:5px 0; border-bottom:1px solid var(--line); font-size:13.5px; flex-wrap:wrap;"><span style="min-width:150px; color:var(--slate-light);">${formatDateTimeUS(e.at)}</span><span>${fmEsc(FM_EVENT_LABELS[e.event] || e.event)}</span>${isAdm && e.ip ? '<span style="color:var(--slate-light);">· IP ' + fmEsc(e.ip) + '</span>' : ''}</div>`).join('') || '<p class="sub">Sin movimientos.</p>')
+      `<div style="display:flex; gap:10px; padding:5px 0; border-bottom:1px solid var(--line); font-size:13.5px; flex-wrap:wrap;"><span style="min-width:150px; color:var(--slate-light);">${formatDateTimeUS(e.at)}</span><span>${fmEsc(fmEventLabel(e))}</span>${isAdm && e.ip ? '<span style="color:var(--slate-light);">· IP ' + fmEsc(e.ip) + '</span>' : ''}</div>`).join('') || '<p class="sub">Sin movimientos.</p>')
       + '<p class="sub" style="margin:8px 0 0; font-size:12.5px;">La constancia de firma (nombre, fecha y hora, IP, dispositivo y huella del documento) viene en la última página del PDF firmado.</p>';
   }catch(e){ panel.innerHTML = '<p class="sub" style="color:#B23A3A;">No se pudo cargar el historial: ' + fmEsc(e.message || e) + '</p>'; }
 }
