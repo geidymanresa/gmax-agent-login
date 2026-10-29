@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <title>Firmar documento — GMAX All Insurance</title>
@@ -18,7 +18,7 @@
   body{ font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--ink); line-height:1.45; -webkit-text-size-adjust:100%; }
   header{ background:var(--navy); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; }
   header b{ font-size:17px; letter-spacing:.2px; } header span{ font-size:12.5px; opacity:.75; }
-  main{ max-width:880px; margin:0 auto; padding:14px 14px 120px; }
+  main{ max-width:880px; margin:0 auto; padding:14px 14px 150px; }
   h1{ font-size:20px; margin:6px 0 4px; } p{ margin:6px 0; } .sub{ color:var(--slate); font-size:14px; }
   .card{ background:#fff; border:1.5px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px; }
   .center{ text-align:center; padding:34px 16px; }
@@ -27,39 +27,65 @@
   .btn:disabled{ opacity:.45; cursor:default; } .btn.ghost{ background:#fff; color:var(--navy); border:1.5px solid var(--line); } .btn.green{ background:var(--green); }
   .err{ background:#FDEAEA; color:#B23A3A; border-radius:10px; padding:10px 12px; margin:10px 0; font-size:14.5px; } .okm{ background:#E9F7F0; color:var(--green); border-radius:10px; padding:10px 12px; margin:10px 0; }
   .progress{ height:8px; background:#E7EAF2; border-radius:99px; overflow:hidden; margin:8px 0 2px; } .progress i{ display:block; height:100%; background:var(--green); width:0; transition:width .25s; }
-  #pages{ margin-top:10px; }
-  .page{ position:relative; margin:0 auto 14px; background:#fff; box-shadow:0 2px 10px rgba(13,20,36,.18); width:100%; max-width:820px; }
+  #pages{ margin-top:10px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  #pages.zoomed .page{ max-width:none; margin-left:0; margin-right:0; }
+  .page{ position:relative; margin:0 auto 14px; background:#fff; box-shadow:0 2px 10px rgba(13,20,36,.18); width:calc(100% * var(--z, 1)); max-width:820px; }
   .page canvas{ display:block; width:100%; height:auto; }
   .ptag{ position:absolute; top:0; left:0; background:var(--navy); color:#fff; font-size:11px; padding:2px 8px; border-radius:0 0 6px 0; opacity:.85; pointer-events:none; }
-  .pf{ position:absolute; border:2px solid var(--blue); background:rgba(37,99,235,.14); border-radius:5px; padding:0 4px; display:flex; align-items:center; overflow:hidden; cursor:pointer; font:inherit; color:var(--blue); text-align:left; }
+  .pf{ position:absolute; border:2px solid var(--blue); background:rgba(37,99,235,.14); border-radius:5px; padding:0 4px; display:flex; align-items:center; overflow:visible; cursor:pointer; font:inherit; color:var(--blue); text-align:left; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+  /* zona táctil mínima de 44px aunque el recuadro sea pequeño (la posición visual NO cambia) */
+  .pf::after{ content:''; position:absolute; left:50%; top:50%; width:max(100%, 44px); height:max(100%, 44px); transform:translate(-50%,-50%); }
   .pf.sigf{ border-color:var(--red); background:rgba(194,59,59,.13); color:var(--red); }
   .pf.opt{ border-style:dashed; }
   .pf.ini{ border-color:#BE185D; background:rgba(190,24,93,.11); color:#BE185D; justify-content:center; }
-  .pf.chk{ border-color:#0891B2; background:rgba(8,145,178,.14); color:#0A1A5C; overflow:visible; justify-content:center; padding:0; }
+  .pf.chk{ border-color:#0891B2; background:rgba(8,145,178,.14); color:#0A1A5C; justify-content:center; padding:0; }
   .pf.chk .cx{ font-weight:800; line-height:1; color:#0A1A5C; }
-  .pf.chk .cl{ position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:6px; background:rgba(255,255,255,.95); border:1px solid #9EC9D6; border-radius:6px; padding:2px 7px; font-size:12px !important; font-weight:700; color:#0B5E73; white-space:nowrap; pointer-events:none; max-width:70vw; overflow:hidden; text-overflow:ellipsis; }
+  .pf.chk .cl{ position:absolute; left:100%; top:50%; transform:translateY(-50%); margin-left:6px; background:rgba(255,255,255,.96); border:1px solid #9EC9D6; border-radius:6px; padding:2px 7px; font-size:12px !important; line-height:1.2; font-weight:700; color:#0B5E73; white-space:normal; width:max-content; max-width:60vw; pointer-events:none; z-index:2; }
   .pf.chk .cl.left{ left:auto; right:100%; margin-left:0; margin-right:6px; }
   .pf.chk.done .cl{ opacity:.0; }
   .pf.chk.done{ background:rgba(23,122,84,.10); border-color:var(--green); }
   .pf.done{ background:rgba(23,122,84,.10); border-color:var(--green); color:var(--ink); }
   .pf.next{ animation:pulse 1.2s infinite; }
   @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(37,99,235,.55);} 50%{ box-shadow:0 0 0 7px rgba(37,99,235,0);} }
-  .pl{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .pv{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#0A1A5C; }
-  .pf img{ max-width:100%; max-height:100%; display:block; margin:0 auto; }
-  .bar{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1.5px solid var(--line); padding:10px 14px calc(10px + env(safe-area-inset-bottom)); display:flex; gap:10px; align-items:center; justify-content:center; z-index:20; }
-  .bar .btn{ flex:1; max-width:420px; }
+  .pl{ display:block; max-width:100%; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .pv{ display:block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#0A1A5C; }
+  .pf img{ max-width:100%; max-height:100%; display:block; margin:0 auto; pointer-events:none; }
+  .bar{ position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1.5px solid var(--line); padding:8px 14px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:6px; align-items:center; justify-content:center; z-index:20; }
+  .bar .btn{ width:100%; max-width:420px; min-height:50px; touch-action:manipulation; }
+  .bartxt{ font-size:13px; color:var(--slate); font-weight:600; }
+  .bar .progress{ width:100%; max-width:420px; margin:0; height:6px; }
+  .zoom{ position:fixed; right:10px; bottom:calc(var(--barh, 110px) + 10px); z-index:19; display:flex; align-items:center; gap:2px; background:#fff; border:1.5px solid var(--line); border-radius:99px; box-shadow:0 2px 10px rgba(13,20,36,.22); padding:3px; }
+  .zoom button{ width:44px; height:44px; border:0; border-radius:99px; background:#fff; color:var(--navy); font-size:24px; font-weight:700; line-height:1; cursor:pointer; touch-action:manipulation; }
+  .zoom button:disabled{ opacity:.3; } .zoom span{ min-width:46px; text-align:center; font-size:12.5px; font-weight:700; color:var(--slate); }
   .backdrop{ position:fixed; inset:0; background:rgba(13,20,36,.55); z-index:40; display:none; }
-  .sheet{ position:fixed; left:0; right:0; bottom:0; max-height:92vh; overflow-y:auto; background:#fff; border-radius:18px 18px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); z-index:41; display:none; max-width:640px; margin:0 auto; box-shadow:0 -6px 30px rgba(0,0,0,.25); }
+  .sheet{ position:fixed; left:0; right:0; bottom:0; max-height:92vh; max-height:92dvh; overscroll-behavior:contain; overflow-y:auto; background:#fff; border-radius:18px 18px 0 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); z-index:41; display:none; max-width:640px; margin:0 auto; box-shadow:0 -6px 30px rgba(0,0,0,.25); }
   .sheet h2{ font-size:18px; margin:0 0 4px; } label.l{ display:block; font-size:13px; font-weight:700; margin:12px 0 5px; }
-  input[type=text]{ width:100%; padding:13px 12px; border:1.5px solid #C9CEDB; border-radius:10px; font-size:17px; font-family:inherit; }
+  input[type=text]{ width:100%; min-height:48px; padding:13px 12px; border:1.5px solid #C9CEDB; border-radius:10px; font-size:17px; font-family:inherit; }
   input[type=text]:focus{ outline:2px solid var(--blue); border-color:var(--blue); }
   textarea{ width:100%; padding:12px; border:1.5px solid #C9CEDB; border-radius:10px; font-size:17px; font-family:inherit; min-height:110px; }
-  .row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; } .row .btn{ flex:1; min-width:130px; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; } .row .btn{ flex:1; min-width:130px; min-height:48px; touch-action:manipulation; }
   #padwrap{ border:2px dashed #9AA3B8; border-radius:12px; background:#FCFCFE; touch-action:none; position:relative; }
   #pad{ display:block; width:100%; height:200px; touch-action:none; } #padhint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#A3AABB; font-size:16px; pointer-events:none; }
   .sum{ border:1px solid var(--line); border-radius:10px; overflow:hidden; } .sum div{ display:flex; justify-content:space-between; gap:10px; padding:8px 10px; border-bottom:1px solid var(--line); font-size:14px; } .sum div:last-child{ border-bottom:0; } .sum b{ color:var(--slate); font-weight:600; } .sum span{ text-align:right; word-break:break-word; }
-  .chk{ display:flex; gap:10px; align-items:flex-start; margin:14px 0 4px; font-size:14.5px; } .chk input{ width:22px; height:22px; margin-top:2px; flex:none; }
+  .consentrow{ display:flex; gap:10px; align-items:flex-start; margin:14px 0 4px; font-size:14.5px; } .consentrow input{ width:24px; height:24px; margin-top:2px; flex:none; }
   footer{ text-align:center; color:#8A93A6; font-size:12px; padding:0 14px 22px; }
+  /* ---- teléfono: la hoja del documento usa casi todo el ancho ---- */
+  @media (max-width:600px){
+    header{ padding:10px 12px; flex-wrap:wrap; gap:2px 10px; } header b{ font-size:16px; }
+    main{ padding:8px 6px 150px; }
+    .card{ padding:12px; border-radius:12px; } h1{ font-size:18px; }
+    .page{ margin-bottom:10px; }
+    .sheet{ border-radius:16px 16px 0 0; padding:14px 12px calc(14px + env(safe-area-inset-bottom)); }
+    .sheet h2{ font-size:17px; }
+    .row .btn{ min-width:0; }
+    footer{ padding:0 12px 16px; }
+  }
+  /* ---- teléfono acostado: poca altura ---- */
+  @media (max-height:520px) and (orientation:landscape){
+    .sheet{ max-height:100vh; max-height:100dvh; border-radius:0; max-width:none; }
+    .bar{ flex-direction:row; padding-top:6px; padding-bottom:calc(6px + env(safe-area-inset-bottom)); } .bar .progress{ display:none; }
+    .bar .btn{ min-height:44px; width:auto; flex:1; }
+    header{ display:none; }
+  }
 </style>
 </head>
 <body>
@@ -80,7 +106,8 @@
   var API = SUPABASE_URL + '/functions/v1/sign-public';
   var PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
   var t0 = Date.now();
-  var S = { token: '', data: null, values: {}, sig: null, initials: null, pages: [], busy: false, nextIds: [] };
+  var S = { token: '', data: null, values: {}, sig: null, initials: null, pages: [], busy: false, nextIds: [], pdf: null, zoom: 1, renderGen: 0, tasks: [], lastW: 0 };
+  var ZOOMS = [1, 1.5, 2, 2.5];
 
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
@@ -131,27 +158,33 @@
     d.fields.forEach(function(f){ if(f.type === 'date' && d.today) S.values[f.id] = d.today; });
     setMain('<div class="card"><h1>' + esc(d.title) + '</h1><p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
       + '<div class="progress"><i id="pbar"></i></div><div class="sub" id="ptxt"></div></div><div id="msgbox"></div><div id="pages"></div>');
-    var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<button class="btn" id="nextbtn">Siguiente →</button>'; document.body.appendChild(bar);
+    var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<div class="bartxt" id="btxt"></div><div class="progress"><i id="pbar2"></i></div><button class="btn" id="nextbtn">Siguiente →</button>'; document.body.appendChild(bar);
     $('nextbtn').addEventListener('click', onNext);
+    var zc = document.createElement('div'); zc.className = 'zoom'; zc.id = 'zoomc'; zc.innerHTML = '<button type="button" id="zout" aria-label="Alejar">−</button><span id="zlbl">100%</span><button type="button" id="zin" aria-label="Acercar">+</button>'; document.body.appendChild(zc);
+    $('zout').addEventListener('click', function(){ setZoom(-1); }); $('zin').addEventListener('click', function(){ setZoom(1); });
     try{
       var pdfjs = await loadPdfJs();
       var buf = await (await fetch(d.pdfUrl)).arrayBuffer();
       var doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-      await renderPages(doc);
+      S.pdf = doc; await renderPages(doc);
     }catch(e){ msgScreen('📄', 'No se pudo mostrar el documento', esc(e.message || 'Intenta de nuevo.'), '<p><button class="btn" onclick="location.reload()">Intentar de nuevo</button></p>'); return; }
-    refresh();
-    window.addEventListener('resize', layout);
+    refresh(); syncBar();
+    var rt; window.addEventListener('resize', function(){ layout(); syncBar(); clearTimeout(rt); rt = setTimeout(function(){ var w = $('pages') ? $('pages').clientWidth : 0; if(w && Math.abs(w - S.lastW) > S.lastW * 0.12) drawCanvases(); }, 300); });
+    window.addEventListener('orientationchange', function(){ setTimeout(function(){ layout(); syncBar(); drawCanvases(); }, 350); });
+    if(window.visualViewport){ var vv = window.visualViewport; var fit = function(){ var sh = $('sheet'); if(!sh || sh.style.display !== 'block') return; var off = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); sh.style.bottom = off + 'px'; sh.style.maxHeight = Math.round(vv.height * 0.94) + 'px'; }; vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
   }
+  function syncBar(){ var b = document.querySelector('.bar'); if(b) document.documentElement.style.setProperty('--barh', b.offsetHeight + 'px'); }
 
+  // Las posiciones de los campos se guardan como FRACCIÓN de la página (0 a 1), por eso se quedan exactamente donde
+  // se pusieron en el editor, sin importar si la pantalla es de teléfono o de PC, ni cuánto se acerque el documento.
   async function renderPages(doc){
-    var wrap = $('pages'); var cssW = Math.min(820, Math.max(260, wrap.clientWidth || 360)); var dpr = Math.min(2, window.devicePixelRatio || 1);
+    var wrap = $('pages');
     for(var i = 1; i <= doc.numPages; i++){
-      var page = await doc.getPage(i); var v1 = page.getViewport({ scale: 1 }); var vp = page.getViewport({ scale: (cssW * dpr) / v1.width });
+      var page = await doc.getPage(i); var v1 = page.getViewport({ scale: 1 });
       var el = document.createElement('div'); el.className = 'page'; el.dataset.page = String(i);
-      var cv = document.createElement('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height); el.appendChild(cv);
+      var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(v1.width)); cv.height = Math.max(1, Math.round(v1.height)); el.appendChild(cv);
       var tg = document.createElement('div'); tg.className = 'ptag'; tg.textContent = 'Página ' + i + ' de ' + doc.numPages; el.appendChild(tg);
       wrap.appendChild(el); S.pages.push(el);
-      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
     }
     S.data.fields.forEach(function(f){
       var pg = S.pages[f.page - 1]; if(!pg) return;
@@ -160,6 +193,30 @@
       b.addEventListener('click', function(){ openField(f.id); });
       pg.appendChild(b);
     });
+    await drawCanvases();
+  }
+  // Dibuja (o vuelve a dibujar nítido) cada página según el ancho real de la pantalla y el zoom.
+  async function drawCanvases(){
+    if(!S.pdf) return;
+    var gen = ++S.renderGen;
+    S.tasks.forEach(function(t){ try{ t.cancel(); }catch(e){} }); S.tasks = [];
+    var wrap = $('pages'); var baseW = Math.max(260, wrap.clientWidth || 360); S.lastW = wrap.clientWidth || 360;
+    var cssW = S.zoom === 1 ? Math.min(baseW, 820) : baseW * S.zoom;
+    var dpr = Math.min(2, window.devicePixelRatio || 1); var px = Math.min(cssW * dpr, 3000);
+    for(var i = 0; i < S.pages.length; i++){
+      if(gen !== S.renderGen) return;
+      var page = await S.pdf.getPage(i + 1); var v1 = page.getViewport({ scale: 1 }); var vp = page.getViewport({ scale: px / v1.width });
+      var cv = S.pages[i].querySelector('canvas'); cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+      var task = page.render({ canvasContext: cv.getContext('2d'), viewport: vp }); S.tasks.push(task);
+      try{ await task.promise; }catch(e){ if(e && e.name === 'RenderingCancelledException') return; }
+    }
+  }
+  function setZoom(dir){
+    var idx = ZOOMS.indexOf(S.zoom); var n = Math.min(ZOOMS.length - 1, Math.max(0, idx + dir)); if(n === idx) return;
+    var de = document.documentElement; var ratio = de.scrollHeight > 0 ? de.scrollTop / de.scrollHeight : 0;
+    S.zoom = ZOOMS[n]; var wrap = $('pages'); wrap.style.setProperty('--z', S.zoom); wrap.classList.toggle('zoomed', S.zoom > 1);
+    $('zlbl').textContent = Math.round(S.zoom * 100) + '%'; $('zout').disabled = n === 0; $('zin').disabled = n === ZOOMS.length - 1;
+    de.scrollTop = ratio * de.scrollHeight; layout(); drawCanvases();
   }
 
   function fieldList(){ return S.data.fields.slice().sort(function(a, b){ return a.page - b.page || a.y - b.y || a.x - b.x; }); }
@@ -186,8 +243,8 @@
   function refresh(){
     var us = units(); var left = us.filter(function(u){ return !u.filled; });
     var done = us.length - left.length;
-    $('pbar').style.width = (us.length ? Math.round(done * 100 / us.length) : 100) + '%';
-    $('ptxt').textContent = us.length ? (done + ' de ' + us.length + ' campos obligatorios listos') : 'Revisa el documento y firma';
+    var pct = (us.length ? Math.round(done * 100 / us.length) : 100) + '%'; $('pbar').style.width = pct; if($('pbar2')) $('pbar2').style.width = pct;
+    var ptxt = us.length ? (done + ' de ' + us.length + ' campos obligatorios listos') : 'Revisa el documento y firma'; $('ptxt').textContent = ptxt; if($('btxt')) $('btxt').textContent = ptxt;
     S.nextIds = left.length ? left[0].ids : [];
     document.querySelectorAll('.pf').forEach(function(b){
       var f = S.data.fields.find(function(x){ return x.id === b.dataset.id; });
@@ -207,7 +264,9 @@
     layout();
   }
   function layout(){
-    document.querySelectorAll('.pf').forEach(function(b){ var h = b.clientHeight; var fs = Math.max(9, Math.min(b.classList.contains('chk') ? 22 : 15, h * 0.58)); b.style.fontSize = fs + 'px'; });
+    document.querySelectorAll('.pf').forEach(function(b){ var h = b.clientHeight; var fs = Math.max(10, Math.min(b.classList.contains('chk') ? 22 : 16, h * 0.58)); b.style.fontSize = fs + 'px'; });
+    // el rótulo de cada casilla no debe salirse de la pantalla: se limita al espacio que hay a su lado
+    document.querySelectorAll('.pf.chk .cl').forEach(function(cl){ var b = cl.parentNode; var pg = b.parentNode; var left = cl.classList.contains('left'); var room = left ? b.offsetLeft : (pg.clientWidth - b.offsetLeft - b.offsetWidth); cl.style.maxWidth = Math.max(70, Math.min(room - 10, window.innerWidth * 0.8)) + 'px'; });
   }
   function note(text){ var m = $('msgbox'); if(!m) return; m.innerHTML = '<div class="err" style="background:#E8F3FB; color:#0B4F7A;">' + esc(text) + '</div>'; clearTimeout(note.t); note.t = setTimeout(function(){ m.innerHTML = ''; }, 4500); }
   function goField(id){
@@ -224,7 +283,7 @@
 
   // ---------- hoja inferior ----------
   function showSheet(html){ $('sheet').innerHTML = html; $('sheet').style.display = 'block'; $('backdrop').style.display = 'block'; $('sheet').scrollTop = 0; document.body.style.overflow = 'hidden'; }
-  function closeSheet(){ $('sheet').style.display = 'none'; $('backdrop').style.display = 'none'; $('sheet').innerHTML = ''; document.body.style.overflow = ''; }
+  function closeSheet(){ $('sheet').style.bottom = ''; $('sheet').style.maxHeight = ''; $('sheet').style.display = 'none'; $('backdrop').style.display = 'none'; $('sheet').innerHTML = ''; document.body.style.overflow = ''; }
   $('backdrop').addEventListener('click', closeSheet);
 
   function maskDate(v){ var d = v.replace(/\D/g, '').slice(0, 8); var o = d.slice(0, 2); if(d.length > 2) o += '/' + d.slice(2, 4); if(d.length > 4) o += '/' + d.slice(4); return o; }
@@ -317,7 +376,7 @@
   }
   function setupPad(cfg){
     var cv = $('pad'); var dpr = Math.min(2, window.devicePixelRatio || 1);
-    var w = cv.clientWidth || 300, h = cfg.h; cv.style.height = h + 'px'; cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr);
+    var w = cv.clientWidth || 300, h = Math.max(120, Math.min(cfg.h, Math.round((window.innerHeight || 600) * 0.34))); cv.style.height = h + 'px'; cv.width = Math.floor(w * dpr); cv.height = Math.floor(h * dpr);
     var ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.6; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#0A1A5C';
     var drawing = false, last = null, len = 0, minX = 1e9, minY = 1e9, maxX = -1, maxY = -1;
     function pt(e){ var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * (w / r.width), y: (e.clientY - r.top) * (h / r.height) }; }
@@ -346,7 +405,7 @@
       + (rows ? '<div class="sum">' + rows + '</div>' : '') + (S.sig ? '<div style="text-align:center; margin:10px 0;"><img alt="Tu firma" src="' + S.sig + '" style="max-height:80px; max-width:80%;"></div>' : '')
       + '<div class="err" id="ferr" style="display:none;"></div>'
       + '<label class="l" for="sname">Escribe tu nombre completo <span style="color:#C23B3B">*</span></label><input type="text" id="sname" maxlength="120" value="' + esc(firstName) + '" autocomplete="name">'
-      + '<label class="chk"><input type="checkbox" id="consent"><span>Acepto firmar este documento de forma electrónica. Entiendo que mi firma electrónica tiene el mismo valor que mi firma a mano y que el documento firmado quedará guardado en el expediente de GMAX All Insurance.</span></label>'
+      + '<label class="consentrow"><input type="checkbox" id="consent"><span>Acepto firmar este documento de forma electrónica. Entiendo que mi firma electrónica tiene el mismo valor que mi firma a mano y que el documento firmado quedará guardado en el expediente de GMAX All Insurance.</span></label>'
       + '<div class="row"><button type="button" class="btn ghost" id="rcancel">Volver</button><button type="button" class="btn green" id="rsend" disabled>Firmar y enviar</button></div>');
     var chk = $('consent'), nm = $('sname'), send = $('rsend');
     function upd(){ send.disabled = !(chk.checked && nm.value.trim().length >= 2); }
