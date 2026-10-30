@@ -12328,7 +12328,7 @@
     if(!confirm((later ? '¿Programar el cobro de $' + bd.total.toFixed(2) + ' a la tarjeta de ' + who + ' para el ' + formatDateUS(nx.chargeOn) + '?' : '¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + who + ' ahora?') + '\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))){ ventureToast('Se guardaron los cambios. El cobro no se programó.'); return; }
     try{
       const { data: { session } } = await sb.auth.getSession();
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'POST',
+      const resp = await fetch(CHARGE_SAVED_CARD_URL, { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ policyId, dueDate: nx.due, amount: nx.amount, requestId: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), chargeOn: nx.chargeOn }) });
       const data = await resp.json().catch(() => ({}));
@@ -12585,6 +12585,9 @@
   // ---------- 💳 Toca cobrar (monto variable) ----------
   // Pólizas con el modo «variable»: 3 días antes de que le toque pagar a Venture sale aquí (y el servidor te manda el correo).
   // Tú pones el monto que pide Venture ese mes y procesas el cobro; después sale en «Pagar en Venture».
+  // Nombre (slug) de la función de cobro en Supabase → Edge Functions. En tu proyecto quedó creada como «charge-saved-card-» (con un guion al final).
+  // Si algún día la vuelves a crear con el nombre limpio «charge-saved-card», cambia SOLO esta línea.
+  const CHARGE_SAVED_CARD_URL = SUPABASE_URL + '/functions/v1/charge-saved-card-';
   const VENTURE_DUE_OVERDUE_DAYS = 5;   // si no se cobró a tiempo, sigue saliendo hasta 5 días después de la fecha
   let ventureDueKnownKeys = null;
   const ventureBadge = { pay: 0, due: 0 };
@@ -12753,7 +12756,7 @@
       const btn = document.getElementById('vcGo'); btn.disabled = true; btn.textContent = later ? 'Programando…' : 'Cobrando…';
       try{
         const { data: { session } } = await sb.auth.getSession();
-        const resp = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'POST',
+        const resp = await fetch(CHARGE_SAVED_CARD_URL, { method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
           body: JSON.stringify({ policyId, dueDate: dueISO, amount, requestId, chargeOn }) });
         const data = await resp.json().catch(() => ({}));
@@ -12786,7 +12789,7 @@
       if(ch && ch.length) return 'Ojo: el cobro SÍ quedó registrado. Revisa el historial de la póliza y recarga Inicio.';
     }catch(e){}
     let alive = false;
-    try{ const r = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'OPTIONS' }); alive = r.ok || r.status === 204; }catch(e){ alive = false; }
+    try{ const r = await fetch(CHARGE_SAVED_CARD_URL, { method: 'OPTIONS' }); alive = r.ok || r.status === 204; }catch(e){ alive = false; }
     if(!alive) return 'NO se cobró nada. El CRM no pudo comunicarse con la función «charge-saved-card» de Supabase: lo más probable es que todavía no esté desplegada (o se llame distinto). Despliega el archivo edge-function-charge-saved-card.ts en Supabase → Edge Functions con el nombre exacto charge-saved-card y vuelve a intentar.';
     return 'NO quedó registrado ningún cobro de ese pago. La función respondió mal o se cortó la conexión; recarga la página e inténtalo otra vez. Si se repite, avísame con una captura.';
   }
@@ -12799,7 +12802,7 @@
     if(!confirm('¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + who + ' ahora (pago con vencimiento el ' + formatDateUS(dueISO) + ')?\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))) return;
     try{
       const { data: { session } } = await sb.auth.getSession();
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'POST',
+      const resp = await fetch(CHARGE_SAVED_CARD_URL, { method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
         body: JSON.stringify({ policyId, dueDate: dueISO, requestId: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }) });
       const data = await resp.json().catch(() => ({}));
