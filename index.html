@@ -1390,7 +1390,7 @@
                (run-venture-payments). Requiere migracion_modos_pago_venture.sql. -->
           <div class="dash-card" id="ventureDueCard" style="display:none; margin:0; background:#EAF0FF; border:2px solid #2B3F8C;">
             <div style="display:inline-block; background:#2B3F8C; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">💳 Acción: cobrar</div>
-            <h4 style="margin-top:0; color:#1E2C6B;">Ya les toca pagar — pon el monto que pide Venture y cobra</h4>
+            <h4 style="margin-top:0; color:#1E2C6B;">Pagos por cobrar — monto variable (pon el monto) o monto fijo que todavía no se ha cobrado</h4>
             <p class="sub" style="margin:0 0 8px;">Después de cobrar, el cliente pasa a «Pagar en Venture» para que hagas el pago dentro de Venture.</p>
             <div id="ventureDueList"></div>
           </div>
@@ -6776,7 +6776,13 @@
       container.innerHTML = `<p class="sub" style="margin:0; color:#C23B3B;">No se pudo cargar el historial: ${error.message}</p>`;
       return;
     }
-    if(!txs || txs.length === 0){
+    // Intentos de cobro automático que FALLARON (no crean transacción, pero también quedan en el historial de la póliza).
+    let failedCharges = [];
+    try{
+      const { data: fc } = await sb.from('client_auto_charges').select('*').eq('policy_id', policyId).eq('status', 'fallido').order('charged_at', { ascending: false });
+      failedCharges = fc || [];
+    }catch(e){ failedCharges = []; }
+    if((!txs || txs.length === 0) && failedCharges.length === 0){
       container.innerHTML = '<p class="sub" style="margin:0;">Todavía no hay transacciones registradas sobre esta póliza.</p>';
       return;
     }
@@ -6785,7 +6791,8 @@
     // lo que haya subido el agente: el endorso o el recibo de la aseguradora).
     // Se consulta directo a la base de datos (en vez de usar el caché de la
     // pestaña Documentos) para que siempre salga lo más reciente.
-    const txIds = txs.map(t => t.id);
+    const txList = txs || [];
+    const txIds = txList.map(t => t.id);
     const { data: docs } = await sb.from('client_documents')
       .select('*')
       .in('receipt_transaction_id', txIds)
@@ -6797,8 +6804,26 @@
       docsByTx[doc.receipt_transaction_id].push(doc);
     }
 
-    const rowsHtml = await Promise.all(txs.map(async t => {
+    const stamp = (iso) => { if(!iso) return ''; const d = new Date(iso); return formatDateUS(toISODateLocal(d)) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+    const money = (n) => '$' + Number(n || 0).toFixed(2);
+    const failedHtml = failedCharges.map(c => `
+        <div style="padding:10px 0; border-bottom:1px solid var(--line);">
+          <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:baseline;">
+            <strong style="color:#B23A3A;">⚠️ Intento de cobro automático — NO se cobró</strong>
+            <span class="sub" style="margin:0;">${stamp(c.charged_at)}${c.total_charged || c.amount ? ' — ' + money(c.total_charged || c.amount) : ''}</span>
+          </div>
+          <div class="sub" style="margin-top:4px; font-size:13px;">${c.due_date ? 'Pago con vencimiento el ' + formatDateUS(String(c.due_date).slice(0, 10)) + '. ' : ''}Motivo: ${escapeHtml(c.failure_reason || 'sin motivo')}</div>
+        </div>`).join('');
+    const rowsHtml = await Promise.all(txList.map(async t => {
       const docsList = docsByTx[t.id] || [];
+      const isAuto = t.transaction_type === 'pago_automatico';
+      const autoHtml = isAuto ? `
+          <div style="margin-top:6px; font-size:13px; background:#F4F6FB; border-radius:8px; padding:8px 10px;">
+            <div><strong>Qué se hizo:</strong> pago asistido automático con la tarjeta${t.card_last4 ? ' ' + escapeHtml(CARD_BRAND_LABELS[t.card_brand] || t.card_brand || '') + ' ••' + escapeHtml(t.card_last4) : ''}.</div>
+            <div><strong>Cobrado el:</strong> ${stamp(t.receipt_issued_at || t.created_at)} — <strong>${money(t.total_reference)}</strong></div>
+            <div><strong>Desglose:</strong> ${money(t.deposit_amount)} para la aseguradora + ${money(t.service_fee_amount)} service fee + ${money(t.processing_fee_estimate)} processing fee</div>
+            ${t.notes ? `<div class="sub" style="font-size:12.5px; margin-top:2px;">${escapeHtml(t.notes)}</div>` : ''}
+          </div>` : '';
       const docsHtml = docsList.length === 0
         ? '<span class="sub" style="font-size:12.5px;">Sin documentos adjuntos todavía.</span>'
         : (await Promise.all(docsList.map(d => documentLinkHtml(d)))).join(' &nbsp;•&nbsp; ');
@@ -6806,8 +6831,9 @@
         <div style="padding:10px 0; border-bottom:1px solid var(--line);">
           <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; align-items:baseline;">
             <strong>${SERVICE_TYPE_LABELS[t.transaction_type] || t.transaction_type}</strong>
-            <span class="sub" style="margin:0;">${formatDateUS(t.created_at?.split('T')[0])} — $${Number(t.total_reference || 0).toFixed(2)}</span>
+            <span class="sub" style="margin:0;">${t.created_at ? formatDateUS(toISODateLocal(new Date(t.created_at))) : ''} — $${Number(t.total_reference || 0).toFixed(2)}</span>
           </div>
+          ${autoHtml}
           <div style="margin-top:6px; font-size:13px;">${docsHtml}</div>
         </div>
       `;
@@ -6815,6 +6841,7 @@
 
     container.innerHTML = `
       <div style="font-size:11.5px; color:var(--slate-light); text-transform:uppercase; letter-spacing:0.03em; font-weight:700; margin-bottom:6px;">📜 Historial de esta póliza</div>
+      ${failedHtml}
       ${rowsHtml.join('')}
     `;
   }
@@ -12184,6 +12211,15 @@
     const startDefault = (editing && curMode === 'fixed' && pol.auto_pay_start_date) ? String(pol.auto_pay_start_date).slice(0, 10) : (dues[0] || '');
     const monthsLeft = (editing && curMode === 'fixed' && pol.auto_pay_months) ? pol.auto_pay_months : (dues.length || 6);
     const amountDefault = (editing && curMode === 'fixed' && pol.auto_pay_fixed_amount) ? Number(pol.auto_pay_fixed_amount) : Number(pol.monthly_payment || 0);
+    // Para el modo variable (al editar): el próximo pago con Venture que todavía no se ha cobrado, para poner monto y fecha de retiro aquí mismo.
+    let nextDue = '';
+    if(editing && pol.auto_pay_enabled){
+      const { data: paidRows } = await sb.from('client_auto_charges').select('due_date').eq('policy_id', policyId).eq('status', 'cobrado');
+      const paidSet = new Set((paidRows || []).filter(r => r.due_date).map(r => String(r.due_date).slice(0, 10)));
+      const { data: schedRows } = await sb.from('venture_scheduled_charges').select('due_date').eq('policy_id', policyId).eq('status', 'programado');
+      const schedSet = new Set((schedRows || []).map(r => String(r.due_date).slice(0, 10)));
+      nextDue = venturePolicyDues({ ...pol, auto_pay_mode: 'variable' }).find(d => d >= isoAddDays(today, -VENTURE_DUE_OVERDUE_DAYS) && !paidSet.has(d) && !schedSet.has(d)) || '';
+    }
     ov = document.createElement('div'); ov.id = 'apModeOverlay';
     ov.style.cssText = 'position:fixed; inset:0; background:rgba(13,20,36,.55); z-index:9000; display:flex; align-items:center; justify-content:center; padding:14px;';
     ov.innerHTML = `
@@ -12196,6 +12232,14 @@
           <div id="apVarBox" style="display:${curMode === 'variable' && editing ? 'block' : 'none'}; margin-top:10px;">
             <div class="sub" style="font-size:12px;">Pago mensual de referencia ($) — es el que sale como sugerido al cobrar</div>
             <input type="text" id="apRef" inputmode="decimal" value="${Number(pol.monthly_payment || 0).toFixed(2)}" style="width:160px;">
+            ${nextDue ? `<div style="margin-top:12px; padding:10px 12px; background:#EAF0FF; border:1.5px solid #C7D3F5; border-radius:10px;">
+              <div style="font-weight:700; font-size:13.5px;">🗓️ Cobrar el próximo pago (opcional)</div>
+              <div class="sub" style="font-size:12.5px; margin:2px 0 8px;">Le toca pagar a Venture el <strong>${formatDateUS(nextDue)}</strong>. Si pones el monto y la fecha, queda programado y se le cobra solo ese día. Si lo dejas vacío, no pasa nada ahora.</div>
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <div><div class="sub" style="font-size:12px;">Monto que pide Venture ($)</div><input type="text" id="apNextAmount" inputmode="decimal" placeholder="0.00" style="width:150px;"></div>
+                <div><div class="sub" style="font-size:12px;">Fecha en que se le saca el dinero</div><input type="text" id="apNextDate" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)" style="width:150px;"></div>
+              </div>
+            </div>` : ''}
           </div>
         </label>
         <label style="display:block; border:2px solid #E4E7EF; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
@@ -12240,6 +12284,13 @@
         const ref = Math.round(Number(String(document.getElementById('apRef').value).replace(/[^0-9.]/g, '')) * 100) / 100;
         if(!(ref > 0)){ err.textContent = 'Escribe el pago mensual de referencia.'; err.style.display = 'block'; return; }
         cfg.ref = ref;
+        const naEl = document.getElementById('apNextAmount'), ndEl = document.getElementById('apNextDate');
+        if(nextDue && naEl && ndEl && (naEl.value.trim() || ndEl.value.trim())){
+          const na = Math.round(Number(String(naEl.value).replace(/[^0-9.]/g, '')) * 100) / 100; const nd = mmddyyyyToISO(ndEl.value);
+          const bad = !(na >= 1 && na <= 10000) ? 'Para programar el cobro escribe el monto que pide Venture (entre $1.00 y $10,000.00).' : !nd ? 'Escribe la fecha en que se le saca el dinero como MM/DD/AAAA.' : nd < today ? 'Esa fecha ya pasó. Pon hoy o una fecha futura.' : nd > isoAddDays(nextDue, 10) ? 'La fecha no puede pasar del ' + formatDateUS(isoAddDays(nextDue, 10)) + ' (10 días después de su fecha de pago).' : '';
+          if(bad){ err.textContent = bad; err.style.display = 'block'; return; }
+          cfg.next = { due: nextDue, amount: na, chargeOn: nd };
+        }
       }
       if(cfg.mode === 'fixed'){
         const amt = Math.round(Number(String(document.getElementById('apAmount').value).replace(/[^0-9.]/g, '')) * 100) / 100;
@@ -12250,8 +12301,42 @@
       }
       document.getElementById('apGo').disabled = true;
       const ok = await finishAutoPayConsent(policyId, cfg, err);
-      if(ok) ov.remove(); else document.getElementById('apGo').disabled = false;
+      if(ok){
+        ov.remove(); if(cfg.next) await ventureChargeFromEdit(policyId, cfg.next);
+        if(cfg.mode === 'fixed' && cfg.savedWithoutNewAuth){
+          // ¿Ya se abrió la ventana de cobro (4 días antes) de algún pago y no se ha cobrado? Se ofrece cobrarlo en este momento.
+          try{
+            await loadVentureDueAlerts();
+            const { data: p2 } = await sb.from('client_policies').select('*').eq('id', policyId).single();
+            const { data: done } = await sb.from('client_auto_charges').select('due_date').eq('policy_id', policyId).eq('status', 'cobrado');
+            const doneSet = new Set((done || []).map(r => String(r.due_date).slice(0, 10)));
+            const tdy = toISODateLocal(new Date());
+            const pend = p2 ? venturePolicyDues(p2).find(d => isoDiffDays(d, tdy) <= AUTOPAY_CHARGE_DAYS_BEFORE && isoDiffDays(d, tdy) >= -VENTURE_DUE_OVERDUE_DAYS && !doneSet.has(d)) : null;
+            if(pend) await ventureChargeFixedNow(policyId, pend);
+          }catch(e){}
+        }
+      } else document.getElementById('apGo').disabled = false;
     };
+  }
+  // Desde «Editar el pago con tarjeta»: programa (o cobra, si la fecha es hoy) el próximo pago de monto variable.
+  async function ventureChargeFromEdit(policyId, nx){
+    const { data: pol } = await sb.from('client_policies').select('insurance_type, client_id').eq('id', policyId).single();
+    const { data: cli } = await sb.from('clients').select('full_name').eq('id', pol ? pol.client_id : currentClientId).single();
+    const svc = pol ? await getAssistedServiceFee(pol.insurance_type) : 0;
+    const bd = monthlyChargeBreakdown(nx.amount, svc || 0);
+    const todayISO = toISODateLocal(new Date()); const later = nx.chargeOn > todayISO; const who = cli ? cli.full_name : 'este cliente';
+    if(!confirm((later ? '¿Programar el cobro de $' + bd.total.toFixed(2) + ' a la tarjeta de ' + who + ' para el ' + formatDateUS(nx.chargeOn) + '?' : '¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + who + ' ahora?') + '\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))){ ventureToast('Se guardaron los cambios. El cobro no se programó.'); return; }
+    try{
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ policyId, dueDate: nx.due, amount: nx.amount, requestId: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10), chargeOn: nx.chargeOn }) });
+      const data = await resp.json().catch(() => ({}));
+      if(resp.ok && data.ok && data.scheduled) ventureToast('🗓️ Programado: el ' + formatDateUS(nx.chargeOn) + ' se le cobrará $' + Number(data.total || bd.total).toFixed(2) + ' a ' + who + ' (Venture $' + nx.amount.toFixed(2) + ')');
+      else if(resp.ok && data.ok) ventureToast('✅ Se le cobró $' + Number(data.total || bd.total).toFixed(2) + ' a ' + who + ' — ahora entra a Venture y paga $' + nx.amount.toFixed(2));
+      else alert(data.error || ('No se pudo programar el cobro (error ' + resp.status + '). Los cambios del pago sí se guardaron.'));
+    }catch(e){ alert('No hubo conexión con el servidor — NO se sabe si el cobro quedó. Revisa Inicio y el historial del cliente antes de volver a intentar.'); }
+    try{ await loadVentureDueAlerts(); await loadVenturePayAlerts(); await loadAutoChargeAlerts(); }catch(e){}
   }
   async function finishAutoPayConsent(policyId, cfg, errEl){
     const showErr = (m) => { if(errEl){ errEl.textContent = m; errEl.style.display = 'block'; } else alert(m); return false; };
@@ -12276,6 +12361,7 @@
     const { error: upErr } = await sb.from('client_policies').update(patch).eq('id', policyId);
     if(upErr) return showErr(/auto_pay_/.test(upErr.message || '') ? 'Falta correr migracion_modos_pago_venture.sql en Supabase (SQL Editor) antes de usar esto.' : 'No se pudo guardar el modo: ' + upErr.message);
     if(!material){
+      cfg.savedWithoutNewAuth = true;
       await loadClientPolicies(currentClientId);
       if(typeof ventureToast === 'function') ventureToast('✓ Cambios guardados. Lo que el cliente ya firmó sigue cubriendo estos cobros.');
       return true;
@@ -12513,12 +12599,14 @@
     const card = document.getElementById('ventureDueCard'); const list = document.getElementById('ventureDueList');
     const hide = () => { if(card) card.style.display = 'none'; ventureBadge.due = 0; updateVentureBadge(); };
     const { data: pols, error } = await sb.from('client_policies').select('*, client:client_id(full_name)')
-      .eq('auto_pay_enabled', true).eq('auto_pay_mode', 'variable').neq('status', 'cancelled');
+      .eq('auto_pay_enabled', true).in('auto_pay_mode', ['variable', 'fixed']).neq('status', 'cancelled');
     if(error || !pols || !pols.length){ hide(); return; }
     const venturePols = pols.filter(p => (p.company || '').toLowerCase().includes('venture'));
     if(!venturePols.length){ hide(); return; }
-    const { data: paidRows } = await sb.from('client_auto_charges').select('policy_id, due_date').eq('status', 'cobrado').in('policy_id', venturePols.map(p => p.id));
-    const paid = new Set((paidRows || []).filter(r => r.due_date).map(r => r.policy_id + '|' + String(r.due_date).slice(0, 10)));
+    const { data: paidRows } = await sb.from('client_auto_charges').select('policy_id, due_date, status, failure_reason').in('status', ['cobrado', 'fallido']).in('policy_id', venturePols.map(p => p.id));
+    const paid = new Set((paidRows || []).filter(r => r.due_date && r.status === 'cobrado').map(r => r.policy_id + '|' + String(r.due_date).slice(0, 10)));
+    const failedBy = {}; (paidRows || []).filter(r => r.due_date && r.status === 'fallido').forEach(r => { failedBy[r.policy_id + '|' + String(r.due_date).slice(0, 10)] = r.failure_reason || 'sin motivo'; });
+    const svcByType = {}; for(const t of new Set(venturePols.filter(p => p.auto_pay_mode === 'fixed').map(p => p.insurance_type))) svcByType[t] = await getAssistedServiceFee(t);
     const today = toISODateLocal(new Date());
     // Cobros ya programados para otro día (se cobran solos ese día con el monto que pusiste).
     const { data: schedRows } = await sb.from('venture_scheduled_charges').select('*').eq('status', 'programado').in('policy_id', venturePols.map(p => p.id));
@@ -12528,6 +12616,12 @@
     venturePols.forEach(p => venturePolicyDues(p).forEach(d => {
       const left = isoDiffDays(d, today);
       const sc = sched[p.id + '|' + d];
+      if(p.auto_pay_mode === 'fixed'){
+        // Monto fijo: el servidor lo cobra solo 4 días antes. Si ya se abrió esa ventana y todavía no hay cobro, sale aquí con «Cobrar ahora».
+        if(left > AUTOPAY_CHARGE_DAYS_BEFORE || left < -VENTURE_DUE_OVERDUE_DAYS || paid.has(p.id + '|' + d)) return;
+        rows.push({ p, d, left, sc: null, fixed: true, failed: failedBy[p.id + '|' + d] || null, svc: svcByType[p.insurance_type] });
+        return;
+      }
       if(!sc && (left > AUTOPAY_NOTICE_DAYS || left < -VENTURE_DUE_OVERDUE_DAYS)) return;
       if(paid.has(p.id + '|' + d)) return;
       rows.push({ p, d, left, sc: sc || null });
@@ -12537,14 +12631,29 @@
     const pendingRows = rows.filter(r => !r.sc);
     ventureBadge.due = pendingRows.length; updateVentureBadge();
     const keys = new Set(pendingRows.map(r => r.p.id + '|' + r.d));
-    if(ventureDueKnownKeys){ const fresh = pendingRows.filter(r => !ventureDueKnownKeys.has(r.p.id + '|' + r.d)); if(fresh.length) ventureToast('💳 Ya le toca pagar a ' + (fresh[0].p.client ? fresh[0].p.client.full_name : 'un cliente') + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '') + ' — pon el monto y cobra'); }
+    if(ventureDueKnownKeys){ const fresh = pendingRows.filter(r => !ventureDueKnownKeys.has(r.p.id + '|' + r.d)); if(fresh.length) ventureToast((fresh[0].fixed ? '💳 Cobro automático sin hacer: ' : '💳 Ya le toca pagar a ') + (fresh[0].p.client ? fresh[0].p.client.full_name : 'un cliente') + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '') + (fresh[0].fixed ? ' — toca «Cobrar ahora»' : ' — pon el monto y cobra')); }
     ventureDueKnownKeys = keys;
     if(!card || !list) return;
     if(!rows.length){ card.style.display = 'none'; return; }
     card.style.display = 'block';
-    list.innerHTML = rows.map(({ p, d, left, sc }) => {
+    list.innerHTML = rows.map(({ p, d, left, sc, fixed, failed, svc }) => {
       const cuando = left === 0 ? '<strong style="color:#C23B3B;">HOY</strong>' : left > 0 ? 'en ' + left + ' día' + (left === 1 ? '' : 's') : '<strong style="color:#C23B3B;">hace ' + (-left) + ' día' + (left === -1 ? '' : 's') + '</strong>';
       const polizaTxt = (INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '') + (p.policy_number ? ' (#' + escapeHtml(p.policy_number) + ')' : '');
+      if(fixed){
+        const bd = monthlyChargeBreakdown(Number(p.auto_pay_fixed_amount || 0), svc || 0);
+        return `
+      <div style="padding:10px 0; border-bottom:1px solid #C7D3F5; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="flex:1; min-width:210px;">
+          <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')"><strong>${p.client ? escapeHtml(p.client.full_name) : 'Cliente'}</strong> — ${polizaTxt} <span class="sub">(monto fijo)</span></div>
+          <div style="margin-top:2px; font-size:14.5px;">⏱️ <strong>Cobro automático todavía sin hacer.</strong> Le toca pagar a Venture el <strong>${formatDateUS(d)}</strong> (${cuando}) · se le cobra $${bd.total.toFixed(2)} ($${bd.carrier.toFixed(2)} de Venture + service fee + processing fee)</div>
+          ${failed ? `<div style="margin-top:4px; padding:6px 10px; background:#FDEAEA; color:#B23A3A; border-radius:8px; font-size:13.5px;">El intento anterior falló: ${escapeHtml(failed)}</div>` : '<div class="sub" style="margin-top:2px;">El sistema lo cobra solo en su próxima revisión (cada hora); si lo quieres ya, toca el botón.</div>'}
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="goToClientFromUnderwriting('${p.client_id}')">Ver cliente</button>
+          <button class="btn" style="width:auto; padding:8px 12px; background:#2B3F8C; color:#fff; font-weight:700; border:0; border-radius:8px; cursor:pointer;" onclick="ventureChargeFixedNow('${p.id}', '${d}')">💳 ${failed ? 'Reintentar cobro' : 'Cobrar ahora'} $${bd.total.toFixed(2)}</button>
+        </div>
+      </div>`;
+      }
       return `
       <div style="padding:10px 0; border-bottom:1px solid #C7D3F5; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div style="flex:1; min-width:210px;">
@@ -12668,6 +12777,24 @@
       }
       btn.disabled = false; syncDate();
     };
+  }
+  // Monto fijo: cobrar YA el pago que le tocaba (el monto es el fijo que el cliente autorizó).
+  async function ventureChargeFixedNow(policyId, dueISO){
+    const { data: pol } = await sb.from('client_policies').select('*, client:client_id(full_name)').eq('id', policyId).single();
+    if(!pol) return;
+    const svc = await getAssistedServiceFee(pol.insurance_type);
+    const bd = monthlyChargeBreakdown(Number(pol.auto_pay_fixed_amount || 0), svc || 0); const who = pol.client ? pol.client.full_name : 'este cliente';
+    if(!confirm('¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + who + ' ahora (pago con vencimiento el ' + formatDateUS(dueISO) + ')?\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))) return;
+    try{
+      const { data: { session } } = await sb.auth.getSession();
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
+        body: JSON.stringify({ policyId, dueDate: dueISO, requestId: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10) }) });
+      const data = await resp.json().catch(() => ({}));
+      if(resp.ok && data.ok) ventureToast('✅ Se le cobró $' + Number(data.total || bd.total).toFixed(2) + ' a ' + who + ' — ahora entra a Venture y paga $' + Number(data.amount || bd.carrier).toFixed(2));
+      else alert(data.error || ('No se pudo cobrar (error ' + resp.status + ').'));
+    }catch(e){ alert('No hubo conexión con el servidor — NO se sabe si el cobro salió. Revisa el historial del cliente antes de volver a intentar.'); }
+    try{ await loadVentureDueAlerts(); await loadVenturePayAlerts(); await loadAutoChargeAlerts(); if(currentClientId === pol.client_id) await loadClientTransactions(currentClientId); }catch(e){}
   }
   async function cancelVentureScheduled(id){
     if(!confirm('¿Cancelar el cobro programado? Después puedes volver a programarlo o cobrar ahora.')) return;
@@ -13181,7 +13308,7 @@
     // (ver sección "Pago automático con tarjeta" más abajo). Solo están acá
     // para que se vean con un nombre bonito en Historial/Documentos/recibos.
     autorizacion_pago_automatico: 'Autorización de Pago Automático',
-    pago_automatico: 'Pago Automático (Venture)'
+    pago_automatico: 'Pago Asistido Automático (Venture)'
   };
   const SERVICE_TYPE_EXPLAINER = {
     nueva_poliza: 'Se cobra únicamente cuando el agente registra una póliza nueva.',
