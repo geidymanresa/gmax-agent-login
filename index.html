@@ -12174,8 +12174,9 @@
     if(!pol || !cliente) return;
     openAutoPayModeDialog(policyId, pol, cliente, { edit: true });
   }
-  function openAutoPayModeDialog(policyId, pol, cliente, opts){
+  async function openAutoPayModeDialog(policyId, pol, cliente, opts){
     opts = opts || {}; const editing = !!opts.edit;
+    const svcFee = await getAssistedServiceFee(pol.insurance_type);
     const curMode = editing ? (pol.auto_pay_mode === 'fixed' ? 'fixed' : 'variable') : 'variable';
     let ov = document.getElementById('apModeOverlay'); if(ov) ov.remove();
     const today = toISODateLocal(new Date());
@@ -12191,7 +12192,7 @@
         <p class="sub" style="margin:0 0 12px;">${escapeHtml(INSURANCE_TYPE_LABELS[pol.insurance_type] || pol.insurance_type || '')} ${pol.policy_number ? '(#' + escapeHtml(pol.policy_number) + ')' : ''} — ${escapeHtml(pol.company || '')} · Tarjeta ${escapeHtml(CARD_BRAND_LABELS[cliente.card_brand] || cliente.card_brand || '')} ••${escapeHtml(cliente.card_last4 || '')}</p>
         <label style="display:block; border:2px solid #C7D3F5; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
           <input type="radio" name="apMode" value="variable" ${curMode === 'variable' ? 'checked' : ''} style="margin-right:8px;"><strong>Monto variable</strong> <span class="sub">(recomendado cuando la aseguradora cambia unos dólares)</span>
-          <div class="sub" style="margin-top:4px;">NO se cobra solo. ${AUTOPAY_NOTICE_DAYS} días antes de que le toque pagar te sale una alerta en Inicio y te llega un correo. Tú pones el monto que pide Venture ese mes y procesas el cobro con un clic.</div>
+          <div class="sub" style="margin-top:4px;">NO se cobra solo. ${AUTOPAY_NOTICE_DAYS} días antes de que le toque pagar te sale una alerta en Inicio y te llega un correo. Tú pones el monto que pide Venture ese mes y procesas el cobro con un clic. A la tarjeta se le cobra como un <strong>pago asistido</strong>: lo de Venture + el service fee + el processing fee de Stripe.</div>
           <div id="apVarBox" style="display:${curMode === 'variable' && editing ? 'block' : 'none'}; margin-top:10px;">
             <div class="sub" style="font-size:12px;">Pago mensual de referencia ($) — es el que sale como sugerido al cobrar</div>
             <input type="text" id="apRef" inputmode="decimal" value="${Number(pol.monthly_payment || 0).toFixed(2)}" style="width:160px;">
@@ -12199,10 +12200,10 @@
         </label>
         <label style="display:block; border:2px solid #E4E7EF; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
           <input type="radio" name="apMode" value="fixed" ${curMode === 'fixed' ? 'checked' : ''} style="margin-right:8px;"><strong>Monto fijo</strong> <span class="sub">(Venture cobra siempre lo mismo)</span>
-          <div class="sub" style="margin-top:4px;">Se le cobra solo el mismo monto todos los meses, ${AUTOPAY_CHARGE_DAYS_BEFORE} días antes de su fecha de pago, desde una fecha y por la cantidad de meses que pongas.</div>
+          <div class="sub" style="margin-top:4px;">Se le cobra solo el mismo monto todos los meses (más el service fee de pago asistido y el processing fee de Stripe), ${AUTOPAY_CHARGE_DAYS_BEFORE} días antes de su fecha de pago, desde una fecha y por la cantidad de meses que pongas.</div>
           <div id="apFixedBox" style="display:${curMode === 'fixed' ? 'block' : 'none'}; margin-top:10px;">
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-              <div><div class="sub" style="font-size:12px;">Monto por mes ($)</div><input type="text" id="apAmount" inputmode="decimal" value="${amountDefault.toFixed(2)}" style="width:100%;"></div>
+              <div><div class="sub" style="font-size:12px;">Pago a Venture por mes ($)</div><input type="text" id="apAmount" inputmode="decimal" value="${amountDefault.toFixed(2)}" style="width:100%;"></div>
               <div><div class="sub" style="font-size:12px;">Primera fecha de pago</div><input type="text" id="apStart" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" value="${startDefault ? formatDateUS(startDefault) : ''}" oninput="maskDateInput(this)" style="width:100%;"></div>
               <div><div class="sub" style="font-size:12px;">Cantidad de meses</div><input type="text" id="apMonths" inputmode="numeric" value="${monthsLeft}" style="width:100%;"></div>
             </div>
@@ -12225,7 +12226,8 @@
       const pv = document.getElementById('apPreview');
       if(!st || !(n >= 1 && n <= 36) || !(amt > 0)){ pv.textContent = ''; return; }
       const list = []; for(let i = 0; i < n; i++){ const d = addMonthsISO(st, i); list.push(formatDateUS(isoAddDays(d, -AUTOPAY_CHARGE_DAYS_BEFORE)) + ' → paga en Venture el ' + formatDateUS(d)); }
-      pv.innerHTML = `Se le cobrará <strong>$${amt.toFixed(2)}</strong> ${n} ${n === 1 ? 'vez' : 'veces'}:<br>` + list.slice(0, 12).map(escapeHtml).join('<br>') + (list.length > 12 ? '<br>…' : '');
+      const bd = monthlyChargeBreakdown(amt, svcFee || 0);
+      pv.innerHTML = `Cada mes se le cobra <strong>$${bd.total.toFixed(2)}</strong> a la tarjeta ($${bd.carrier.toFixed(2)} de Venture + $${bd.serviceFee.toFixed(2)} de service fee de pago asistido + $${bd.processing.toFixed(2)} de processing fee)${svcFee === null ? ' <span style="color:#8a6116;">⚠ no hay service fee de «Pago asistido» configurado para este producto</span>' : ''}. ${n} ${n === 1 ? 'vez' : 'veces'}:<br>` + list.slice(0, 12).map(escapeHtml).join('<br>') + (list.length > 12 ? '<br>…' : '');
     }
     radios.forEach(r => r.addEventListener('change', () => { document.getElementById('apFixedBox').style.display = mode() === 'fixed' ? 'block' : 'none'; document.getElementById('apVarBox').style.display = (mode() === 'variable' && editing) ? 'block' : 'none'; previewFixed(); }));
     previewFixed();
@@ -12327,6 +12329,8 @@
       policyNumber = pol ? (pol.policy_number || '—') : '—'; polFull = pol || null;
     }
     const isFixed = !!(polFull && polFull.auto_pay_mode === 'fixed' && polFull.auto_pay_start_date);
+    const svcFeeAuth = await getAssistedServiceFee(t.product || (polFull && polFull.insurance_type));
+    const bdAuth = monthlyChargeBreakdown(Number(t.total_reference || 0), svcFeeAuth || 0);
     const clienteNombre = document.getElementById('cd-nombre').textContent;
     const fecha = formatDateUS(t.created_at ? t.created_at.split('T')[0] : new Date().toISOString().split('T')[0]);
     const cardLine = (t.card_brand && t.card_last4)
@@ -12348,6 +12352,7 @@
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">Compañía</div><div>${t.company_name || '—'}</div></div>
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">Número de póliza</div><div>${policyNumber}</div></div>
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">${isFixed ? 'Monto fijo por mes' : 'Monto mensual (referencia — puede variar)'}</div><div>$${Number(t.total_reference || 0).toFixed(2)}${isFixed ? '' : ' aprox.'}</div></div>
+        <div style="grid-column:1 / -1;"><div class="label" style="font-size:12px; color:var(--slate-light);">Cada cobro a la tarjeta${isFixed ? '' : ' (con el monto de referencia)'}</div><div>$${bdAuth.carrier.toFixed(2)} pago del seguro + $${bdAuth.serviceFee.toFixed(2)} service fee de pago asistido + $${bdAuth.processing.toFixed(2)} processing fee de la tarjeta = <strong>$${bdAuth.total.toFixed(2)}</strong></div></div>
         ${isFixed ? `<div><div class="label" style="font-size:12px; color:var(--slate-light);">Pagos autorizados</div><div>${polFull.auto_pay_months} (${formatDateUS(String(polFull.auto_pay_start_date).slice(0,10))} – ${formatDateUS(String(polFull.auto_pay_end_date || '').slice(0,10))})</div></div>` : `<div><div class="label" style="font-size:12px; color:var(--slate-light);">Cobro</div><div>Cada mes, el monto que pida la aseguradora</div></div>`}
         <div><div class="label" style="font-size:12px; color:var(--slate-light);">Tarjeta</div><div>${cardLine}</div></div>
       </div>
@@ -12356,8 +12361,8 @@
         <strong>${isFixed ? 'RECURRING PAYMENT AUTHORIZATION — FIXED AMOUNT.' : 'RECURRING PAYMENT AUTHORIZATION — VARIABLE AMOUNT.'}</strong> By signing this document, I, the undersigned,
         authorize GMAX All Insurance ("the Agency") to charge the payment method on file (described above)
         ${isFixed
-          ? `the fixed monthly amount shown above for each of the ${polFull.auto_pay_months} consecutive monthly payments listed, a few days before each payment due date set by the insurance company; this authorization ends after the last of those payments or when I cancel it, whichever comes first`
-          : `each billing cycle, for the monthly payment amount that the insurance company requires for my policy for that month (which may differ slightly from the reference amount shown above — for example, by a few dollars or cents due to the insurance company's adjustments) and never more than that required payment, for as long as this policy remains active and this authorization is not cancelled`}.
+          ? `the fixed monthly amount shown above for each of the ${polFull.auto_pay_months} consecutive monthly payments listed, a few days before each payment due date set by the insurance company; this authorization ends after the last of those payments or when I cancel it, whichever comes first. Each charge consists of the insurance payment shown above, plus the Agency's assisted-payment service fee ($${bdAuth.serviceFee.toFixed(2)}) and the card processing fee (2.9% + $0.30 of the total charged), for a total of $${bdAuth.total.toFixed(2)} per charge`
+          : `each billing cycle, for the monthly payment amount that the insurance company requires for my policy for that month (which may differ slightly from the reference amount shown above — for example, by a few dollars or cents due to the insurance company's adjustments) and never more than that required payment plus the Agency's assisted-payment service fee ($${bdAuth.serviceFee.toFixed(2)}) and the card processing fee (2.9% + $0.30 of the total charged), for as long as this policy remains active and this authorization is not cancelled`}.
         I understand that: (1) this authorization covers EVERY ${isFixed ? 'payment in that period' : 'future recurring charge under this policy'}, not just a single transaction — this is the key difference between
         this document and a normal one-time receipt; (2) I will receive a receipt by email each time a payment is
         processed, and no additional signature will be requested for those individual charges; (3) I may cancel
@@ -12462,7 +12467,7 @@
     if(venturePayKnownIds){
       const fresh = rows.filter(r => !venturePayKnownIds.has(r.id));
       if(fresh.length){ const f = fresh[0];
-        ventureToast('💰 Se le acaba de retirar $' + Number(f.amount || 0).toFixed(2) + ' a ' + (f.client ? f.client.full_name : 'un cliente') + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '') + ' — entra a Venture y haz el pago'); }
+        ventureToast('💰 Se le acaba de retirar $' + Number(f.total_charged || f.amount || 0).toFixed(2) + ' a ' + (f.client ? f.client.full_name : 'un cliente') + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '') + ' — entra a Venture y haz el pago'); }
     } else if(rows.length){
       ventureToast('💰 Tienes ' + rows.length + ' pago' + (rows.length === 1 ? '' : 's') + ' por hacer en Venture');
     }
@@ -12473,12 +12478,15 @@
     list.innerHTML = rows.map(c => {
       const polizaTxt = c.policy ? ((INSURANCE_TYPE_LABELS[c.policy.insurance_type] || c.policy.insurance_type || '') + (c.policy.policy_number ? ' (#' + escapeHtml(c.policy.policy_number) + ')' : '')) : '';
       const due = venturePayDueISO(c);
-      const amt = Number(c.amount || 0).toFixed(2);
+      const amt = Number(c.amount || 0).toFixed(2);          // lo que hay que pagarle a Venture
+      const totalTxt = Number(c.total_charged || c.amount || 0).toFixed(2);   // lo que se le retiró al cliente (con service fee y processing fee)
+      const extraTxt = c.total_charged ? ` <span class="sub">(el resto es tuyo: service fee $${Number(c.service_fee || 0).toFixed(2)} + processing fee $${Number(c.processing_fee || 0).toFixed(2)})</span>` : '';
       return `
       <div style="padding:10px 0; border-bottom:1px solid #EBCB7A; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div style="flex:1; min-width:210px;">
           <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${c.client_id}')"><strong>${c.client ? escapeHtml(c.client.full_name) : 'Cliente'}</strong> — ${polizaTxt}</div>
-          <div style="margin-top:2px; font-size:14.5px;">💵 Se le retiró <strong>$${amt}</strong> el ${formatDateTimeUS(c.charged_at)}${due ? ' · le toca pagar en Venture el <strong>' + formatDateUS(due) + '</strong>' : ''}</div>
+          <div style="margin-top:2px; font-size:14.5px;">💵 Se le retiró <strong>$${totalTxt}</strong> el ${formatDateTimeUS(c.charged_at)}${due ? ' · le toca pagar en Venture el <strong>' + formatDateUS(due) + '</strong>' : ''}</div>
+          <div style="margin-top:2px; font-size:15px; color:#7A4F00;">➡ Paga en Venture: <strong>$${amt}</strong>${extraTxt}</div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="copyVentureAmount('${amt}', event)">📋 Copiar monto</button>
@@ -12543,6 +12551,18 @@
       </div>`;
     }).join('');
   }
+  // Cada pago mensual con tarjeta se cobra COMO UN PAGO ASISTIDO: lo que pide la aseguradora + el service fee de
+  // «Pago asistido» (Service Fees, por producto) + el processing fee de Stripe (2.9% + $0.30, calculado sobre el total).
+  async function getAssistedServiceFee(insuranceType){
+    const { data } = await sb.from('service_fees').select('*').eq('service_type', 'pago_asistido').eq('insurance_type', insuranceType);
+    const row = (data || []).find(f => f.active !== false);
+    return row ? Math.round(Number(row.amount) * 100) / 100 : null;     // null = no hay service fee configurado
+  }
+  function monthlyChargeBreakdown(carrierAmount, serviceFee){
+    const base = (Number(carrierAmount) || 0) + (Number(serviceFee) || 0);
+    const { fee, total } = calcStripeGrossUp(base, 'tarjeta');
+    return { carrier: Number(carrierAmount) || 0, serviceFee: Number(serviceFee) || 0, processing: fee, total };
+  }
   async function openVentureChargeDialog(policyId, dueISO){
     const { data: pol } = await sb.from('client_policies').select('*').eq('id', policyId).single();
     if(!pol) return;
@@ -12552,6 +12572,7 @@
     ov.style.cssText = 'position:fixed; inset:0; background:rgba(13,20,36,.55); z-index:9000; display:flex; align-items:center; justify-content:center; padding:14px;';
     const hasCard = !!(cli && cli.stripe_pm_id);
     const ref = Number(pol.monthly_payment || 0);
+    const svc = await getAssistedServiceFee(pol.insurance_type);
     ov.innerHTML = `
       <div style="background:#fff; border-radius:16px; max-width:480px; width:100%; padding:20px;">
         <h3 style="margin:0 0 4px;">Cobrar el pago de este mes</h3>
@@ -12561,6 +12582,8 @@
         <label class="sub" style="font-size:13px; font-weight:700;">Monto que pide Venture este mes ($)</label>
         <input type="text" id="vcAmount" inputmode="decimal" value="${ref ? ref.toFixed(2) : ''}" placeholder="0.00" style="width:100%; font-size:20px; padding:10px;" ${hasCard ? '' : 'disabled'}>
         <p class="sub" style="margin:6px 0 0;">Referencia del sistema: $${ref.toFixed(2)}. Pon aquí lo que Venture pide ahora (a veces cambia unos dólares o centavos).</p>
+        <div id="vcBreakdown" style="margin-top:10px; padding:10px 12px; background:#F4F6FB; border-radius:10px; font-size:14px;"></div>
+        ${svc === null ? `<div style="margin-top:8px; padding:8px 10px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:8px; color:#8a6116; font-size:12.5px;">⚠ No hay un service fee de «Pago asistido» configurado para este producto (Service Fees). Se cobraría con $0 de service fee.</div>` : ''}
         <div class="err" id="vcErr" style="display:none; background:#FDEAEA; color:#B23A3A; border-radius:10px; padding:8px 10px; margin:10px 0 0;"></div>
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
           <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" id="vcCancel">Cancelar</button>
@@ -12569,6 +12592,16 @@
       </div>`;
     document.body.appendChild(ov);
     document.getElementById('vcCancel').onclick = () => ov.remove();
+    const showBreak = () => {
+      const a = Math.round(Number(String(document.getElementById('vcAmount').value).replace(/[^0-9.]/g, '')) * 100) / 100;
+      const el = document.getElementById('vcBreakdown');
+      if(!(a >= 1)){ el.innerHTML = '<span class="sub">Escribe el monto para ver el total que se le cobra a la tarjeta.</span>'; return null; }
+      const b = monthlyChargeBreakdown(a, svc || 0);
+      const row = (l, v, strong) => `<div style="display:flex; justify-content:space-between; padding:2px 0;${strong ? ' border-top:1.5px solid #D5DAE8; margin-top:4px; padding-top:6px; font-size:16px;' : ''}"><span>${l}</span><${strong ? 'strong' : 'span'}>$${v.toFixed(2)}</${strong ? 'strong' : 'span'}></div>`;
+      el.innerHTML = row('Pago a Venture', b.carrier) + row('Service fee (pago asistido)', b.serviceFee) + row('Processing fee (Stripe, 2.9% + $0.30)', b.processing) + row('Total que se cobra a la tarjeta', b.total, true);
+      return b;
+    };
+    document.getElementById('vcAmount').addEventListener('input', showBreak); showBreak();
     let requestId = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
     const err = (m) => { const e = document.getElementById('vcErr'); e.textContent = m; e.style.display = 'block'; };
     document.getElementById('vcGo').onclick = async () => {
@@ -12576,7 +12609,8 @@
       const amount = Math.round(Number(String(document.getElementById('vcAmount').value).replace(/[^0-9.]/g, '')) * 100) / 100;
       if(!(amount >= 1 && amount <= 10000)){ err('Escribe el monto que pide Venture (entre $1.00 y $10,000.00).'); return; }
       if(ref > 0 && Math.abs(amount - ref) > Math.max(10, ref * 0.15) && !confirm('El monto ($' + amount.toFixed(2) + ') es muy distinto al de referencia ($' + ref.toFixed(2) + '). ¿Seguro que es lo que pide Venture?')) return;
-      if(!confirm('¿Cobrar $' + amount.toFixed(2) + ' a la tarjeta de ' + (cli ? cli.full_name : 'este cliente') + ' ahora?')) return;
+      const bd = monthlyChargeBreakdown(amount, svc || 0);
+      if(!confirm('¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + (cli ? cli.full_name : 'este cliente') + ' ahora?\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))) return;
       const btn = document.getElementById('vcGo'); btn.disabled = true; btn.textContent = 'Cobrando…';
       try{
         const { data: { session } } = await sb.auth.getSession();
@@ -12586,7 +12620,7 @@
         const data = await resp.json().catch(() => ({}));
         if(resp.ok && data.ok){
           ov.remove();
-          ventureToast('✅ Se le cobró $' + amount.toFixed(2) + ' a ' + (cli ? cli.full_name : 'el cliente') + (data.warning ? ' (ojo: ' + data.warning + ')' : ' — ahora entra a Venture y haz el pago'));
+          ventureToast('✅ Se le cobró $' + Number(data.total || bd.total).toFixed(2) + ' a ' + (cli ? cli.full_name : 'el cliente') + (data.warning ? ' (ojo: ' + data.warning + ')' : ' — ahora entra a Venture y paga $' + amount.toFixed(2)));
           await loadVentureDueAlerts(); await loadVenturePayAlerts(); await loadAutoChargeAlerts();
           if(currentClientId === pol.client_id){ try{ await loadClientTransactions(currentClientId); }catch(e){} }
           return;
