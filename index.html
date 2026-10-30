@@ -12010,8 +12010,8 @@
 
     const rowsHtml = await Promise.all(policies.map(async p => {
       let autoPayEnabled = !!p.auto_pay_enabled;
-      let lastConsentTxId = null;
-      if(!autoPayEnabled){
+      let lastConsentTxId = null; let newAuthPending = false;
+      {
         const { data: lastConsentTx } = await sb.from('client_transactions')
           .select('id')
           .eq('policy_id', p.id)
@@ -12022,18 +12022,21 @@
         if(lastConsentTx){
           lastConsentTxId = lastConsentTx.id;
           const { data: sigReq } = await sb.from('signature_requests').select('status').eq('transaction_id', lastConsentTx.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
-          if(sigReq && sigReq.status === 'firmado'){
+          const signed = !!(sigReq && sigReq.status === 'firmado');
+          if(signed && !autoPayEnabled){
             await sb.from('client_policies').update({ auto_pay_enabled: true }).eq('id', p.id);
             autoPayEnabled = true;
           }
+          // Ya estaba activado y se editó algo que el cliente había autorizado → hay una autorización NUEVA esperando su firma
+          if(!signed && autoPayEnabled) newAuthPending = true;
         }
       }
 
       let estadoHtml;
       if(autoPayEnabled){
-        estadoHtml = `<span style="color:#177A54; font-weight:700;">✓ Pago con tarjeta activado</span><div class="sub" style="font-size:12px; margin-top:2px;">${escapeHtml(autoPayModeSummary(p))}</div> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="disableAutoPayForPolicy('${p.id}')">Desactivar</button>`;
+        estadoHtml = `<span style="color:#177A54; font-weight:700;">✓ Pago con tarjeta activado</span><div class="sub" style="font-size:12px; margin-top:2px;">${escapeHtml(autoPayModeSummary(p))}</div>${newAuthPending ? `<div style="color:#8a6116; font-weight:700; font-size:12px; margin-top:2px;">⏳ Cambiaste lo que el cliente autorizó: falta que firme la autorización nueva <a href="javascript:void(0)" onclick="showAutoPayConsentForm('${lastConsentTxId}')">(ver / reenviar)</a></div>` : ''} <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="editAutoPay('${p.id}')">✏️ Editar</button> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="disableAutoPayForPolicy('${p.id}')">Desactivar</button>`;
       } else if(lastConsentTxId){
-        estadoHtml = `<span style="color:#8a6116; font-weight:700;">⏳ Falta que el cliente firme la autorización</span> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="showAutoPayConsentForm('${lastConsentTxId}')">Ver / reenviar</button>`;
+        estadoHtml = `<span style="color:#8a6116; font-weight:700;">⏳ Falta que el cliente firme la autorización</span> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:8px;" onclick="showAutoPayConsentForm('${lastConsentTxId}')">Ver / reenviar</button> <button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px; margin-left:4px;" onclick="editAutoPay('${p.id}')">✏️ Editar</button>`;
       } else {
         estadoHtml = `<button type="button" class="btn-primary" style="width:auto; padding:6px 14px; font-size:12.5px;" onclick="requestAutoPayConsent('${p.id}')" ${tieneTarjeta ? '' : 'disabled title="Primero guarda la tarjeta del cliente"'}>Activar pago automático</button>`;
       }
@@ -12165,38 +12168,52 @@
     if(p.auto_pay_mode === 'variable') return `Monto variable: te avisa ${AUTOPAY_NOTICE_DAYS} días antes de cada pago y tú pones el monto que pide Venture`;
     return 'Modo sin definir — desactívalo y vuelve a activarlo para escoger el modo';
   }
-  function openAutoPayModeDialog(policyId, pol, cliente){
+  async function editAutoPay(policyId){
+    const { data: cliente } = await sb.from('clients').select('stripe_pm_id, card_brand, card_last4').eq('id', currentClientId).single();
+    const { data: pol } = await sb.from('client_policies').select('*').eq('id', policyId).single();
+    if(!pol || !cliente) return;
+    openAutoPayModeDialog(policyId, pol, cliente, { edit: true });
+  }
+  function openAutoPayModeDialog(policyId, pol, cliente, opts){
+    opts = opts || {}; const editing = !!opts.edit;
+    const curMode = editing ? (pol.auto_pay_mode === 'fixed' ? 'fixed' : 'variable') : 'variable';
     let ov = document.getElementById('apModeOverlay'); if(ov) ov.remove();
     const today = toISODateLocal(new Date());
     const dues = venturePolicyDues(pol).filter(d => d >= today);
-    const startDefault = dues[0] || '';
-    const monthsLeft = dues.length || 6;
+    const startDefault = (editing && curMode === 'fixed' && pol.auto_pay_start_date) ? String(pol.auto_pay_start_date).slice(0, 10) : (dues[0] || '');
+    const monthsLeft = (editing && curMode === 'fixed' && pol.auto_pay_months) ? pol.auto_pay_months : (dues.length || 6);
+    const amountDefault = (editing && curMode === 'fixed' && pol.auto_pay_fixed_amount) ? Number(pol.auto_pay_fixed_amount) : Number(pol.monthly_payment || 0);
     ov = document.createElement('div'); ov.id = 'apModeOverlay';
     ov.style.cssText = 'position:fixed; inset:0; background:rgba(13,20,36,.55); z-index:9000; display:flex; align-items:center; justify-content:center; padding:14px;';
     ov.innerHTML = `
       <div style="background:#fff; border-radius:16px; max-width:560px; width:100%; max-height:92vh; overflow:auto; padding:20px;">
-        <h3 style="margin:0 0 4px;">Pago con tarjeta — ¿cómo quieres cobrar?</h3>
+        <h3 style="margin:0 0 4px;">${editing ? '✏️ Editar el pago con tarjeta' : 'Pago con tarjeta — ¿cómo quieres cobrar?'}</h3>
         <p class="sub" style="margin:0 0 12px;">${escapeHtml(INSURANCE_TYPE_LABELS[pol.insurance_type] || pol.insurance_type || '')} ${pol.policy_number ? '(#' + escapeHtml(pol.policy_number) + ')' : ''} — ${escapeHtml(pol.company || '')} · Tarjeta ${escapeHtml(CARD_BRAND_LABELS[cliente.card_brand] || cliente.card_brand || '')} ••${escapeHtml(cliente.card_last4 || '')}</p>
         <label style="display:block; border:2px solid #C7D3F5; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
-          <input type="radio" name="apMode" value="variable" checked style="margin-right:8px;"><strong>Monto variable</strong> <span class="sub">(recomendado cuando la aseguradora cambia unos dólares)</span>
+          <input type="radio" name="apMode" value="variable" ${curMode === 'variable' ? 'checked' : ''} style="margin-right:8px;"><strong>Monto variable</strong> <span class="sub">(recomendado cuando la aseguradora cambia unos dólares)</span>
           <div class="sub" style="margin-top:4px;">NO se cobra solo. ${AUTOPAY_NOTICE_DAYS} días antes de que le toque pagar te sale una alerta en Inicio y te llega un correo. Tú pones el monto que pide Venture ese mes y procesas el cobro con un clic.</div>
+          <div id="apVarBox" style="display:${curMode === 'variable' && editing ? 'block' : 'none'}; margin-top:10px;">
+            <div class="sub" style="font-size:12px;">Pago mensual de referencia ($) — es el que sale como sugerido al cobrar</div>
+            <input type="text" id="apRef" inputmode="decimal" value="${Number(pol.monthly_payment || 0).toFixed(2)}" style="width:160px;">
+          </div>
         </label>
         <label style="display:block; border:2px solid #E4E7EF; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
-          <input type="radio" name="apMode" value="fixed" style="margin-right:8px;"><strong>Monto fijo</strong> <span class="sub">(Venture cobra siempre lo mismo)</span>
+          <input type="radio" name="apMode" value="fixed" ${curMode === 'fixed' ? 'checked' : ''} style="margin-right:8px;"><strong>Monto fijo</strong> <span class="sub">(Venture cobra siempre lo mismo)</span>
           <div class="sub" style="margin-top:4px;">Se le cobra solo el mismo monto todos los meses, ${AUTOPAY_CHARGE_DAYS_BEFORE} días antes de su fecha de pago, desde una fecha y por la cantidad de meses que pongas.</div>
-          <div id="apFixedBox" style="display:none; margin-top:10px;">
+          <div id="apFixedBox" style="display:${curMode === 'fixed' ? 'block' : 'none'}; margin-top:10px;">
             <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
-              <div><div class="sub" style="font-size:12px;">Monto por mes ($)</div><input type="text" id="apAmount" inputmode="decimal" value="${Number(pol.monthly_payment || 0).toFixed(2)}" style="width:100%;"></div>
+              <div><div class="sub" style="font-size:12px;">Monto por mes ($)</div><input type="text" id="apAmount" inputmode="decimal" value="${amountDefault.toFixed(2)}" style="width:100%;"></div>
               <div><div class="sub" style="font-size:12px;">Primera fecha de pago</div><input type="text" id="apStart" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" value="${startDefault ? formatDateUS(startDefault) : ''}" oninput="maskDateInput(this)" style="width:100%;"></div>
               <div><div class="sub" style="font-size:12px;">Cantidad de meses</div><input type="text" id="apMonths" inputmode="numeric" value="${monthsLeft}" style="width:100%;"></div>
             </div>
             <div id="apPreview" class="sub" style="margin-top:8px; font-size:12.5px;"></div>
           </div>
         </label>
+        ${editing ? `<div class="sub" style="font-size:12.5px; margin:4px 0 0;">Puedes cambiar el modo, el monto, las fechas o los meses cuando quieras. Si cambias algo que el cliente ya había autorizado (el modo, el monto fijo o alargas el periodo), se crea una <strong>autorización nueva</strong> para que la firme.</div>` : ''}
         <div class="err" id="apErr" style="display:none; background:#FDEAEA; color:#B23A3A; border-radius:10px; padding:8px 10px; margin:8px 0;"></div>
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
           <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" id="apCancel">Cancelar</button>
-          <button type="button" class="btn-primary" style="width:auto; padding:8px 16px;" id="apGo">Continuar → crear la autorización</button>
+          <button type="button" class="btn-primary" style="width:auto; padding:8px 16px;" id="apGo">${editing ? 'Guardar cambios' : 'Continuar → crear la autorización'}</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
@@ -12210,12 +12227,18 @@
       const list = []; for(let i = 0; i < n; i++){ const d = addMonthsISO(st, i); list.push(formatDateUS(isoAddDays(d, -AUTOPAY_CHARGE_DAYS_BEFORE)) + ' → paga en Venture el ' + formatDateUS(d)); }
       pv.innerHTML = `Se le cobrará <strong>$${amt.toFixed(2)}</strong> ${n} ${n === 1 ? 'vez' : 'veces'}:<br>` + list.slice(0, 12).map(escapeHtml).join('<br>') + (list.length > 12 ? '<br>…' : '');
     }
-    radios.forEach(r => r.addEventListener('change', () => { document.getElementById('apFixedBox').style.display = mode() === 'fixed' ? 'block' : 'none'; previewFixed(); }));
+    radios.forEach(r => r.addEventListener('change', () => { document.getElementById('apFixedBox').style.display = mode() === 'fixed' ? 'block' : 'none'; document.getElementById('apVarBox').style.display = (mode() === 'variable' && editing) ? 'block' : 'none'; previewFixed(); }));
+    previewFixed();
     ['apAmount', 'apStart', 'apMonths'].forEach(id => document.getElementById(id).addEventListener('input', previewFixed));
     document.getElementById('apCancel').onclick = () => ov.remove();
     document.getElementById('apGo').onclick = async () => {
       const err = document.getElementById('apErr'); err.style.display = 'none';
-      const cfg = { mode: mode() };
+      const cfg = { mode: mode(), edit: editing };
+      if(cfg.mode === 'variable' && editing){
+        const ref = Math.round(Number(String(document.getElementById('apRef').value).replace(/[^0-9.]/g, '')) * 100) / 100;
+        if(!(ref > 0)){ err.textContent = 'Escribe el pago mensual de referencia.'; err.style.display = 'block'; return; }
+        cfg.ref = ref;
+      }
       if(cfg.mode === 'fixed'){
         const amt = Math.round(Number(String(document.getElementById('apAmount').value).replace(/[^0-9.]/g, '')) * 100) / 100;
         const st = mmddyyyyToISO(document.getElementById('apStart').value); const n = parseInt(document.getElementById('apMonths').value, 10);
@@ -12236,8 +12259,25 @@
     const patch = cfg.mode === 'fixed'
       ? { auto_pay_mode: 'fixed', auto_pay_fixed_amount: cfg.amount, auto_pay_start_date: cfg.start, auto_pay_months: cfg.months, auto_pay_end_date: cfg.end }
       : { auto_pay_mode: 'variable', auto_pay_fixed_amount: null, auto_pay_start_date: null, auto_pay_months: null, auto_pay_end_date: null };
+    if(cfg.mode === 'variable' && cfg.ref) patch.monthly_payment = cfg.ref;
+    // ¿Lo que se cambió es algo que el cliente ya había autorizado? (modo, monto fijo, o alargar el periodo)
+    let material = true;
+    if(cfg.edit && pol.auto_pay_enabled){
+      if(pol.auto_pay_mode !== cfg.mode) material = true;
+      else if(cfg.mode === 'variable') material = false;
+      else {
+        const oldEnd = pol.auto_pay_end_date ? String(pol.auto_pay_end_date).slice(0, 10) : (pol.auto_pay_start_date ? addMonthsISO(String(pol.auto_pay_start_date).slice(0, 10), Number(pol.auto_pay_months || 1) - 1) : '');
+        const oldStart = pol.auto_pay_start_date ? String(pol.auto_pay_start_date).slice(0, 10) : '';
+        material = Number(pol.auto_pay_fixed_amount) !== cfg.amount || !oldStart || cfg.start < oldStart || !oldEnd || cfg.end > oldEnd;
+      }
+    }
     const { error: upErr } = await sb.from('client_policies').update(patch).eq('id', policyId);
     if(upErr) return showErr(/auto_pay_/.test(upErr.message || '') ? 'Falta correr migracion_modos_pago_venture.sql en Supabase (SQL Editor) antes de usar esto.' : 'No se pudo guardar el modo: ' + upErr.message);
+    if(!material){
+      await loadClientPolicies(currentClientId);
+      if(typeof ventureToast === 'function') ventureToast('✓ Cambios guardados. Lo que el cliente ya firmó sigue cubriendo estos cobros.');
+      return true;
+    }
     const { data: { session } } = await sb.auth.getSession();
     const payload = {
       client_id: currentClientId,
@@ -12248,12 +12288,12 @@
       card_last4: cliente.card_last4,
       product: pol.insurance_type,
       company_name: pol.company,
-      total_reference: cfg.mode === 'fixed' ? cfg.amount : pol.monthly_payment,
+      total_reference: cfg.mode === 'fixed' ? cfg.amount : (cfg.ref || pol.monthly_payment),
       service_fee_amount: 0,
       processing_fee_estimate: 0,
-      notes: cfg.mode === 'fixed'
+      notes: (cfg.edit ? '(Cambio de condiciones) ' : '') + (cfg.mode === 'fixed'
         ? `Autorización de pago con tarjeta (Venture) — monto fijo $${cfg.amount.toFixed(2)} por mes, ${cfg.months} pagos, del ${formatDateUS(cfg.start)} al ${formatDateUS(cfg.end)}.`
-        : 'Autorización de pago con tarjeta (Venture) — monto variable: se cobra el monto que pide la aseguradora cada mes, con aviso previo a la administradora.',
+        : 'Autorización de pago con tarjeta (Venture) — monto variable: se cobra el monto que pide la aseguradora cada mes, con aviso previo a la administradora.'),
       status: 'completada',
       created_by: session.user.id
     };
