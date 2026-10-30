@@ -12335,7 +12335,7 @@
       if(resp.ok && data.ok && data.scheduled) ventureToast('🗓️ Programado: el ' + formatDateUS(nx.chargeOn) + ' se le cobrará $' + Number(data.total || bd.total).toFixed(2) + ' a ' + who + ' (Venture $' + nx.amount.toFixed(2) + ')');
       else if(resp.ok && data.ok) ventureToast('✅ Se le cobró $' + Number(data.total || bd.total).toFixed(2) + ' a ' + who + ' — ahora entra a Venture y paga $' + nx.amount.toFixed(2));
       else alert(data.error || ('No se pudo programar el cobro (error ' + resp.status + '). Los cambios del pago sí se guardaron.'));
-    }catch(e){ alert('No hubo conexión con el servidor — NO se sabe si el cobro quedó. Revisa Inicio y el historial del cliente antes de volver a intentar.'); }
+    }catch(e){ alert(await ventureDiagnoseNoReply(policyId, nx.due)); }
     try{ await loadVentureDueAlerts(); await loadVenturePayAlerts(); await loadAutoChargeAlerts(); }catch(e){}
   }
   async function finishAutoPayConsent(policyId, cfg, errEl){
@@ -12773,10 +12773,22 @@
         requestId = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);   // respuesta definitiva: un intento nuevo usa otra llave
         err(data.error || ('No se pudo cobrar (error ' + resp.status + ').'));
       }catch(e){
-        err('No hubo conexión con el servidor — NO se sabe si el cobro salió. Revisa el historial del cliente antes de volver a intentar.');
+        err(await ventureDiagnoseNoReply(policyId, dueISO));
       }
       btn.disabled = false; syncDate();
     };
+  }
+  // El navegador no pudo hablar con la función de cobro. En vez de dejarte con la duda, se revisa si el cobro quedó anotado
+  // y si la función responde, para decir con claridad qué pasó.
+  async function ventureDiagnoseNoReply(policyId, dueISO){
+    try{
+      const { data: ch } = await sb.from('client_auto_charges').select('id').eq('policy_id', policyId).eq('due_date', dueISO).eq('status', 'cobrado').limit(1);
+      if(ch && ch.length) return 'Ojo: el cobro SÍ quedó registrado. Revisa el historial de la póliza y recarga Inicio.';
+    }catch(e){}
+    let alive = false;
+    try{ const r = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'OPTIONS' }); alive = r.ok || r.status === 204; }catch(e){ alive = false; }
+    if(!alive) return 'NO se cobró nada. El CRM no pudo comunicarse con la función «charge-saved-card» de Supabase: lo más probable es que todavía no esté desplegada (o se llame distinto). Despliega el archivo edge-function-charge-saved-card.ts en Supabase → Edge Functions con el nombre exacto charge-saved-card y vuelve a intentar.';
+    return 'NO quedó registrado ningún cobro de ese pago. La función respondió mal o se cortó la conexión; recarga la página e inténtalo otra vez. Si se repite, avísame con una captura.';
   }
   // Monto fijo: cobrar YA el pago que le tocaba (el monto es el fijo que el cliente autorizó).
   async function ventureChargeFixedNow(policyId, dueISO){
@@ -12793,7 +12805,7 @@
       const data = await resp.json().catch(() => ({}));
       if(resp.ok && data.ok) ventureToast('✅ Se le cobró $' + Number(data.total || bd.total).toFixed(2) + ' a ' + who + ' — ahora entra a Venture y paga $' + Number(data.amount || bd.carrier).toFixed(2));
       else alert(data.error || ('No se pudo cobrar (error ' + resp.status + ').'));
-    }catch(e){ alert('No hubo conexión con el servidor — NO se sabe si el cobro salió. Revisa el historial del cliente antes de volver a intentar.'); }
+    }catch(e){ alert(await ventureDiagnoseNoReply(policyId, dueISO)); }
     try{ await loadVentureDueAlerts(); await loadVenturePayAlerts(); await loadAutoChargeAlerts(); if(currentClientId === pol.client_id) await loadClientTransactions(currentClientId); }catch(e){}
   }
   async function cancelVentureScheduled(id){
