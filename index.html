@@ -12192,7 +12192,7 @@
         <p class="sub" style="margin:0 0 12px;">${escapeHtml(INSURANCE_TYPE_LABELS[pol.insurance_type] || pol.insurance_type || '')} ${pol.policy_number ? '(#' + escapeHtml(pol.policy_number) + ')' : ''} — ${escapeHtml(pol.company || '')} · Tarjeta ${escapeHtml(CARD_BRAND_LABELS[cliente.card_brand] || cliente.card_brand || '')} ••${escapeHtml(cliente.card_last4 || '')}</p>
         <label style="display:block; border:2px solid #C7D3F5; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
           <input type="radio" name="apMode" value="variable" ${curMode === 'variable' ? 'checked' : ''} style="margin-right:8px;"><strong>Monto variable</strong> <span class="sub">(recomendado cuando la aseguradora cambia unos dólares)</span>
-          <div class="sub" style="margin-top:4px;">NO se cobra solo. ${AUTOPAY_NOTICE_DAYS} días antes de que le toque pagar te sale una alerta en Inicio y te llega un correo. Tú pones el monto que pide Venture ese mes y procesas el cobro con un clic. A la tarjeta se le cobra como un <strong>pago asistido</strong>: lo de Venture + el service fee + el processing fee de Stripe.</div>
+          <div class="sub" style="margin-top:4px;">NO se cobra solo. ${AUTOPAY_NOTICE_DAYS} días antes de que le toque pagar te sale una alerta en Inicio y te llega un correo. Tú pones el monto que pide Venture ese mes, <strong>eliges el día en que se le saca el dinero al cliente</strong> (hoy o una fecha futura) y listo. A la tarjeta se le cobra como un <strong>pago asistido</strong>: lo de Venture + el service fee + el processing fee de Stripe.</div>
           <div id="apVarBox" style="display:${curMode === 'variable' && editing ? 'block' : 'none'}; margin-top:10px;">
             <div class="sub" style="font-size:12px;">Pago mensual de referencia ($) — es el que sale como sugerido al cobrar</div>
             <input type="text" id="apRef" inputmode="decimal" value="${Number(pol.monthly_payment || 0).toFixed(2)}" style="width:160px;">
@@ -12520,22 +12520,29 @@
     const { data: paidRows } = await sb.from('client_auto_charges').select('policy_id, due_date').eq('status', 'cobrado').in('policy_id', venturePols.map(p => p.id));
     const paid = new Set((paidRows || []).filter(r => r.due_date).map(r => r.policy_id + '|' + String(r.due_date).slice(0, 10)));
     const today = toISODateLocal(new Date());
+    // Cobros ya programados para otro día (se cobran solos ese día con el monto que pusiste).
+    const { data: schedRows } = await sb.from('venture_scheduled_charges').select('*').eq('status', 'programado').in('policy_id', venturePols.map(p => p.id));
+    const sched = {};
+    (schedRows || []).forEach(sc => { sched[sc.policy_id + '|' + String(sc.due_date).slice(0, 10)] = sc; });
     const rows = [];
     venturePols.forEach(p => venturePolicyDues(p).forEach(d => {
       const left = isoDiffDays(d, today);
-      if(left > AUTOPAY_NOTICE_DAYS || left < -VENTURE_DUE_OVERDUE_DAYS) return;
+      const sc = sched[p.id + '|' + d];
+      if(!sc && (left > AUTOPAY_NOTICE_DAYS || left < -VENTURE_DUE_OVERDUE_DAYS)) return;
       if(paid.has(p.id + '|' + d)) return;
-      rows.push({ p, d, left });
+      rows.push({ p, d, left, sc: sc || null });
     }));
     rows.sort((a, b) => a.d.localeCompare(b.d));
-    ventureBadge.due = rows.length; updateVentureBadge();
-    const keys = new Set(rows.map(r => r.p.id + '|' + r.d));
-    if(ventureDueKnownKeys){ const fresh = rows.filter(r => !ventureDueKnownKeys.has(r.p.id + '|' + r.d)); if(fresh.length) ventureToast('💳 Ya le toca pagar a ' + (fresh[0].p.client ? fresh[0].p.client.full_name : 'un cliente') + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '') + ' — pon el monto y cobra'); }
+    // Lo que ya está programado no es «pendiente»: no cuenta en el globito ni en el aviso.
+    const pendingRows = rows.filter(r => !r.sc);
+    ventureBadge.due = pendingRows.length; updateVentureBadge();
+    const keys = new Set(pendingRows.map(r => r.p.id + '|' + r.d));
+    if(ventureDueKnownKeys){ const fresh = pendingRows.filter(r => !ventureDueKnownKeys.has(r.p.id + '|' + r.d)); if(fresh.length) ventureToast('💳 Ya le toca pagar a ' + (fresh[0].p.client ? fresh[0].p.client.full_name : 'un cliente') + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '') + ' — pon el monto y cobra'); }
     ventureDueKnownKeys = keys;
     if(!card || !list) return;
     if(!rows.length){ card.style.display = 'none'; return; }
     card.style.display = 'block';
-    list.innerHTML = rows.map(({ p, d, left }) => {
+    list.innerHTML = rows.map(({ p, d, left, sc }) => {
       const cuando = left === 0 ? '<strong style="color:#C23B3B;">HOY</strong>' : left > 0 ? 'en ' + left + ' día' + (left === 1 ? '' : 's') : '<strong style="color:#C23B3B;">hace ' + (-left) + ' día' + (left === -1 ? '' : 's') + '</strong>';
       const polizaTxt = (INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '') + (p.policy_number ? ' (#' + escapeHtml(p.policy_number) + ')' : '');
       return `
@@ -12543,10 +12550,12 @@
         <div style="flex:1; min-width:210px;">
           <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')"><strong>${p.client ? escapeHtml(p.client.full_name) : 'Cliente'}</strong> — ${polizaTxt}</div>
           <div style="margin-top:2px; font-size:14.5px;">📅 Le toca pagar a Venture el <strong>${formatDateUS(d)}</strong> (${cuando}) · monto de referencia $${Number(p.monthly_payment || 0).toFixed(2)}</div>
+          ${sc ? `<div style="margin-top:4px; padding:6px 10px; background:#E4F6EC; border:1.5px solid #A9DFC4; border-radius:8px; color:#177A54; font-size:14px;">🗓️ <strong>Programado:</strong> el <strong>${formatDateUS(String(sc.charge_on).slice(0, 10))}</strong> se le saca el dinero (Venture $${Number(sc.amount).toFixed(2)} + service fee + processing fee)</div>` : ''}
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="goToClientFromUnderwriting('${p.client_id}')">Ver cliente</button>
-          <button class="btn" style="width:auto; padding:8px 12px; background:#2B3F8C; color:#fff; font-weight:700; border:0; border-radius:8px; cursor:pointer;" onclick="openVentureChargeDialog('${p.id}', '${d}')">💵 Poner monto y cobrar</button>
+          ${sc ? `<button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="cancelVentureScheduled('${sc.id}')">Cancelar programación</button>` : ''}
+          <button class="btn" style="width:auto; padding:8px 12px; background:#2B3F8C; color:#fff; font-weight:700; border:0; border-radius:8px; cursor:pointer;" onclick="openVentureChargeDialog('${p.id}', '${d}')">${sc ? '✏️ Cambiar monto o fecha' : '💵 Poner monto y cobrar'}</button>
         </div>
       </div>`;
     }).join('');
@@ -12573,6 +12582,8 @@
     const hasCard = !!(cli && cli.stripe_pm_id);
     const ref = Number(pol.monthly_payment || 0);
     const svc = await getAssistedServiceFee(pol.insurance_type);
+    const todayISO = toISODateLocal(new Date());
+    const maxChargeISO = isoAddDays(dueISO, 10);
     ov.innerHTML = `
       <div style="background:#fff; border-radius:16px; max-width:480px; width:100%; padding:20px;">
         <h3 style="margin:0 0 4px;">Cobrar el pago de este mes</h3>
@@ -12582,12 +12593,15 @@
         <label class="sub" style="font-size:13px; font-weight:700;">Monto que pide Venture este mes ($)</label>
         <input type="text" id="vcAmount" inputmode="decimal" value="${ref ? ref.toFixed(2) : ''}" placeholder="0.00" style="width:100%; font-size:20px; padding:10px;" ${hasCard ? '' : 'disabled'}>
         <p class="sub" style="margin:6px 0 0;">Referencia del sistema: $${ref.toFixed(2)}. Pon aquí lo que Venture pide ahora (a veces cambia unos dólares o centavos).</p>
+        <label class="sub" style="font-size:13px; font-weight:700; display:block; margin-top:12px;">Fecha en que se le saca el dinero al cliente</label>
+        <input type="text" id="vcDate" inputmode="numeric" maxlength="10" placeholder="MM/DD/AAAA" value="${formatDateUS(todayISO)}" oninput="maskDateInput(this); window.__vcDateChanged && window.__vcDateChanged()" style="width:180px; font-size:18px; padding:8px 10px;" ${hasCard ? '' : 'disabled'}>
+        <p class="sub" id="vcDateHint" style="margin:4px 0 0;"></p>
         <div id="vcBreakdown" style="margin-top:10px; padding:10px 12px; background:#F4F6FB; border-radius:10px; font-size:14px;"></div>
         ${svc === null ? `<div style="margin-top:8px; padding:8px 10px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:8px; color:#8a6116; font-size:12.5px;">⚠ No hay un service fee de «Pago asistido» configurado para este producto (Service Fees). Se cobraría con $0 de service fee.</div>` : ''}
         <div class="err" id="vcErr" style="display:none; background:#FDEAEA; color:#B23A3A; border-radius:10px; padding:8px 10px; margin:10px 0 0;"></div>
         <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
           <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" id="vcCancel">Cancelar</button>
-          <button type="button" class="btn-primary" style="width:auto; padding:8px 16px;" id="vcGo" ${hasCard ? '' : 'disabled'}>Cobrar a la tarjeta</button>
+          <button type="button" class="btn-primary" style="width:auto; padding:8px 16px;" id="vcGo" ${hasCard ? '' : 'disabled'}>Cobrar ahora</button>
         </div>
       </div>`;
     document.body.appendChild(ov);
@@ -12602,6 +12616,17 @@
       return b;
     };
     document.getElementById('vcAmount').addEventListener('input', showBreak); showBreak();
+    // El botón y el aviso cambian según la fecha: hoy = cobra ya; fecha futura = queda programado.
+    const chosenDate = () => mmddyyyyToISO(document.getElementById('vcDate').value);
+    const syncDate = () => {
+      const iso = chosenDate(); const hint = document.getElementById('vcDateHint'); const go = document.getElementById('vcGo');
+      if(!iso){ hint.textContent = 'Escribe la fecha como MM/DD/AAAA.'; go.textContent = 'Cobrar'; return; }
+      if(iso < todayISO){ hint.textContent = 'Esa fecha ya pasó. Pon hoy o una fecha futura.'; go.textContent = 'Cobrar'; }
+      else if(iso > maxChargeISO){ hint.textContent = 'Máximo hasta el ' + formatDateUS(maxChargeISO) + ' (10 días después de su fecha de pago).'; go.textContent = 'Programar cobro'; }
+      else if(iso === todayISO){ hint.textContent = 'Hoy: se cobra en cuanto das clic.'; go.textContent = 'Cobrar ahora'; }
+      else { hint.textContent = 'Se queda programado y el sistema lo cobra solo el ' + formatDateUS(iso) + ' con el monto que pusiste. Puedes cancelarlo o cambiarlo antes.'; go.textContent = 'Programar cobro'; }
+    };
+    window.__vcDateChanged = syncDate; syncDate();
     let requestId = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
     const err = (m) => { const e = document.getElementById('vcErr'); e.textContent = m; e.style.display = 'block'; };
     document.getElementById('vcGo').onclick = async () => {
@@ -12609,15 +12634,26 @@
       const amount = Math.round(Number(String(document.getElementById('vcAmount').value).replace(/[^0-9.]/g, '')) * 100) / 100;
       if(!(amount >= 1 && amount <= 10000)){ err('Escribe el monto que pide Venture (entre $1.00 y $10,000.00).'); return; }
       if(ref > 0 && Math.abs(amount - ref) > Math.max(10, ref * 0.15) && !confirm('El monto ($' + amount.toFixed(2) + ') es muy distinto al de referencia ($' + ref.toFixed(2) + '). ¿Seguro que es lo que pide Venture?')) return;
+      const chargeOn = chosenDate();
+      if(!chargeOn){ err('Escribe la fecha en que se le saca el dinero como MM/DD/AAAA.'); return; }
+      if(chargeOn < todayISO){ err('Esa fecha ya pasó. Pon hoy o una fecha futura.'); return; }
+      if(chargeOn > maxChargeISO){ err('La fecha no puede pasar del ' + formatDateUS(maxChargeISO) + ' (10 días después de su fecha de pago).'); return; }
+      const later = chargeOn > todayISO;
       const bd = monthlyChargeBreakdown(amount, svc || 0);
-      if(!confirm('¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + (cli ? cli.full_name : 'este cliente') + ' ahora?\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))) return;
-      const btn = document.getElementById('vcGo'); btn.disabled = true; btn.textContent = 'Cobrando…';
+      if(!confirm((later ? '¿Programar el cobro de $' + bd.total.toFixed(2) + ' a la tarjeta de ' + (cli ? cli.full_name : 'este cliente') + ' para el ' + formatDateUS(chargeOn) + '?' : '¿Cobrar $' + bd.total.toFixed(2) + ' a la tarjeta de ' + (cli ? cli.full_name : 'este cliente') + ' ahora?') + '\n\nPago a Venture: $' + bd.carrier.toFixed(2) + '\nService fee: $' + bd.serviceFee.toFixed(2) + '\nProcessing fee: $' + bd.processing.toFixed(2))) return;
+      const btn = document.getElementById('vcGo'); btn.disabled = true; btn.textContent = later ? 'Programando…' : 'Cobrando…';
       try{
         const { data: { session } } = await sb.auth.getSession();
         const resp = await fetch(SUPABASE_URL + '/functions/v1/charge-saved-card', { method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token, 'apikey': SUPABASE_ANON_KEY },
-          body: JSON.stringify({ policyId, dueDate: dueISO, amount, requestId }) });
+          body: JSON.stringify({ policyId, dueDate: dueISO, amount, requestId, chargeOn }) });
         const data = await resp.json().catch(() => ({}));
+        if(resp.ok && data.ok && data.scheduled){
+          ov.remove();
+          ventureToast('🗓️ Programado: el ' + formatDateUS(chargeOn) + ' se le cobrará $' + Number(data.total || bd.total).toFixed(2) + ' a ' + (cli ? cli.full_name : 'el cliente') + ' (Venture $' + amount.toFixed(2) + ')');
+          await loadVentureDueAlerts();
+          return;
+        }
         if(resp.ok && data.ok){
           ov.remove();
           ventureToast('✅ Se le cobró $' + Number(data.total || bd.total).toFixed(2) + ' a ' + (cli ? cli.full_name : 'el cliente') + (data.warning ? ' (ojo: ' + data.warning + ')' : ' — ahora entra a Venture y paga $' + amount.toFixed(2)));
@@ -12630,8 +12666,14 @@
       }catch(e){
         err('No hubo conexión con el servidor — NO se sabe si el cobro salió. Revisa el historial del cliente antes de volver a intentar.');
       }
-      btn.disabled = false; btn.textContent = 'Cobrar a la tarjeta';
+      btn.disabled = false; syncDate();
     };
+  }
+  async function cancelVentureScheduled(id){
+    if(!confirm('¿Cancelar el cobro programado? Después puedes volver a programarlo o cobrar ahora.')) return;
+    const { error } = await sb.from('venture_scheduled_charges').update({ status: 'cancelado', note: 'Cancelado desde el CRM.', processed_at: new Date().toISOString() }).eq('id', id).eq('status', 'programado');
+    if(error){ alert('No se pudo cancelar: ' + error.message); return; }
+    await loadVentureDueAlerts();
   }
   function copyVentureAmount(amt, evt){
     if(evt) evt.stopPropagation();
