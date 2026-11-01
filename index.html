@@ -12192,7 +12192,7 @@
       const dues = venturePolicyDues(p);
       return `Monto fijo: $${Number(p.auto_pay_fixed_amount || 0).toFixed(2)} por mes, ${p.auto_pay_months} pago${Number(p.auto_pay_months) === 1 ? '' : 's'}${dues.length ? ' (del ' + formatDateUS(dues[0]) + ' al ' + formatDateUS(dues[dues.length - 1]) + ')' : ''} — se cobra solo ${AUTOPAY_CHARGE_DAYS_BEFORE} días antes de cada fecha de pago`;
     }
-    if(p.auto_pay_mode === 'variable') return `Monto variable: te avisa ${AUTOPAY_NOTICE_DAYS} días antes de cada pago y tú pones el monto que pide Venture`;
+    if(p.auto_pay_mode === 'variable') return `Monto variable: te avisa ${AUTOPAY_NOTICE_DAYS} días antes de cada pago y tú pones el monto que pide Venture${p.auto_pay_charge_day ? ' · se le saca el dinero el día ' + Number(p.auto_pay_charge_day) + ' de cada mes' : ''}`;
     return 'Modo sin definir — desactívalo y vuelve a activarlo para escoger el modo';
   }
   async function editAutoPay(policyId){
@@ -12229,6 +12229,11 @@
         <label style="display:block; border:2px solid #C7D3F5; border-radius:12px; padding:12px; margin-bottom:10px; cursor:pointer;">
           <input type="radio" name="apMode" value="variable" ${curMode === 'variable' ? 'checked' : ''} style="margin-right:8px;"><strong>Monto variable</strong> <span class="sub">(recomendado cuando la aseguradora cambia unos dólares)</span>
           <div class="sub" style="margin-top:4px;">NO se cobra solo. ${AUTOPAY_NOTICE_DAYS} días antes de que le toque pagar te sale una alerta en Inicio y te llega un correo. Tú pones el monto que pide Venture ese mes, <strong>eliges el día en que se le saca el dinero al cliente</strong> (hoy o una fecha futura) y listo. A la tarjeta se le cobra como un <strong>pago asistido</strong>: lo de Venture + el service fee + el processing fee de Stripe.</div>
+          <div id="apVarDay" style="display:${curMode === 'variable' ? 'block' : 'none'}; margin-top:10px; padding:10px 12px; background:#EAF0FF; border:1.5px solid #C7D3F5; border-radius:10px;">
+            <div style="font-weight:700; font-size:13.5px;">🗓️ ¿Qué día del mes quieres que se le saque el dinero?</div>
+            <div class="sub" style="font-size:12.5px; margin:2px 0 8px;">Escribe el día (1 al 31), por ejemplo <strong>29</strong> = el 29 de cada mes. Cada mes, cuando pongas el monto que pide Venture, esa fecha sale ya puesta y solo la confirmas (la puedes cambiar ese mes). Si lo dejas vacío, el día lo escoges tú cada mes.</div>
+            <input type="text" id="apChargeDay" inputmode="numeric" maxlength="2" placeholder="Ej.: 29" value="${pol.auto_pay_charge_day ? Number(pol.auto_pay_charge_day) : ''}" oninput="this.value=this.value.replace(/[^0-9]/g,'')" style="width:110px; font-size:16px; padding:8px 10px;">
+          </div>
           <div id="apVarBox" style="display:${curMode === 'variable' && editing ? 'block' : 'none'}; margin-top:10px;">
             <div class="sub" style="font-size:12px;">Pago mensual de referencia ($) — es el que sale como sugerido al cobrar</div>
             <input type="text" id="apRef" inputmode="decimal" value="${Number(pol.monthly_payment || 0).toFixed(2)}" style="width:160px;">
@@ -12273,13 +12278,18 @@
       const bd = monthlyChargeBreakdown(amt, svcFee || 0);
       pv.innerHTML = `Cada mes se le cobra <strong>$${bd.total.toFixed(2)}</strong> a la tarjeta ($${bd.carrier.toFixed(2)} de Venture + $${bd.serviceFee.toFixed(2)} de service fee de pago asistido + $${bd.processing.toFixed(2)} de processing fee)${svcFee === null ? ' <span style="color:#8a6116;">⚠ no hay service fee de «Pago asistido» configurado para este producto</span>' : ''}. ${n} ${n === 1 ? 'vez' : 'veces'}:<br>` + list.slice(0, 12).map(escapeHtml).join('<br>') + (list.length > 12 ? '<br>…' : '');
     }
-    radios.forEach(r => r.addEventListener('change', () => { document.getElementById('apFixedBox').style.display = mode() === 'fixed' ? 'block' : 'none'; document.getElementById('apVarBox').style.display = (mode() === 'variable' && editing) ? 'block' : 'none'; previewFixed(); }));
+    radios.forEach(r => r.addEventListener('change', () => { document.getElementById('apFixedBox').style.display = mode() === 'fixed' ? 'block' : 'none'; document.getElementById('apVarBox').style.display = (mode() === 'variable' && editing) ? 'block' : 'none'; document.getElementById('apVarDay').style.display = mode() === 'variable' ? 'block' : 'none'; previewFixed(); }));
     previewFixed();
     ['apAmount', 'apStart', 'apMonths'].forEach(id => document.getElementById(id).addEventListener('input', previewFixed));
     document.getElementById('apCancel').onclick = () => ov.remove();
     document.getElementById('apGo').onclick = async () => {
       const err = document.getElementById('apErr'); err.style.display = 'none';
       const cfg = { mode: mode(), edit: editing };
+      if(cfg.mode === 'variable'){
+        const dv = String(document.getElementById('apChargeDay').value || '').trim();
+        if(dv){ const dn = parseInt(dv, 10); if(!(dn >= 1 && dn <= 31)){ err.textContent = 'El día del mes debe ser un número del 1 al 31.'; err.style.display = 'block'; return; } cfg.chargeDay = dn; }
+        else cfg.chargeDay = pol.auto_pay_charge_day ? null : undefined;     // vacío: se quita el día si había uno; si nunca hubo, no se toca la columna
+      }
       if(cfg.mode === 'variable' && editing){
         const ref = Math.round(Number(String(document.getElementById('apRef').value).replace(/[^0-9.]/g, '')) * 100) / 100;
         if(!(ref > 0)){ err.textContent = 'Escribe el pago mensual de referencia.'; err.style.display = 'block'; return; }
@@ -12347,6 +12357,7 @@
       ? { auto_pay_mode: 'fixed', auto_pay_fixed_amount: cfg.amount, auto_pay_start_date: cfg.start, auto_pay_months: cfg.months, auto_pay_end_date: cfg.end }
       : { auto_pay_mode: 'variable', auto_pay_fixed_amount: null, auto_pay_start_date: null, auto_pay_months: null, auto_pay_end_date: null };
     if(cfg.mode === 'variable' && cfg.ref) patch.monthly_payment = cfg.ref;
+    if(cfg.mode === 'variable' && cfg.chargeDay !== undefined) patch.auto_pay_charge_day = cfg.chargeDay;
     // ¿Lo que se cambió es algo que el cliente ya había autorizado? (modo, monto fijo, o alargar el periodo)
     let material = true;
     if(cfg.edit && pol.auto_pay_enabled){
@@ -12595,7 +12606,7 @@
     const n = ventureBadge.pay + ventureBadge.due;
     const badge = document.getElementById('navInicioBadge');
     if(badge){ badge.textContent = n; badge.style.display = n ? 'inline-block' : 'none'; }
-    document.title = n ? '(' + n + ') Pagos de Venture — ' + BASE_DOC_TITLE : BASE_DOC_TITLE;
+    document.title = n ? '(' + n + ') ' + BASE_DOC_TITLE : BASE_DOC_TITLE;
   }
   async function loadVentureDueAlerts(){
     if(!currentProfile || !isAdminUser()) return;
@@ -12684,6 +12695,15 @@
     const { fee, total } = calcStripeGrossUp(base, 'tarjeta');
     return { carrier: Number(carrierAmount) || 0, serviceFee: Number(serviceFee) || 0, processing: fee, total };
   }
+  // Fecha sugerida para sacar el dinero: el «día de cobro» de la póliza (p. ej. el 29) más cercano ANTES de la fecha de pago con Venture; si ya pasó, hoy.
+  function ventureDefaultChargeDate(dueISO, day, todayISO){
+    const dn = Number(day); if(!(dn >= 1 && dn <= 31)) return todayISO;
+    const pick = (y, m) => { const dim = new Date(y, m, 0).getDate(); return y + '-' + pad2(m) + '-' + pad2(Math.min(dn, dim)); };
+    const dy = +dueISO.slice(0, 4), dm = +dueISO.slice(5, 7);
+    let cand = pick(dy, dm);
+    if(cand > dueISO){ const pm = dm === 1 ? 12 : dm - 1; cand = pick(dm === 1 ? dy - 1 : dy, pm); }
+    return cand < todayISO ? todayISO : cand;
+  }
   async function openVentureChargeDialog(policyId, dueISO){
     const { data: pol } = await sb.from('client_policies').select('*').eq('id', policyId).single();
     if(!pol) return;
@@ -12695,6 +12715,7 @@
     const ref = Number(pol.monthly_payment || 0);
     const svc = await getAssistedServiceFee(pol.insurance_type);
     const todayISO = toISODateLocal(new Date());
+    const defaultChargeISO = ventureDefaultChargeDate(dueISO, pol.auto_pay_charge_day, todayISO);
     const maxChargeISO = isoAddDays(dueISO, 10);
     ov.innerHTML = `
       <div style="background:#fff; border-radius:16px; max-width:480px; width:100%; padding:20px;">
@@ -12706,7 +12727,8 @@
         <input type="text" id="vcAmount" inputmode="decimal" value="${ref ? ref.toFixed(2) : ''}" placeholder="0.00" style="width:100%; font-size:20px; padding:10px;" ${hasCard ? '' : 'disabled'}>
         <p class="sub" style="margin:6px 0 0;">Referencia del sistema: $${ref.toFixed(2)}. Pon aquí lo que Venture pide ahora (a veces cambia unos dólares o centavos).</p>
         <label class="sub" style="font-size:13px; font-weight:700; display:block; margin-top:12px;">Fecha en que se le saca el dinero al cliente</label>
-        <input type="text" id="vcDate" inputmode="numeric" maxlength="10" placeholder="MM/DD/AAAA" value="${formatDateUS(todayISO)}" oninput="maskDateInput(this); window.__vcDateChanged && window.__vcDateChanged()" style="width:180px; font-size:18px; padding:8px 10px;" ${hasCard ? '' : 'disabled'}>
+        <input type="text" id="vcDate" inputmode="numeric" maxlength="10" placeholder="MM/DD/AAAA" value="${formatDateUS(defaultChargeISO)}" oninput="maskDateInput(this); window.__vcDateChanged && window.__vcDateChanged()" style="width:180px; font-size:18px; padding:8px 10px;" ${hasCard ? '' : 'disabled'}>
+        ${pol.auto_pay_charge_day ? `<p class="sub" style="margin:4px 0 0;">Día de cobro de esta póliza: el <strong>${Number(pol.auto_pay_charge_day)}</strong> de cada mes (puedes cambiar la fecha solo para este mes).</p>` : ''}
         <p class="sub" id="vcDateHint" style="margin:4px 0 0;"></p>
         <div id="vcBreakdown" style="margin-top:10px; padding:10px 12px; background:#F4F6FB; border-radius:10px; font-size:14px;"></div>
         ${svc === null ? `<div style="margin-top:8px; padding:8px 10px; background:#FFF8EA; border:1.5px solid #F0D28A; border-radius:8px; color:#8a6116; font-size:12.5px;">⚠ No hay un service fee de «Pago asistido» configurado para este producto (Service Fees). Se cobraría con $0 de service fee.</div>` : ''}
