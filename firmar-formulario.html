@@ -146,18 +146,26 @@
   async function init(){
     S.token = new URLSearchParams(location.search).get('t') || '';
     if(!/^[A-Za-z0-9_-]{30,80}$/.test(S.token)){ msgScreen('🔗', 'Este link no es válido', 'Revisa que hayas copiado el link completo, o pídele a tu agente que te mande uno nuevo.'); return; }
+    await loadDoc();
+  }
+  // Carga el documento que toca firmar (un link de «paquete» trae varios: se firman uno tras otro, en orden).
+  async function loadDoc(){
     var d;
     try{ d = await api({ action: 'get', token: S.token }); }
     catch(e){ msgScreen('📡', 'No se pudo abrir', esc(e.message), '<p><button class="btn" onclick="location.reload()">Intentar de nuevo</button></p>'); return; }
     if(d.__status === 404 || (d.error && !d.status)){ msgScreen('🔗', 'Este link ya no está activo', esc(d.error || 'Pídele a tu agente que te mande uno nuevo.')); return; }
-    if(d.status === 'firmado'){ msgScreen('✅', 'Este documento ya fue firmado', 'Gracias. No necesitas hacer nada más.'); return; }
+    if(d.status === 'firmado'){ if(d.batch){ msgScreen('✅', 'Ya firmaste todos los documentos', 'Gracias. No necesitas hacer nada más.', batchList(d.batch)); } else msgScreen('✅', 'Este documento ya fue firmado', 'Gracias. No necesitas hacer nada más.'); return; }
     if(d.status === 'cancelado'){ msgScreen('🚫', 'Este documento fue cancelado', 'Tu agente lo canceló. Si necesitas firmar algo, pídele que te mande uno nuevo.'); return; }
     if(d.status === 'vencido'){ msgScreen('⌛', 'Este link venció', 'Pídele a tu agente que te mande uno nuevo.'); return; }
     if(d.status === 'procesando'){ msgScreen('⏳', 'Tu firma se está guardando', 'Espera un momento y vuelve a abrir el link.'); return; }
     if(d.status !== 'pendiente'){ msgScreen('⚠️', 'No se pudo abrir', esc(d.error || 'Intenta de nuevo.')); return; }
+    // Documento nuevo (o el siguiente del paquete): se limpia lo del anterior. La firma y las iniciales dibujadas se conservan.
+    var oldBar = document.querySelector('.bar'); if(oldBar) oldBar.remove(); var oldZoom = $('zoomc'); if(oldZoom) oldZoom.remove();
+    S.renderGen++; S.mustAdopt = false; S.values = {}; S.nextIds = []; S.pdf = null; S.pages = []; S.zoom = 1; S.busy = false; t0 = Date.now(); closeSheet();
     S.data = d;
     d.fields.forEach(function(f){ if(f.type === 'date' && d.today) S.values[f.id] = d.today; });
-    setMain('<div class="card"><h1>' + esc(d.title) + '</h1><p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
+    var bt = d.batch ? '<div class="sub" style="font-weight:700; color:#0B1F4B;">Documento ' + d.batch.index + ' de ' + d.batch.total + '</div>' : '';
+    setMain('<div class="card">' + bt + '<h1>' + esc(d.title) + '</h1><p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
       + '<div class="progress"><i id="pbar"></i></div><div class="sub" id="ptxt"></div></div><div id="msgbox"></div><div id="pages"></div>');
     var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<div class="bartxt" id="btxt"></div><div class="progress"><i id="pbar2"></i></div><button class="btn" id="nextbtn">Siguiente →</button>'; document.body.appendChild(bar);
     $('nextbtn').addEventListener('click', onNext);
@@ -170,9 +178,21 @@
       S.pdf = doc; await renderPages(doc);
     }catch(e){ msgScreen('📄', 'No se pudo mostrar el documento', esc(e.message || 'Intenta de nuevo.'), '<p><button class="btn" onclick="location.reload()">Intentar de nuevo</button></p>'); return; }
     refresh(); syncBar();
+    S.batchTotal = d.batch ? d.batch.total : 1;
+    // Antes de llenar nada: el cliente ADOPTA su firma (la dibuja una sola vez, obligatorio) y se pone en todos los lugares de firma.
+    var firstSig = d.fields.find(function(x){ return x.type === 'signature'; });
+    if(firstSig && !S.sig) setTimeout(function(){ if(!S.sig) openSignature(firstSig, true); }, 300);
+    if(S.listening){ return; } S.listening = true;
     var rt; window.addEventListener('resize', function(){ layout(); syncBar(); clearTimeout(rt); rt = setTimeout(function(){ var w = $('pages') ? $('pages').clientWidth : 0; if(w && Math.abs(w - S.lastW) > S.lastW * 0.12) drawCanvases(); }, 300); });
     window.addEventListener('orientationchange', function(){ setTimeout(function(){ layout(); syncBar(); drawCanvases(); }, 350); });
     if(window.visualViewport){ var vv = window.visualViewport; var fit = function(){ var sh = $('sheet'); if(!sh || sh.style.display !== 'block') return; var off = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); sh.style.bottom = off + 'px'; sh.style.maxHeight = Math.round(vv.height * 0.94) + 'px'; }; vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+  }
+  // Lista de los documentos del paquete con su estado (✓ firmado / ⏳ falta)
+  function batchList(b, downloads){
+    var dl = {}; (downloads || []).forEach(function(x){ dl[x.title] = x.url; });
+    return '<div style="text-align:left; margin:14px auto 0; max-width:420px;">' + b.items.map(function(it){
+      return '<div style="display:flex; gap:8px; align-items:center; padding:8px 4px; border-bottom:1px solid var(--line, #E1E5EE);"><span>' + (it.status === 'firmado' ? '✅' : (it.current ? '👉' : '⏳')) + '</span><span style="flex:1;">' + esc(it.title) + '</span>'
+        + (dl[it.title] ? '<a href="' + esc(dl[it.title]) + '" target="_blank" rel="noopener" style="font-weight:700;">⬇</a>' : '') + '</div>'; }).join('') + '</div>';
   }
   function syncBar(){ var b = document.querySelector('.bar'); if(b) document.documentElement.style.setProperty('--barh', b.offsetHeight + 'px'); }
 
@@ -286,7 +306,7 @@
   // ---------- hoja inferior ----------
   function showSheet(html){ $('sheet').innerHTML = html; $('sheet').style.display = 'block'; $('backdrop').style.display = 'block'; $('sheet').scrollTop = 0; document.body.style.overflow = 'hidden'; }
   function closeSheet(){ $('sheet').style.bottom = ''; $('sheet').style.maxHeight = ''; $('sheet').style.display = 'none'; $('backdrop').style.display = 'none'; $('sheet').innerHTML = ''; document.body.style.overflow = ''; }
-  $('backdrop').addEventListener('click', closeSheet);
+  $('backdrop').addEventListener('click', function(){ if(!S.mustAdopt) closeSheet(); });
 
   function maskDate(v){ var d = v.replace(/\D/g, '').slice(0, 8); var o = d.slice(0, 2); if(d.length > 2) o += '/' + d.slice(2, 4); if(d.length > 4) o += '/' + d.slice(4); return o; }
   function validDate(s){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s); if(!m) return false; var mo = +m[1], da = +m[2], yr = +m[3]; if(yr < 1900 || yr > 2100 || mo < 1 || mo > 12 || da < 1) return false; return da <= new Date(yr, mo, 0).getDate(); }
@@ -365,16 +385,17 @@
   }
 
   // ---------- firma con el dedo ----------
-  function openSignature(f){
-    var had = !!S.sig;
-    showSheet('<h2>Tu firma</h2><p class="sub">Firma con el dedo (o el mouse) dentro del recuadro.</p><div class="err" id="ferr" style="display:none;"></div>'
+  function openSignature(f, adopt){
+    var had = !!S.sig; S.mustAdopt = !!adopt && !had;
+    var nSig = S.data.fields.filter(function(x){ return x.type === 'signature'; }).length;
+    showSheet('<h2>' + (S.mustAdopt ? 'Adopta tu firma' : 'Tu firma') + '</h2><p class="sub">' + (S.mustAdopt ? 'Dibuja tu firma <b>una sola vez</b> (con el dedo o el mouse). Después la ponemos automáticamente en ' + (nSig > 1 ? 'los ' + nSig + ' lugares' : 'el lugar') + ' donde hay que firmar' + (S.batchTotal > 1 ? ', y también en tus demás documentos' : '') + '.' : 'Firma con el dedo (o el mouse) dentro del recuadro.') + '</p><div class="err" id="ferr" style="display:none;"></div>'
       + (had ? '<div id="prev" style="text-align:center; border:1.5px solid var(--line); border-radius:12px; padding:10px;"><img alt="Tu firma" src="' + S.sig + '" style="max-width:100%; max-height:140px;"><div class="sub">Esta es tu firma actual.</div></div><div class="row"><button type="button" class="btn ghost" id="redo">Dibujar de nuevo</button><button type="button" class="btn" id="keep">Usar esta firma</button></div>' : '')
       + '<div id="padarea" style="' + (had ? 'display:none;' : '') + '"><div id="padwrap"><canvas id="pad"></canvas><div id="padhint">Firma aquí</div></div>'
       + '<div class="row"><button type="button" class="btn ghost" id="clr">Borrar</button><button type="button" class="btn" id="sigok">Guardar firma</button></div></div>'
-      + '<div class="row" style="margin-top:6px;"><button type="button" class="btn ghost" id="fcancel">Cancelar</button></div>');
-    $('fcancel').addEventListener('click', closeSheet);
-    if(had){ $('keep').addEventListener('click', closeSheet); $('redo').addEventListener('click', function(){ $('prev').style.display = 'none'; $('redo').parentNode.style.display = 'none'; $('padarea').style.display = 'block'; setupPad({ h: 200, minLen: 30, minW: 20, minH: 8, maxOut: 700, bad: 'Dibuja tu firma completa dentro del recuadro.', onSave: function(url){ S.sig = url; closeSheet(); refresh(); } }); }); }
-    else setupPad({ h: 200, minLen: 30, minW: 20, minH: 8, maxOut: 700, bad: 'Dibuja tu firma completa dentro del recuadro.', onSave: function(url){ S.sig = url; closeSheet(); refresh(); } });
+      + (S.mustAdopt ? '' : '<div class="row" style="margin-top:6px;"><button type="button" class="btn ghost" id="fcancel">Cancelar</button></div>'));
+    if($('fcancel')) $('fcancel').addEventListener('click', closeSheet);
+    if(had){ $('keep').addEventListener('click', closeSheet); $('redo').addEventListener('click', function(){ $('prev').style.display = 'none'; $('redo').parentNode.style.display = 'none'; $('padarea').style.display = 'block'; setupPad({ h: 200, minLen: 30, minW: 20, minH: 8, maxOut: 700, bad: 'Dibuja tu firma completa dentro del recuadro.', onSave: function(url){ S.sig = url; S.mustAdopt = false; closeSheet(); refresh(); if(adopt){ var sgs = S.data.fields.filter(function(x){ return x.type === 'signature'; }); var el0 = sgs.length ? document.querySelector('.pf[data-id="' + sgs[0].id + '"]') : null; if(el0) setTimeout(function(){ el0.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 200); note('¡Listo! Tu firma ya quedó puesta en ' + (sgs.length > 1 ? 'los ' + sgs.length + ' lugares' : 'el lugar') + ' donde hay que firmar. Ahora llena lo que falta con «Siguiente campo».'); } } }); }); }
+    else setupPad({ h: 200, minLen: 30, minW: 20, minH: 8, maxOut: 700, bad: 'Dibuja tu firma completa dentro del recuadro.', onSave: function(url){ S.sig = url; S.mustAdopt = false; closeSheet(); refresh(); if(adopt){ var sgs = S.data.fields.filter(function(x){ return x.type === 'signature'; }); var el0 = sgs.length ? document.querySelector('.pf[data-id="' + sgs[0].id + '"]') : null; if(el0) setTimeout(function(){ el0.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 200); note('¡Listo! Tu firma ya quedó puesta en ' + (sgs.length > 1 ? 'los ' + sgs.length + ' lugares' : 'el lugar') + ' donde hay que firmar. Ahora llena lo que falta con «Siguiente campo».'); } } });
   }
   function setupPad(cfg){
     var cv = $('pad'); var dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -423,12 +444,25 @@
     var ref = ''; try{ ref = document.referrer ? new URL(document.referrer).host : ''; }catch(e){}
     var browser = { tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){ return ''; } })(), lang: navigator.language || '', screen: screen.width + 'x' + screen.height, touch: ('ontouchstart' in window) || navigator.maxTouchPoints > 0, seconds: Math.round((Date.now() - t0) / 1000), ref: ref };
     var r;
-    try{ r = await api({ action: 'submit', token: S.token, values: values, signatureImage: S.sig, initialsImage: fieldList().some(function(f){ return f.type === 'initials' && S.values[f.id] === '1'; }) ? S.initials : undefined, signerName: signerName, consent: true, browser: browser }); }
+    try{ r = await api({ action: 'submit', token: S.token, values: values, signatureImage: S.sig, initialsImage: fieldList().some(function(f){ return f.type === 'initials' && S.values[f.id] === '1'; }) ? S.initials : undefined, signerName: signerName, consent: true, browser: browser, docId: S.data && S.data.docId ? S.data.docId : undefined }); }
     catch(e){ S.busy = false; send.disabled = false; send.textContent = 'Firmar y enviar'; showErr(e.message); return; }
     S.busy = false;
+    if(r.ok && r.batch){
+      closeSheet(); document.querySelector('.bar') && document.querySelector('.bar').remove(); var zz = $('zoomc'); if(zz) zz.remove(); window.scrollTo(0, 0);
+      if(r.batch.next){
+        msgScreen('✅', 'Documento ' + (r.batch.signedCount) + ' de ' + r.batch.total + ' firmado', 'Muy bien. Todavía falta' + (r.batch.total - r.batch.signedCount === 1 ? ' 1 documento' : 'n ' + (r.batch.total - r.batch.signedCount) + ' documentos') + ' por firmar.',
+          batchList(r.batch) + '<p style="margin-top:18px;"><button class="btn green" id="nextdoc">Siguiente documento →</button></p>');
+        $('nextdoc').addEventListener('click', function(){ this.disabled = true; this.textContent = 'Abriendo…'; loadDoc(); });
+      } else {
+        msgScreen('🎉', '¡Firmaste los ' + r.batch.total + ' documentos!', 'Gracias por hacer negocios con GMAX All Insurance. Tu agente ya recibió los documentos firmados y te mandamos tu copia por correo. Ya puedes cerrar esta página.',
+          batchList(r.batch, r.batch.downloads) + '<p class="sub" style="margin-top:12px;">Las flechas ⬇ de descarga solo funcionan unos minutos.</p>');
+      }
+      return;
+    }
     if(r.ok){ closeSheet(); document.querySelector('.bar') && document.querySelector('.bar').remove(); window.scrollTo(0, 0);
       msgScreen('✅', '¡Firma enviada con éxito!', 'Gracias por hacer negocios con GMAX All Insurance. Tu agente ya recibió el documento firmado. Ya puedes cerrar esta página.',
         r.downloadUrl ? '<p style="margin-top:16px;"><a class="btn" href="' + esc(r.downloadUrl) + '" target="_blank" rel="noopener">⬇ Descargar mi copia</a></p><p class="sub">El botón de descarga solo funciona unos minutos.</p>' : ''); return; }
+    if(r.reload){ closeSheet(); loadDoc(); return; }
     if(r.__status === 404){ closeSheet(); msgScreen('🔗', 'Este link ya no está activo', 'Tu agente lo cambió o lo canceló. Pídele que te mande uno nuevo.'); return; }
     if(r.status === 'firmado'){ closeSheet(); msgScreen('✅', 'Este documento ya fue firmado', 'Gracias. No necesitas hacer nada más.'); return; }
     if(r.status === 'vencido'){ closeSheet(); msgScreen('⌛', 'Este link venció', 'Pídele a tu agente que te mande uno nuevo.'); return; }

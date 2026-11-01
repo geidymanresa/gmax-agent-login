@@ -982,6 +982,8 @@
 
 
 
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1064,6 +1066,7 @@
       <div class="fm-body">
         <!-- Paso 1 -->
         <div id="fm-step1">
+          <div class="fm-box" id="fm-queue-box" style="display:none; background:#EEF2FB; border-color:#B9C6E6;"></div>
           <div class="fm-box">
             <div class="msg" id="fm-msg1"></div>
             <div class="form-row"><label>Título del documento <span style="color:#C23B3B;">*</span></label>
@@ -1124,6 +1127,7 @@
             </span>
             <span style="flex:1;"></span>
             <label style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-send-email"> <span id="fm-send-email-label"></span></label>
+            <button type="button" class="btn-ghost" id="fm-add-btn" style="width:auto; padding:11px 16px; margin:0;" onclick="fmAddAnother()" title="Guarda este documento y elige otro: el cliente los firma todos con un solo link">➕ Agregar otro documento</button>
             <button type="button" class="btn-primary" id="fm-create-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCreate()">Crear link de firma →</button>
           </div>
         </div>
@@ -1277,6 +1281,8 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
 
 
 
@@ -2764,6 +2770,8 @@
 
 
 
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3673,6 +3681,12 @@
       <section class="dash-tab" id="tab-underwriting" style="display:none;">
         <h2>Underwriting</h2>
         <p class="sub">Revisión de documentos requeridos por póliza. Solo administradores tienen acceso.</p>
+
+        <div class="dash-card" id="uw-carrierReceiptsCard" style="display:none; background:#FFF4D6; border:2px solid #E3A81F; margin-bottom:20px;">
+          <h4 style="margin-top:0; color:#7A4F00;">🧾 Recibos de pago a la aseguradora por revisar</h4>
+          <p class="sub" style="margin:0 0 8px;">Cada pago asistido hecho dentro de la aseguradora (Venture u otra) tiene que traer su recibo. Revisa que el monto y el cliente coincidan; si algo no cuadra, recházalo y se le pide de nuevo.</p>
+          <div id="uw-carrierReceiptsBody"></div>
+        </div>
 
         <div class="dash-card" style="background:#FDEAEA; border:2px solid #E39C9C;">
           <h4 style="margin-top:0; color:#8a3030;">Pendientes de revisión (todas las fechas)</h4>
@@ -6804,6 +6818,10 @@
       docsByTx[doc.receipt_transaction_id].push(doc);
     }
 
+    try{
+      const crIds = (docs || []).filter(d => d.category === CARRIER_RECEIPT_CATEGORY).map(d => d.id);
+      if(crIds.length){ const { data: crs } = await sb.from('client_auto_charges').select('carrier_receipt_doc_id, carrier_receipt_status').in('carrier_receipt_doc_id', crIds); (crs || []).forEach(r => { carrierReceiptStatusByDoc[r.carrier_receipt_doc_id] = r.carrier_receipt_status; }); }
+    }catch(e){}
     const stamp = (iso) => { if(!iso) return ''; const d = new Date(iso); return formatDateUS(toISODateLocal(d)) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
     const money = (n) => '$' + Number(n || 0).toFixed(2);
     const failedHtml = failedCharges.map(c => `
@@ -6823,6 +6841,7 @@
             <div><strong>Cobrado el:</strong> ${stamp(t.receipt_issued_at || t.created_at)} — <strong>${money(t.total_reference)}</strong></div>
             <div><strong>Desglose:</strong> ${money(t.deposit_amount)} para la aseguradora + ${money(t.service_fee_amount)} service fee + ${money(t.processing_fee_estimate)} processing fee</div>
             ${t.notes ? `<div class="sub" style="font-size:12.5px; margin-top:2px;">${escapeHtml(t.notes)}</div>` : ''}
+            ${docsList.some(d => d.category === CARRIER_RECEIPT_CATEGORY && !/^✕ RECHAZADO/.test(d.file_name || '')) ? '' : '<div style="margin-top:4px; color:#B23A3A; font-weight:700;">⚠ Falta subir el recibo del pago a la aseguradora (obligatorio)</div>'}
           </div>` : '';
       const docsHtml = docsList.length === 0
         ? '<span class="sub" style="font-size:12.5px;">Sin documentos adjuntos todavía.</span>'
@@ -8170,7 +8189,7 @@
     }
     const { data: signed } = await sb.storage.from('client-documents').createSignedUrl(doc.storage_path, 300);
     const url = signed ? signed.signedUrl : '#';
-    return `<a href="${url}" target="_blank" rel="noopener">📎 ${doc.file_name}</a>`;
+    return `<a href="${url}" target="_blank" rel="noopener">📎 ${doc.file_name}</a>${doc.category === CARRIER_RECEIPT_CATEGORY ? carrierReceiptBadgeHtml(carrierReceiptStatusByDoc[doc.id]) : ''}`;
   }
 
   async function renderClientDocuments(){
@@ -12558,6 +12577,7 @@
       .order('charged_at', { ascending: true }).limit(50);
     if(error) return;
     const rows = data || [];
+    rows.forEach(r => { venturePayRows[r.id] = r; });
     ventureBadge.pay = rows.length; updateVentureBadge();
     // aviso emergente SOLO para cobros nuevos que aparecen mientras el CRM está abierto
     const ids = new Set(rows.map(r => r.id));
@@ -12584,11 +12604,13 @@
           <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${c.client_id}')"><strong>${c.client ? escapeHtml(c.client.full_name) : 'Cliente'}</strong> — ${polizaTxt}</div>
           <div style="margin-top:2px; font-size:14.5px;">💵 Se le retiró <strong>$${totalTxt}</strong> el ${formatDateTimeUS(c.charged_at)}${due ? ' · le toca pagar en Venture el <strong>' + formatDateUS(due) + '</strong>' : ''}</div>
           <div style="margin-top:2px; font-size:15px; color:#7A4F00;">➡ Paga en Venture: <strong>$${amt}</strong>${extraTxt}</div>
+          ${c.carrier_receipt_status === 'rechazado' ? `<div style="margin-top:4px; font-size:13.5px; color:#B23A3A; font-weight:700;">✕ El recibo que subiste fue rechazado${c.carrier_receipt_note ? ': ' + escapeHtml(c.carrier_receipt_note) : ''}. Súbelo otra vez.</div>` : ''}
+          <div style="margin-top:2px; font-size:12.5px; color:#7A4F00;">🧾 Al terminar tienes que subir el recibo de la aseguradora (es obligatorio).</div>
         </div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="copyVentureAmount('${amt}', event)">📋 Copiar monto</button>
           <button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="goToClientFromUnderwriting('${c.client_id}')">Ver cliente</button>
-          <button class="btn" style="width:auto; padding:8px 12px; background:#177A54; color:#fff; font-weight:700; border:0; border-radius:8px; cursor:pointer;" onclick="markVenturePaid('${c.id}', event)">✓ Ya pagué en Venture</button>
+          <button class="btn" style="width:auto; padding:8px 12px; background:#177A54; color:#fff; font-weight:700; border:0; border-radius:8px; cursor:pointer;" onclick="markVenturePaid('${c.id}', event)">${c.carrier_receipt_status === 'rechazado' ? '🧾 Subir recibo otra vez' : '✓ Ya pagué en Venture'}</button>
         </div>
       </div>`;
     }).join('');
@@ -12602,6 +12624,7 @@
   const VENTURE_DUE_OVERDUE_DAYS = 5;   // si no se cobró a tiempo, sigue saliendo hasta 5 días después de la fecha
   let ventureDueKnownKeys = null;
   const ventureBadge = { pay: 0, due: 0 };
+  const venturePayRows = {};
   function updateVentureBadge(){
     const n = ventureBadge.pay + ventureBadge.due;
     const badge = document.getElementById('navInicioBadge');
@@ -12843,12 +12866,155 @@
     if(evt) evt.stopPropagation();
     try{ navigator.clipboard.writeText(amt).then(function(){ ventureToast('Monto copiado: $' + amt); }); }catch(e){ ventureToast('Monto: $' + amt); }
   }
+  // ---------- 🧾 Recibo OBLIGATORIO del pago hecho dentro de la aseguradora ----------
+  // Cada pago asistido que se postea dentro de una aseguradora (Venture o cualquier otra) necesita su recibo.
+  // «Ya pagué» ya NO cierra nada por sí solo: abre esta ventana y no deja continuar hasta subir el archivo.
+  // El recibo queda en el historial de la póliza y en Underwriting «Recibos de pago a la aseguradora por revisar».
+  const CARRIER_RECEIPT_CATEGORY = 'Recibo de la aseguradora';
+  const CARRIER_RECEIPT_MAX_MB = 15;
+  const carrierReceiptStatusByDoc = {};
+  function isMissingColumnError(error){ return !!error && (error.code === '42703' || error.code === 'PGRST204' || /column|schema cache/i.test(error.message || '')); }
+  function carrierReceiptBadgeHtml(status){
+    const m = { pendiente_revision: ['#FFF3CD', '#8a6116', '⏳ En revisión'], aprobado: ['#E4F6EC', '#177A54', '✓ Aprobado'], rechazado: ['#FDEAEA', '#B23A3A', '✕ Rechazado'] }[status];
+    return m ? ` <span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700; background:${m[0]}; color:${m[1]};">${m[2]}</span>` : '';
+  }
+  // La transacción «Pago Asistido Automático» que se creó junto con este cobro (se empata por póliza y hora del cobro).
+  async function findAutoChargeTransaction(c){
+    if(!c || !c.policy_id) return null;
+    const { data } = await sb.from('client_transactions').select('id, created_at, receipt_issued_at')
+      .eq('policy_id', c.policy_id).eq('transaction_type', 'pago_automatico').order('created_at', { ascending: false }).limit(20);
+    const at = new Date(c.charged_at || 0).getTime(); let best = null, bestDiff = Infinity;
+    (data || []).forEach(t => { const d = Math.abs(new Date(t.receipt_issued_at || t.created_at).getTime() - at); if(d < bestDiff){ bestDiff = d; best = t; } });
+    return best && bestDiff <= 10 * 60 * 1000 ? best.id : null;
+  }
   async function markVenturePaid(id, evt){
     if(evt) evt.stopPropagation();
-    if(!confirm('¿Ya hiciste este pago dentro de Venture? Se quitará de la lista.')) return;
-    const { error } = await sb.from('client_auto_charges').update({ carrier_paid: true, carrier_paid_at: new Date().toISOString(), carrier_paid_by: currentProfile ? currentProfile.id : null, viewed: true }).eq('id', id);
-    if(error){ alert('No se pudo marcar: ' + error.message); return; }
-    await loadVenturePayAlerts(); await loadAutoChargeAlerts();
+    await openCarrierReceiptDialog(id);
+  }
+  async function openCarrierReceiptDialog(id){
+    let c = venturePayRows[id];
+    if(!c){ const { data } = await sb.from('client_auto_charges').select('*, client:client_id(full_name), policy:policy_id(policy_number, insurance_type, company)').eq('id', id).single(); c = data; }
+    if(!c){ alert('No se encontró este cobro. Actualiza la página.'); return; }
+    const who = c.client ? c.client.full_name : 'el cliente';
+    const carrier = (c.policy && c.policy.company) || 'la aseguradora';
+    const amt = Number(c.amount || 0).toFixed(2);
+    let ov = document.getElementById('carrierReceiptOverlay'); if(ov) ov.remove();
+    ov = document.createElement('div'); ov.id = 'carrierReceiptOverlay';
+    ov.style.cssText = 'position:fixed; inset:0; background:rgba(13,20,36,.55); z-index:9000; display:flex; align-items:center; justify-content:center; padding:14px;';
+    ov.innerHTML = `
+      <div style="background:#fff; border-radius:16px; max-width:480px; width:100%; padding:20px;">
+        <h3 style="margin:0 0 4px;">🧾 Sube el recibo del pago</h3>
+        <p class="sub" style="margin:0 0 12px;"><strong>${escapeHtml(who)}</strong> — pago de <strong>$${amt}</strong> a ${escapeHtml(carrier)}</p>
+        <div style="padding:10px 12px; background:#FFF4D6; border:1.5px solid #E3A81F; border-radius:8px; color:#7A4F00; font-size:14px; margin-bottom:12px;">Es <strong>obligatorio</strong>: sin el recibo que te da ${escapeHtml(carrier)} no se puede marcar este pago como hecho. El recibo queda en el historial de la póliza y pasa a revisión.</div>
+        <label class="sub" style="font-size:13px; font-weight:700;">Recibo (foto, captura o PDF)</label>
+        <input type="file" id="crFile" accept="image/*,application/pdf" style="width:100%; margin-top:4px;">
+        <div class="err" id="crErr" style="display:none; background:#FDEAEA; color:#B23A3A; border-radius:10px; padding:8px 10px; margin:10px 0 0;"></div>
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+          <button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" id="crCancel">Cancelar</button>
+          <button type="button" class="btn-primary" style="width:auto; padding:8px 16px;" id="crGo" disabled>Subir recibo y marcar como pagado</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const err = (m) => { const e = document.getElementById('crErr'); e.textContent = m; e.style.display = m ? 'block' : 'none'; };
+    const fileEl = document.getElementById('crFile'), go = document.getElementById('crGo');
+    document.getElementById('crCancel').onclick = () => ov.remove();
+    const check = () => {
+      const f = fileEl.files && fileEl.files[0]; err('');
+      if(!f){ go.disabled = true; return null; }
+      if(!(/^image\//.test(f.type) || f.type === 'application/pdf')){ err('El recibo tiene que ser una foto o un PDF.'); go.disabled = true; return null; }
+      if(f.size > CARRIER_RECEIPT_MAX_MB * 1024 * 1024){ err('El archivo pesa más de ' + CARRIER_RECEIPT_MAX_MB + ' MB. Sube una foto más liviana o un PDF más pequeño.'); go.disabled = true; return null; }
+      go.disabled = false; return f;
+    };
+    fileEl.addEventListener('change', check);
+    go.onclick = async () => {
+      const file = check();
+      if(!file){ err('Primero sube el recibo: es obligatorio.'); return; }
+      go.disabled = true; go.textContent = 'Subiendo…';
+      const r = await submitCarrierReceipt(c, file);
+      if(r.ok){ ov.remove(); ventureToast('✅ Recibo subido — quedó en revisión' + (r.warning ? ' (' + r.warning + ')' : '')); await loadVenturePayAlerts(); await loadAutoChargeAlerts(); try{ if(currentClientId === c.client_id){ await loadClientTransactions(currentClientId); await loadClientDocuments(currentClientId); } }catch(e){} }
+      else { err(r.error); go.disabled = false; go.textContent = 'Subir recibo y marcar como pagado'; }
+    };
+  }
+  async function submitCarrierReceipt(c, file){
+    if(!file) return { ok: false, error: 'Primero sube el recibo: es obligatorio.' };
+    const { data: { session } } = await sb.auth.getSession();
+    const uid = session && session.user ? session.user.id : null;
+    const txId = await findAutoChargeTransaction(c);
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${c.client_id}/${Date.now()}_${safeName}`;
+    const up = await sb.storage.from('client-documents').upload(path, file);
+    if(up.error) return { ok: false, error: 'No se pudo subir el recibo: ' + up.error.message + '. No se marcó como pagado.' };
+    const carrier = (c.policy && c.policy.company) || 'aseguradora';
+    const ins = await sb.from('client_documents').insert({
+      client_id: c.client_id, policy_id: c.policy_id || null, receipt_transaction_id: txId,
+      file_name: `Recibo de pago a ${carrier} — ${file.name}`, storage_path: path, category: CARRIER_RECEIPT_CATEGORY, uploaded_by: uid
+    }).select().single();
+    if(ins.error || !ins.data){ try{ await sb.storage.from('client-documents').remove([path]); }catch(e){} return { ok: false, error: 'El recibo se subió pero no se pudo guardar en Documentos: ' + ((ins.error && ins.error.message) || 'error') + '. No se marcó como pagado.' }; }
+    const nowIso = new Date().toISOString();
+    const full = { carrier_paid: true, carrier_paid_at: nowIso, carrier_paid_by: uid, viewed: true,
+      carrier_receipt_status: 'pendiente_revision', carrier_receipt_doc_id: ins.data.id, carrier_receipt_path: path, carrier_receipt_uploaded_at: nowIso,
+      carrier_receipt_note: null, carrier_receipt_reviewed_by: null, carrier_receipt_reviewed_at: null };
+    let upd = await sb.from('client_auto_charges').update(full).eq('id', c.id);
+    let warning = null;
+    if(upd.error && isMissingColumnError(upd.error)){
+      // Todavía no se corrió migracion_recibo_aseguradora.sql: el recibo ya quedó guardado, pero sin cola de revisión.
+      upd = await sb.from('client_auto_charges').update({ carrier_paid: true, carrier_paid_at: nowIso, carrier_paid_by: uid, viewed: true }).eq('id', c.id);
+      warning = 'falta correr «migracion_recibo_aseguradora.sql» para que salga en Underwriting';
+    }
+    if(upd.error){
+      try{ await sb.from('client_documents').delete().eq('id', ins.data.id); await sb.storage.from('client-documents').remove([path]); }catch(e){}
+      return { ok: false, error: 'No se pudo marcar como pagado: ' + upd.error.message };
+    }
+    delete venturePayRows[c.id];
+    return { ok: true, warning, docId: ins.data.id, transactionId: txId };
+  }
+  // ---- Revisión de esos recibos (Underwriting) ----
+  async function loadCarrierReceiptReviews(){
+    const card = document.getElementById('uw-carrierReceiptsCard'); const body = document.getElementById('uw-carrierReceiptsBody');
+    if(!card || !body) return;
+    if(!currentProfile || !isAdminUser()){ card.style.display = 'none'; return; }
+    const { data, error } = await sb.from('client_auto_charges')
+      .select('*, client:client_id(full_name), policy:policy_id(policy_number, insurance_type, company)')
+      .eq('carrier_receipt_status', 'pendiente_revision').order('carrier_receipt_uploaded_at', { ascending: true });
+    if(error || !data || !data.length){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    body.innerHTML = (await Promise.all(data.map(async c => {
+      let link = '<span class="sub">Sin archivo</span>';
+      if(c.carrier_receipt_path){ const { data: signed } = await sb.storage.from('client-documents').createSignedUrl(c.carrier_receipt_path, 600); if(signed) link = `<a href="${signed.signedUrl}" target="_blank" rel="noopener">👁 Ver recibo</a>`; }
+      const polizaTxt = c.policy ? ((INSURANCE_TYPE_LABELS[c.policy.insurance_type] || c.policy.insurance_type || '') + (c.policy.policy_number ? ' (#' + escapeHtml(c.policy.policy_number) + ')' : '')) : '';
+      return `
+      <div style="padding:10px 0; border-bottom:1px solid #EBCB7A; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="flex:1; min-width:220px;">
+          <div><strong>${c.client ? escapeHtml(c.client.full_name) : 'Cliente'}</strong> — ${polizaTxt}${c.policy && c.policy.company ? ' · ' + escapeHtml(c.policy.company) : ''}</div>
+          <div class="sub" style="margin-top:2px;">Pago asistido a la aseguradora: <strong>$${Number(c.amount || 0).toFixed(2)}</strong> · recibo subido el ${c.carrier_receipt_uploaded_at ? formatDateTimeUS(c.carrier_receipt_uploaded_at) : ''}</div>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+          ${link}
+          <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.client_id}')">Ver cliente</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 10px; color:#C23B3B; border-color:#F0C6C6;" onclick="rejectCarrierReceipt('${c.id}')">✕ Rechazar</button>
+          <button class="btn-primary" style="width:auto; padding:6px 12px;" onclick="approveCarrierReceipt('${c.id}')">Aprobar</button>
+        </div>
+      </div>`;
+    }))).join('');
+  }
+  async function approveCarrierReceipt(id){
+    if(!confirm('¿El recibo coincide con el pago (cliente, monto y aseguradora)? Se aprueba y queda en el historial.')) return;
+    const { data: { session } } = await sb.auth.getSession();
+    const { data: row } = await sb.from('client_auto_charges').select('carrier_receipt_doc_id').eq('id', id).single();
+    const { error } = await sb.from('client_auto_charges').update({ carrier_receipt_status: 'aprobado', carrier_receipt_reviewed_by: session.user.id, carrier_receipt_reviewed_at: new Date().toISOString(), carrier_receipt_note: null }).eq('id', id);
+    if(error){ alert('No se pudo aprobar: ' + error.message); return; }
+    await loadCarrierReceiptReviews();
+  }
+  async function rejectCarrierReceipt(id){
+    const nota = prompt('¿Por qué se rechaza este recibo? (se le muestra a quien lo subió, y el pago vuelve a «Pagar en Venture»)', '');
+    if(nota === null) return;
+    if(!nota.trim()){ alert('Escribe el motivo del rechazo.'); return; }
+    const { data: { session } } = await sb.auth.getSession();
+    const { data: row } = await sb.from('client_auto_charges').select('carrier_receipt_doc_id').eq('id', id).single();
+    const { error } = await sb.from('client_auto_charges').update({ carrier_receipt_status: 'rechazado', carrier_receipt_note: nota.trim(), carrier_receipt_reviewed_by: session.user.id, carrier_receipt_reviewed_at: new Date().toISOString(), carrier_paid: false, carrier_paid_at: null, viewed: false }).eq('id', id);
+    if(error){ alert('No se pudo rechazar: ' + error.message); return; }
+    if(row && row.carrier_receipt_doc_id){ try{ const { data: d } = await sb.from('client_documents').select('file_name').eq('id', row.carrier_receipt_doc_id).single(); if(d && !/^✕ RECHAZADO/.test(d.file_name)) await sb.from('client_documents').update({ file_name: '✕ RECHAZADO — ' + d.file_name }).eq('id', row.carrier_receipt_doc_id); }catch(e){} }
+    await loadCarrierReceiptReviews(); try{ await loadVenturePayAlerts(); }catch(e){}
   }
 
   async function markAutoChargeViewed(id, evt){
@@ -17138,6 +17304,8 @@ async function saSaveSettings(){
 
 
 
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -17173,7 +17341,7 @@ const FM_EVENT_LABELS = {
   completed: 'Documento firmado y guardado', failed: 'Falló al guardar la firma (se puede reintentar)', cancelled: 'Se canceló'
 };
 const FM = { clientId: null, client: null, source: 'upload', template: null, templates: [], bytes: null, pdf: null, pages: [], fields: [],
-  sel: null, title: '', created: null, pdfjsP: null, busy: false, cardTimer: null, step: 1, templateDirty: false };
+  sel: null, title: '', created: null, pdfjsP: null, busy: false, cardTimer: null, step: 1, templateDirty: false, queue: [] };
 
 function fmEsc(s){ return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function fmClamp(n, a, b){ return Math.min(b, Math.max(a, n)); }
@@ -17224,7 +17392,7 @@ function fmLoadPdfJs(){
 // =============== VENTANA «FIRMAR DOCUMENTO» ===============
 function fmReset(){
   FM.source = 'upload'; FM.template = null; FM.bytes = null; FM.pdf = null; FM.pages = []; FM.fields = []; FM.sel = null;
-  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false; FM.reopen = null;
+  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false; FM.reopen = null; FM.queue = [];
   const pg = document.getElementById('fm-pages'); if(pg) pg.innerHTML = '';
   ['fm-msg1', 'fm-msg2', 'fm-msg3'].forEach(id => fmMsg(id, '', ''));
   const t = document.getElementById('fm-title'); if(t) t.value = '';
@@ -17249,7 +17417,7 @@ async function fmOpen(clientId){
 }
 
 function fmClose(force){
-  if(!force && FM.step === 2 && FM.fields.length > 0 && !confirm('Vas a salir sin crear el link. Se pierden los campos que marcaste (si no los guardaste como plantilla). ¿Salir?')) return;
+  if(!force && ((FM.step === 2 && FM.fields.length > 0) || (FM.step !== 3 && FM.queue && FM.queue.length > 0)) && !confirm('Vas a salir sin crear el link' + (FM.queue && FM.queue.length ? ' de los ' + (FM.queue.length + (FM.step === 2 ? 1 : 0)) + ' documentos' : '') + '. Se pierden los campos que marcaste (si no los guardaste como plantilla). ¿Salir?')) return;
   document.getElementById('fmOverlay').style.display = 'none';
   document.body.style.overflow = '';
   fmReset();
@@ -17259,7 +17427,10 @@ function fmClose(force){
 function fmStep(n){
   FM.step = n;
   [1, 2, 3].forEach(i => { document.getElementById('fm-step' + i).style.display = (i === n) ? 'block' : 'none'; });
-  document.getElementById('fm-stepnum').textContent = n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar';
+  const qn = (FM.queue || []).length, pre = (qn > 0 && n < 3) ? 'Documento ' + (qn + 1) + ' · ' : '';
+  document.getElementById('fm-stepnum').textContent = pre + (n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar');
+  fmRenderQueue();
+  const cb2 = document.getElementById('fm-create-btn'); if(cb2 && !FM.busy) cb2.textContent = qn > 0 ? 'Crear link de los ' + (qn + 1) + ' documentos →' : 'Crear link de firma →';
   const ov = document.getElementById('fmOverlay'); if(ov) ov.scrollTop = 0;
   const body = ov && ov.querySelector('.fm-body'); if(body) body.classList.toggle('fm-wide', n === 2);
   if(n === 2){
@@ -17615,7 +17786,7 @@ function fmValidate(){
   const bad = FM.fields.find(f => !String(f.label || '').trim());
   if(bad){ fmSelect(bad.id, true); return 'Hay un campo sin nombre. Escribe qué le vas a pedir al cliente.'; }
   const dup = FM.fields.filter(f => f.type === 'signature').length;
-  return dup > 6 ? 'Hay demasiados campos de firma.' : '';
+  return dup > 100 ? 'Hay demasiados campos de firma (máximo 100).' : '';
 }
 
 async function fmSaveTemplate(update){
@@ -17637,12 +17808,74 @@ async function fmSaveTemplate(update){
   FM.busy = false;
 }
 
+// ---- PAQUETE: varios documentos, un solo link ----
+// «Agregar otro documento» guarda el documento actual (con sus campos) en la cola y vuelve al paso 1.
+// Al final, «Crear link» crea todos juntos y el cliente los firma uno tras otro con UN solo link.
+const FM_MAX_BATCH = 6;
+function fmSnapshotCurrent(){ return { title: FM.title, source: FM.source, templateId: FM.template ? FM.template.id : null, bytes: FM.bytes, fields: fmCleanFields() }; }
+function fmRenderQueue(){
+  const box = document.getElementById('fm-queue-box'); if(!box) return;
+  const q = FM.queue || [];
+  if(q.length === 0 || FM.step === 3){ box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-weight:700; margin-bottom:6px;">📦 Paquete: ' + q.length + ' documento' + (q.length === 1 ? '' : 's') + ' listo' + (q.length === 1 ? '' : 's') + (FM.step === 1 ? ' (este será el ' + (q.length + 1) + ')' : '') + '</div>'
+    + q.map((d, i) => '<div style="display:flex; gap:8px; align-items:center; padding:5px 0; border-top:1px solid #D5DAE8; font-size:14px;"><span style="flex:1;">' + (i + 1) + '. ' + fmEsc(d.title) + ' <span class="sub" style="margin:0;">· ' + d.fields.length + ' campo' + (d.fields.length === 1 ? '' : 's') + '</span></span>'
+      + (FM.step === 1 ? '<button type="button" class="btn-ghost" style="width:auto; padding:3px 10px; font-size:12.5px; color:#B23A3A;" onclick="fmRemoveQueued(' + i + ')">Quitar</button>' : '') + '</div>').join('')
+    + '<div class="sub" style="margin:6px 0 0;">El cliente recibe UN solo link y firma los documentos uno tras otro, en este orden.</div>';
+}
+function fmRemoveQueued(i){
+  const d = FM.queue[i]; if(!d) return;
+  if(!confirm('¿Quitar «' + d.title + '» del paquete?')) return;
+  FM.queue.splice(i, 1); fmRenderQueue(); fmStep(FM.step);
+}
+function fmAddAnother(){
+  fmMsg('fm-msg2', '', '');
+  const err = fmValidate(); if(err){ fmMsg('fm-msg2', 'error', err); return; }
+  if(FM.busy) return;
+  if(FM.queue.length + 1 >= FM_MAX_BATCH){ fmMsg('fm-msg2', 'error', 'Un paquete puede tener máximo ' + FM_MAX_BATCH + ' documentos. Crea el link con estos.'); return; }
+  const snap = fmSnapshotCurrent(); FM.queue.push(snap);
+  // limpiar SOLO lo del documento actual (el cliente, el paquete y el correo se conservan)
+  FM.source = 'upload'; FM.template = null; FM.bytes = null; FM.pdf = null; FM.pages = []; FM.fields = []; FM.sel = null; FM.title = ''; FM.templateDirty = false; FM.reopen = null;
+  const pg = document.getElementById('fm-pages'); if(pg) pg.innerHTML = '';
+  const t = document.getElementById('fm-title'); if(t) t.value = '';
+  const f = document.getElementById('fm-file'); if(f) f.value = '';
+  const tn = document.getElementById('fm-tpl-name'); if(tn) tn.value = '';
+  fmOnSourceChange(); fmStep(1);
+  fmMsg('fm-msg1', 'success', '✓ «' + snap.title + '» quedó en el paquete. Ahora elige el documento ' + (FM.queue.length + 1) + ' (otra plantilla o un PDF nuevo).');
+}
+
+async function fmCreateBatch(btn, emailOn){
+  const docs = FM.queue.concat([fmSnapshotCurrent()]);
+  const made = []; let lk;
+  try{
+    const b = await fmCall({ action: 'batch_create', clientId: FM.clientId });
+    for(let i = 0; i < docs.length; i++){
+      btn.textContent = 'Creando documento ' + (i + 1) + ' de ' + docs.length + '…';
+      const d = docs[i];
+      const body = { action: 'create', clientId: FM.clientId, batchId: b.batchId, title: d.title, fields: d.fields, linkBase: fmLinkBase() };
+      if(d.source === 'template' && d.templateId) body.templateId = d.templateId; else body.pdfBase64 = fmBytesToB64(d.bytes);
+      const r = await fmCall(body); made.push(r.requestId);
+    }
+    btn.textContent = 'Armando el link…';
+    lk = await fmCall({ action: 'batch_link', batchId: b.batchId, linkBase: fmLinkBase(), ...(emailOn ? { emailTo: FM.client.email } : {}) });
+    lk.batchId = b.batchId;
+  }catch(e){
+    for(const id of made){ try{ await fmCall({ action: 'cancel', requestId: id }); }catch(_){} }
+    throw new Error('No se pudo crear el paquete de documentos: ' + (e.message || e) + (made.length ? ' (lo que alcanzó a crearse se canceló; vuelve a intentar)' : ''));
+  }
+  return { ...lk, requestId: made[0], requestIds: made, documents: docs.length };
+}
+
 async function fmCreate(){
   fmMsg('fm-msg2', '', '');
   const err = fmValidate(); if(err){ fmMsg('fm-msg2', 'error', err); return; }
   if(FM.busy) return; FM.busy = true;
   const btn = document.getElementById('fm-create-btn'); btn.disabled = true; btn.textContent = 'Creando…';
   try{
+    if(FM.queue.length > 0){
+      const r = await fmCreateBatch(btn, !!(document.getElementById('fm-send-email').checked && FM.client && FM.client.email));
+      FM.created = r; fmShowDone(r); FM.busy = false; btn.disabled = false; fmStep(3); return;
+    }
     const body = { action: 'create', clientId: FM.clientId, title: FM.title, fields: fmCleanFields(), linkBase: fmLinkBase() };
     if(FM.source === 'template' && FM.template) body.templateId = FM.template.id;
     else body.pdfBase64 = fmBytesToB64(FM.bytes);
@@ -17652,7 +17885,7 @@ async function fmCreate(){
     if(FM.reopen && FM.reopen.replaces){ try{ await fmCall({ action: 'cancel', requestId: FM.reopen.replaces }); r.replacedOld = true; }catch(e){ r.replacedOld = false; } }
     fmShowDone(r);
   }catch(e){ fmMsg('fm-msg2', 'error', e.message); }
-  FM.busy = false; btn.disabled = false; btn.textContent = 'Crear link de firma →';
+  FM.busy = false; btn.disabled = false; btn.textContent = (FM.queue.length > 0 ? 'Crear link de los ' + (FM.queue.length + 1) + ' documentos →' : 'Crear link de firma →');
 }
 
 function fmShowDone(r){
@@ -17660,9 +17893,10 @@ function fmShowDone(r){
   document.getElementById('fm-link').value = r.link;
   const exp = r.expiresAt ? new Date(r.expiresAt).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' }) : '';
   document.getElementById('fm-done-exp').textContent = exp ? 'El link vence el ' + exp + '.' : '';
-  if(r.emailed) fmMsg('fm-msg3', 'success', '✓ Se mandó el link por correo a ' + r.emailedTo + '. También lo puedes copiar aquí abajo.');
+  const nd = r.documents > 1 ? r.documents : 0;
+  if(r.emailed) fmMsg('fm-msg3', 'success', '✓ ' + (nd ? 'Link ÚNICO de los ' + nd + ' documentos creado. ' : '') + 'Se mandó el link por correo a ' + r.emailedTo + '. También lo puedes copiar aquí abajo.');
   else if(r.emailError) fmMsg('fm-msg3', 'error', 'El link se creó pero el correo no se pudo mandar: ' + r.emailError + ' Copia el link y mándaselo tú.');
-  else fmMsg('fm-msg3', 'success', '✓ Link creado. Cópialo y mándaselo al cliente (mensaje de texto, WhatsApp, etc.).');
+  else fmMsg('fm-msg3', 'success', nd ? '✓ Link ÚNICO creado para los ' + nd + ' documentos: el cliente los firma uno tras otro. Cópialo y mándaselo (mensaje de texto, WhatsApp, etc.).' : '✓ Link creado. Cópialo y mándaselo al cliente (mensaje de texto, WhatsApp, etc.).');
   const hasEmail = FM.client && FM.client.email;
   document.getElementById('fm-done-email-btn').style.display = (r.emailed || !hasEmail) ? 'none' : 'inline-block';
   if(r.replacedOld) fmMsg('fm-msg3', document.getElementById('fm-msg3').className.includes('error') ? 'error' : 'success', document.getElementById('fm-msg3').textContent + ' (El link anterior sin firmar se canceló.)');
@@ -17696,8 +17930,10 @@ async function fmLoadCard(clientId){
   const tb = document.getElementById('cd-firmasList'); if(!tb) return;
   let rows = [], err = null;
   try{
-    const r = await sb.from('sign_requests').select('id,title,status,created_at,expires_at,emailed_to,emailed_at,first_viewed_at,signer_name,signed_at,signed_path,created_by_name,link_issued_at')
-      .eq('client_id', clientId).order('created_at', { ascending: false });
+    const COLS = 'id,title,status,created_at,expires_at,emailed_to,emailed_at,first_viewed_at,signer_name,signed_at,signed_path,created_by_name,link_issued_at';
+    let r = await sb.from('sign_requests').select(COLS + ',batch_id,batch_pos').eq('client_id', clientId).order('created_at', { ascending: false });
+    // Si todavía no se corrió migracion_firma_paquetes.sql, la tarjeta sigue funcionando como siempre (sin paquetes).
+    if(r.error && /batch_id|batch_pos/.test(String(r.error.message || ''))) r = await sb.from('sign_requests').select(COLS).eq('client_id', clientId).order('created_at', { ascending: false });
     if(r.error) throw r.error; rows = r.data || [];
   }catch(e){ err = e; }
   if(clientId !== currentClientId) return;
@@ -17711,6 +17947,7 @@ async function fmLoadCard(clientId){
   const keepMsg = document.getElementById('fm-card-msg'); if(keepMsg && keepMsg.classList.contains('error') && /migracion_firma|No se pudo cargar/.test(keepMsg.textContent)) fmMsg('fm-card-msg', '', '');
   if(rows.length === 0){ tb.innerHTML = '<tr><td colspan="5">Todavía no le has mandado ningún documento a firmar a este cliente. Toca «Firmar documento».</td></tr>'; return; }
   const now = Date.now(); const isAdm = typeof isAdminUser === 'function' && isAdminUser();
+  const batchCount = {}; rows.forEach(x => { if(x.batch_id && x.status !== 'cancelado') batchCount[x.batch_id] = (batchCount[x.batch_id] || 0) + 1; });
   tb.innerHTML = rows.map(r => {
     let ui = FM_STATUS_UI[r.status] || { text: r.status, cls: 'gray' };
     let sub = '';
@@ -17720,7 +17957,7 @@ async function fmLoadCard(clientId){
     const sent = r.emailed_to ? ('✉️ ' + fmEsc(r.emailed_to) + (r.emailed_at ? '<div class="sub" style="margin:0;">' + formatDateTimeUS(r.emailed_at) + '</div>' : '')) : '<span class="sub" style="margin:0;">Link copiado / sin enviar</span>';
     let acts = '';
     if(r.status === 'pendiente'){
-      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardCopy('${r.id}')">📋 Link nuevo</button> `;
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardCopy('${r.id}', ${r.batch_id ? 'true' : 'false'})">📋 Link nuevo${r.batch_id ? ' del paquete' : ''}</button> `;
       acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardEmail('${r.id}')">✉️ Enviar por correo</button> `;
       acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px; color:#B23A3A;" onclick="fmCardCancel('${r.id}')">Cancelar</button> `;
     }
@@ -17730,7 +17967,7 @@ async function fmLoadCard(clientId){
     acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmCardEvents('${r.id}')">Historial</button>`;
     return `<tr>
       <td data-label="Fecha">${formatDateTimeUS(r.created_at)}${r.created_by_name ? '<div class="sub" style="margin:0;">por ' + fmEsc(r.created_by_name) + '</div>' : ''}</td>
-      <td data-label="Documento"><strong>${fmEsc(r.title)}</strong></td>
+      <td data-label="Documento"><strong>${fmEsc(r.title)}</strong>${r.batch_id ? '<div class="sub" style="margin:2px 0 0;">📦 Paquete · documento ' + (r.batch_pos || '') + ' de ' + (batchCount[r.batch_id] || '') + ' (un solo link)</div>' : ''}</td>
       <td data-label="Estado"><span class="badge ${ui.cls}">${ui.text}</span>${sub ? '<div class="sub" style="margin:4px 0 0;">' + sub + '</div>' : ''}</td>
       <td data-label="Enviado a">${sent}</td>
       <td data-label="">${acts}</td></tr>`;
@@ -17743,8 +17980,8 @@ function fmCardLinkBox(r, note){
   el.innerHTML = '✓ ' + fmEsc(note) + '<br><input type="text" id="fm-card-link" readonly style="width:100%; margin-top:6px; padding:8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px;" onclick="this.select()">';
   document.getElementById('fm-card-link').value = r.link;
 }
-async function fmCardCopy(id){
-  if(!confirm('Esto crea un link NUEVO para este documento. Si ya le mandaste un link al cliente, ese deja de servir. ¿Continuar?')) return;
+async function fmCardCopy(id, inBatch){
+  if(!confirm(inBatch ? 'Esto crea un link NUEVO para todo el paquete (los documentos que faltan por firmar). Si ya le mandaste un link al cliente, ese deja de servir. ¿Continuar?' : 'Esto crea un link NUEVO para este documento. Si ya le mandaste un link al cliente, ese deja de servir. ¿Continuar?')) return;
   fmMsg('fm-card-msg', 'success', 'Generando link…');
   try{
     const r = await fmCall({ action: 'issue_link', requestId: id, linkBase: fmLinkBase() });
@@ -17768,7 +18005,7 @@ async function fmCardEmail(id){
   }catch(e){ fmMsg('fm-card-msg', 'error', e.message); }
 }
 async function fmCardCancel(id){
-  if(!confirm('¿Cancelar este documento? El link que se le mandó al cliente dejará de funcionar.')) return;
+  if(!confirm('¿Cancelar este documento? El link que se le mandó al cliente dejará de funcionar. (Si es de un paquete, solo se cancela este documento: el cliente seguirá con los demás.)')) return;
   try{ await fmCall({ action: 'cancel', requestId: id }); fmMsg('fm-card-msg', 'success', 'Documento cancelado.'); fmRefreshCardSoon(currentClientId); }
   catch(e){ fmMsg('fm-card-msg', 'error', e.message); }
 }
@@ -18416,6 +18653,7 @@ function pwBusy(b){ PW.busy = b; document.querySelectorAll('#tab-pagina button, 
       .eq('resolved', false)
       .order('due_date', { ascending: true });
     renderUnderwritingPending(reqs || []);
+    try{ await loadCarrierReceiptReviews(); }catch(e){}
   }
 
   function renderUnderwritingPending(reqs){
@@ -18517,7 +18755,18 @@ function pwBusy(b){ PW.busy = b; document.querySelectorAll('#tab-pagina button, 
     document.getElementById('uw-review-row-' + requirementId).style.display = 'table-row';
   }
 
+  // Los recibos (pago asistido, reinstalación) y el documento del endorsement son OBLIGATORIOS: no se aprueban sin el archivo.
+  function isMandatoryReceiptItem(item){ return /^Subir el (recibo|documento de endorsement)/i.test((item && item.label) || ''); }
   async function approveRequirement(id){
+    const { data: reqChk } = await sb.from('client_requirements').select('*').eq('id', id).single();
+    if(reqChk){
+      const mand = (reqChk.checklist || []).filter(isMandatoryReceiptItem);
+      if(mand.length){
+        const { data: docsChk } = await sb.from('client_documents').select('file_name, storage_path').eq('client_id', reqChk.client_id);
+        const faltan = mand.filter(i => !i.done || !(docsChk || []).some(d => d.storage_path && d.file_name && d.file_name.startsWith(i.label)));
+        if(faltan.length){ alert('No se puede aprobar: falta subir el archivo obligatorio — ' + faltan.map(i => i.label).join('; ') + '.'); return; }
+      }
+    }
     if(!confirm('¿Dar el visto bueno a este requisito? Esto lo cerrará y desaparecerá la alerta del agente.')) return;
     const { data: { session } } = await sb.auth.getSession();
     const { error } = await sb.from('client_requirements').update({
