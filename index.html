@@ -984,6 +984,8 @@
 
 
 
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1023,7 +1025,16 @@
       #fmOverlay .fm-side #fm-props{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line, #E3E6EE); }
       #fmOverlay .fm-side #fm-props input[type="text"]{ width:100%; box-sizing:border-box; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; padding:8px 9px; font:inherit; font-size:14px; }
       #fmOverlay .fm-ti{ margin-right:4px; }
+      #fmOverlay #fm-tpl-box select, #fmOverlay #fm-tpl-company-save{ padding:10px 12px; border:1.5px solid var(--line, #E3E6EE); border-radius:10px; font:inherit; font-size:14.5px; background:#fff; color:inherit; box-sizing:border-box; min-width:0; }
+      #fmOverlay #fm-tpl-company-save{ width:200px !important; }
       #fmOverlay .fm-tplwrap{ display:contents; }
+      /* Modo «Marcar campos del formulario» (desde Recursos): sin cliente, sin crear link */
+      #fmOverlay.fm-tplmode .fm-req-only{ display:none !important; }
+      #fmOverlay.fm-tplmode #fm-bar-more{ display:none !important; }
+      #fmOverlay.fm-tplmode #fm-step2 .fm-bar .fm-tplwrap{ display:flex !important; gap:8px; flex-wrap:wrap; align-items:center; }
+      #fmOverlay .fm-val{ margin-top:8px; padding:8px 10px; border:1.5px dashed #0B1F4B55; border-radius:10px; background:#F7F9FE; }
+      #fmOverlay .fm-field .fm-fval{ font-size:12px; font-weight:600; color:#0A1A5C; padding:0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+      #fmOverlay .fm-field.hasval{ background:rgba(255,255,255,.55) !important; border-style:dashed; }
       /* Los avisos del paso 2 (ej. error al crear el link) se quedan a la vista aunque estés abajo en el documento */
       #fmOverlay #fm-msg2{ position:sticky; top:calc(var(--fm-top-h, 58px) + 8px); z-index:8; box-shadow:0 4px 14px rgba(13,20,36,.22); font-size:14.5px; font-weight:600; border:1.5px solid currentColor; }
       @media (max-width:820px){
@@ -1060,7 +1071,7 @@
     </style>
     <div id="fmOverlay" role="dialog" aria-modal="true" aria-label="Firmar documento">
       <div class="fm-top">
-        <h3>Firmar documento <small><span id="fm-client-name"></span> · <span id="fm-stepnum"></span></small></h3>
+        <h3><span id="fm-top-title">Firmar documento</span> <small><span id="fm-client-name"></span> · <span id="fm-stepnum"></span></small></h3>
         <button type="button" class="fm-x" onclick="fmClose(false)">✕ Cerrar</button>
       </div>
       <div class="fm-body">
@@ -1072,20 +1083,21 @@
             <div class="form-row"><label>Título del documento <span style="color:#C23B3B;">*</span></label>
               <input type="text" id="fm-title" maxlength="160" placeholder="Ej: Cambio de dirección — Progressive"></div>
             <div style="display:flex; gap:18px; flex-wrap:wrap; margin:6px 0 10px;">
-              <label style="display:flex; gap:6px; align-items:center; cursor:pointer;"><input type="radio" name="fm-src" id="fm-src-template" onchange="fmOnSourceChange()"> Usar una plantilla guardada</label>
-              <label style="display:flex; gap:6px; align-items:center; cursor:pointer;"><input type="radio" name="fm-src" id="fm-src-upload" checked onchange="fmOnSourceChange()"> Subir un PDF nuevo</label>
+              <label style="display:flex; gap:6px; align-items:center; cursor:pointer;"><input type="radio" name="fm-src" id="fm-src-upload" checked onchange="fmOnSourceChange()"> 📄 Nuevo documento (subir un PDF de mi computadora)</label>
+              <label style="display:flex; gap:6px; align-items:center; cursor:pointer;"><input type="radio" name="fm-src" id="fm-src-template" onchange="fmOnSourceChange()"> 📁 Agregar formulario (de las compañías)</label>
             </div>
             <div id="fm-tpl-box" style="display:none;">
               <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                <select id="fm-tpl-select" onchange="fmOnTemplatePick()" style="flex:1; min-width:220px;"></select>
-                <button type="button" class="btn-ghost" id="fm-tpl-del" style="width:auto; padding:9px 14px; color:#B23A3A; display:none;" onclick="fmDeleteTemplate()">🗑️ Borrar plantilla</button>
+                <select id="fm-tpl-company" onchange="fmOnCompanyPick()" style="flex:1; min-width:200px;" aria-label="Compañía"></select>
+                <select id="fm-tpl-select" onchange="fmOnTemplatePick()" style="flex:1; min-width:220px;" aria-label="Formulario"></select>
+                <button type="button" class="btn-ghost" id="fm-tpl-del" style="width:auto; padding:9px 14px; color:#B23A3A; display:none;" onclick="fmDeleteTemplate()">🗑️ Borrar formulario</button>
               </div>
-              <p class="sub" style="margin:8px 0 0;">Las plantillas guardan el PDF y dónde van los campos. Podrás ajustar los campos antes de mandarlo.</p>
+              <p class="sub" id="fm-tpl-note" style="margin:8px 0 0;">Primero elige la compañía y luego el formulario. Los formularios los sube la administradora en <b>Recursos → Formularios y documentos</b>. Podrás ajustar los campos y escribir datos dentro del documento antes de mandarlo.</p>
             </div>
-            <div id="fm-tpl-empty" class="sub" style="display:none;">Todavía no hay plantillas guardadas. Sube un PDF y, en el siguiente paso, tócale «Guardar como plantilla».</div>
+            <div id="fm-tpl-empty" class="sub" style="display:none;">Todavía no hay formularios guardados. La administradora los sube en Recursos → «Formularios y documentos» (o sube un PDF nuevo aquí y, en el siguiente paso, tócale «Guardar como formulario»).</div>
             <div id="fm-up-box">
               <input type="file" id="fm-file" accept="application/pdf,.pdf">
-              <p class="sub" style="margin:8px 0 0;">PDF de hasta 8 MB y 30 páginas. Puede ser el formulario de la compañía tal cual.</p>
+              <p class="sub" style="margin:8px 0 0;">PDF de hasta 8 MB y 30 páginas.</p>
             </div>
             <button type="button" class="btn-primary" id="fm-start-btn" style="width:auto; padding:12px 24px; margin-top:12px;" onclick="fmStart()">Continuar →</button>
           </div>
@@ -1118,17 +1130,18 @@
             </div>
           </div>
           <div class="fm-bar">
-            <button type="button" class="btn-ghost" style="width:auto; padding:10px 16px;" onclick="if(FM.fields.length===0 || confirm('Volver al paso 1 pierde los campos que marcaste. ¿Volver?')){ fmStep(1); }">← Atrás</button>
+            <button type="button" class="btn-ghost fm-req-only" style="width:auto; padding:10px 16px;" onclick="if(FM.fields.length===0 || confirm('Volver al paso 1 pierde los campos que marcaste. ¿Volver?')){ fmStep(1); }">← Atrás</button>
             <button type="button" class="btn-ghost fm-bar-more" id="fm-bar-more" style="width:auto; padding:10px 14px; display:none;" onclick="this.closest('.fm-bar').classList.toggle('fm-open')">💾 Plantilla ▾</button>
             <span class="fm-tplwrap">
-              <input type="text" id="fm-tpl-name" maxlength="120" placeholder="Nombre de la plantilla" style="width:170px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; display:none;">
-              <button type="button" class="btn-ghost" id="fm-tpl-save-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(false)">💾 Guardar como plantilla</button>
-              <button type="button" class="btn-ghost" id="fm-tpl-update-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(true)">💾 Actualizar plantilla</button>
+              <input type="text" id="fm-tpl-name" maxlength="120" placeholder="Nombre del formulario" style="width:170px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; display:none;">
+              <select id="fm-tpl-company-save" style="width:170px; padding:9px 10px; border:1.5px solid var(--line); border-radius:8px; display:none;" title="Compañía a la que pertenece el formulario" aria-label="Compañía del formulario"></select>
+              <button type="button" class="btn-ghost" id="fm-tpl-save-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(false)">💾 Guardar como formulario</button>
+              <button type="button" class="btn-ghost" id="fm-tpl-update-btn" style="width:auto; padding:10px 14px; display:none;" onclick="fmSaveTemplate(true)">💾 Actualizar formulario</button>
             </span>
             <span style="flex:1;"></span>
-            <label style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-send-email"> <span id="fm-send-email-label"></span></label>
-            <button type="button" class="btn-ghost" id="fm-add-btn" style="width:auto; padding:11px 16px; margin:0;" onclick="fmAddAnother()" title="Guarda este documento y elige otro: el cliente los firma todos con un solo link">➕ Agregar otro documento</button>
-            <button type="button" class="btn-primary" id="fm-create-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCreate()">Crear link de firma →</button>
+            <label class="fm-req-only" style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-send-email"> <span id="fm-send-email-label"></span></label>
+            <button type="button" class="btn-ghost fm-req-only" id="fm-add-btn" style="width:auto; padding:11px 16px; margin:0;" onclick="fmAddAnother()" title="Guarda este documento y elige otro: el cliente los firma todos con un solo link">➕ Agregar otro documento</button>
+            <button type="button" class="btn-primary fm-req-only" id="fm-create-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCreate()">Crear link de firma →</button>
           </div>
         </div>
         <!-- Paso 3 -->
@@ -1281,6 +1294,8 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
 
 
 
@@ -2793,6 +2808,8 @@
 
 
 
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3142,6 +3159,27 @@
           <p class="sub" style="margin-bottom:10px;">Formularios de cancelación, de aseguradoras, y otros documentos listos para usar.</p>
           <div id="res-formulariosList"><p class="sub">Cargando...</p></div>
         </div>
+
+<!-- ===== FIRMAS-RECURSOS-START ===== -->
+        <div class="dash-card" id="fm-rec-card">
+          <h4>📁 Formularios y documentos</h4>
+          <p class="sub" style="margin-bottom:10px;">Los formularios de cada compañía, guardados por compañía (por ejemplo, el «Statement of No Loss» de Safeco o el «EFT» de Venture). Cuando un agente pide firmas a un cliente y toca <b>Agregar formulario</b>, elige la compañía y le salen estos formularios para mandarlos a firmar.</p>
+          <div class="msg" id="fm-rec-msg2"></div>
+          <div id="fm-rec-admin" style="display:none; background:var(--canvas, #F4F6FB); border:1.5px solid var(--line, #E3E6EE); border-radius:12px; padding:14px; margin-bottom:6px;">
+            <div style="font-weight:700; margin-bottom:8px;">Agregar un formulario</div>
+            <div class="form-row-2">
+              <div class="form-row"><label>Compañía</label><select id="fm-rec-company"><option value="">Elige la compañía…</option></select></div>
+              <div class="form-row"><label>Nombre del formulario</label><input type="text" id="fm-rec-name" maxlength="120" placeholder="Ej: Statement of No Loss"></div>
+            </div>
+            <div class="form-row"><label>Archivo PDF (hasta 8 MB y 30 páginas)</label><input type="file" id="fm-rec-file" accept="application/pdf,.pdf"></div>
+            <div class="msg" id="fm-rec-msg"></div>
+            <button type="button" class="btn-primary" id="fm-rec-btn" style="width:auto; padding:10px 20px;" onclick="fmRecUpload()">Guardar formulario</button>
+            <p class="sub" style="margin:8px 0 0;">Después de guardarlo puedes marcar dónde va la firma y los datos con <b>🖊️ Marcar campos</b>.</p>
+          </div>
+          <div id="fm-rec-list"><p class="sub">Cargando...</p></div>
+        </div>
+<!-- ===== FIRMAS-RECURSOS-END ===== -->
+
 
         <div class="dash-card">
           <h4>🏢 Información de aseguradoras</h4>
@@ -17555,6 +17593,8 @@ async function saSaveSettings(){
 
 
 
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -17590,7 +17630,8 @@ const FM_EVENT_LABELS = {
   completed: 'Documento firmado y guardado', failed: 'Falló al guardar la firma (se puede reintentar)', cancelled: 'Se canceló'
 };
 const FM = { clientId: null, client: null, source: 'upload', template: null, templates: [], bytes: null, pdf: null, pages: [], fields: [],
-  sel: null, title: '', created: null, pdfjsP: null, busy: false, cardTimer: null, step: 1, templateDirty: false, queue: [] };
+  sel: null, title: '', created: null, pdfjsP: null, busy: false, cardTimer: null, step: 1, templateDirty: false, queue: [],
+  companies: [], noCompanyCols: false, tplMode: false, recRows: [] };
 
 function fmEsc(s){ return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function fmClamp(n, a, b){ return Math.min(b, Math.max(a, n)); }
@@ -17641,12 +17682,15 @@ function fmLoadPdfJs(){
 // =============== VENTANA «FIRMAR DOCUMENTO» ===============
 function fmReset(){
   FM.source = 'upload'; FM.template = null; FM.bytes = null; FM.pdf = null; FM.pages = []; FM.fields = []; FM.sel = null;
-  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false; FM.reopen = null; FM.queue = [];
+  FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false; FM.reopen = null; FM.queue = []; FM.tplMode = false;
+  const ovr = document.getElementById('fmOverlay'); if(ovr) ovr.classList.remove('fm-tplmode');
+  const ttl = document.getElementById('fm-top-title'); if(ttl) ttl.textContent = 'Firmar documento';
   const pg = document.getElementById('fm-pages'); if(pg) pg.innerHTML = '';
   ['fm-msg1', 'fm-msg2', 'fm-msg3'].forEach(id => fmMsg(id, '', ''));
   const t = document.getElementById('fm-title'); if(t) t.value = '';
   const f = document.getElementById('fm-file'); if(f) f.value = '';
   const tn = document.getElementById('fm-tpl-name'); if(tn) tn.value = '';
+  const ub = document.getElementById('fm-tpl-update-btn'); if(ub) ub.textContent = '💾 Actualizar formulario';
 }
 
 async function fmOpen(clientId){
@@ -17666,6 +17710,11 @@ async function fmOpen(clientId){
 }
 
 function fmClose(force){
+  if(FM.tplMode){
+    if(!force && FM.templateDirty && !confirm('Hay cambios sin guardar en este formulario. Si sales, se pierden. ¿Salir?')) return;
+    document.getElementById('fmOverlay').style.display = 'none'; document.body.style.overflow = '';
+    fmReset(); fmLoadRecursos().catch(() => {}); return;
+  }
   if(!force && ((FM.step === 2 && FM.fields.length > 0) || (FM.step !== 3 && FM.queue && FM.queue.length > 0)) && !confirm('Vas a salir sin crear el link' + (FM.queue && FM.queue.length ? ' de los ' + (FM.queue.length + (FM.step === 2 ? 1 : 0)) + ' documentos' : '') + '. Se pierden los campos que marcaste (si no los guardaste como plantilla). ¿Salir?')) return;
   document.getElementById('fmOverlay').style.display = 'none';
   document.body.style.overflow = '';
@@ -17677,7 +17726,8 @@ function fmStep(n){
   FM.step = n;
   [1, 2, 3].forEach(i => { document.getElementById('fm-step' + i).style.display = (i === n) ? 'block' : 'none'; });
   const qn = (FM.queue || []).length, pre = (qn > 0 && n < 3) ? 'Documento ' + (qn + 1) + ' · ' : '';
-  document.getElementById('fm-stepnum').textContent = pre + (n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar');
+  if(FM.tplMode){ document.getElementById('fm-stepnum').textContent = 'Marca dónde va cada cosa y toca «Guardar formulario»'; }
+  else document.getElementById('fm-stepnum').textContent = pre + (n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar');
   fmRenderQueue();
   const cb2 = document.getElementById('fm-create-btn'); if(cb2 && !FM.busy) cb2.textContent = qn > 0 ? 'Crear link de los ' + (qn + 1) + ' documentos →' : 'Crear link de firma →';
   const ov = document.getElementById('fmOverlay'); if(ov) ov.scrollTop = 0;
@@ -17721,29 +17771,93 @@ function fmUpdateCurPage(){
   el.textContent = mobile ? ('Pág. ' + pg.n + '/' + FM.pages.length) : ('Estás en la página ' + pg.n + ' de ' + FM.pages.length);
 }
 
+async function fmLoadCompanies(){
+  try{
+    const r = await sb.rpc('list_active_companies');
+    FM.companies = ((r && r.data) || []).map(c => ({ id: c.id, name: String(c.name || '').trim() })).filter(c => c.id && c.name).sort((x, y) => x.name.localeCompare(y.name, 'es', { sensitivity: 'base' }));
+  }catch(e){ FM.companies = []; }
+  return FM.companies;
+}
+// Nombre de la compañía de un formulario (el actual de la lista; si ya no existe, el que se guardó)
+function fmCoName(t){
+  if(!t || !t.company_id) return '';
+  const c = (FM.companies || []).find(x => x.id === t.company_id);
+  return c ? c.name : (t.company_name || 'Otra compañía');
+}
+const FM_NO_CO = '__none';
+// Opciones de compañía (para guardar un formulario): «General» + todas las compañías activas
+function fmCompanyOptionsHtml(selectedId, generalText){
+  return '<option value="">' + fmEsc(generalText || 'General (sin compañía)') + '</option>' + (FM.companies || []).map(c => '<option value="' + c.id + '"' + (c.id === selectedId ? ' selected' : '') + '>' + fmEsc(c.name) + '</option>').join('');
+}
+
 async function fmLoadTemplates(){
   const sel = document.getElementById('fm-tpl-select');
   sel.innerHTML = '<option value="">Cargando…</option>';
   let rows = [], err = null;
+  await fmLoadCompanies();
   try{
-    const r = await sb.from('sign_templates').select('id,name,description,page_count,fields,updated_at').order('name', { ascending: true });
+    let r = await sb.from('sign_templates').select('id,name,description,page_count,fields,updated_at,company_id,company_name').order('name', { ascending: true });
+    // Si todavía no se corrió migracion_formularios_por_compania.sql, las plantillas siguen funcionando (sin compañía).
+    FM.noCompanyCols = false;
+    if(r.error && /company_id|company_name/.test(String(r.error.message || ''))){
+      FM.noCompanyCols = true;
+      r = await sb.from('sign_templates').select('id,name,description,page_count,fields,updated_at').order('name', { ascending: true });
+    }
     if(r.error) throw r.error; rows = r.data || [];
   }catch(e){ err = e; }
   FM.templates = rows;
   if(err){
     const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
     sel.innerHTML = '<option value="">—</option>';
-    fmMsg('fm-msg1', 'error', missing ? 'Falta correr «migracion_firma_formularios.sql» en Supabase (SQL Editor) para poder usar esta función.' : 'No se pudieron cargar las plantillas: ' + (err.message || err));
+    fmMsg('fm-msg1', 'error', missing ? 'Falta correr «migracion_firma_formularios.sql» en Supabase (SQL Editor) para poder usar esta función.' : 'No se pudieron cargar los formularios: ' + (err.message || err));
     document.getElementById('fm-src-template').disabled = true;
     document.getElementById('fm-src-upload').checked = true; fmOnSourceChange();
     return;
   }
   document.getElementById('fm-src-template').disabled = rows.length === 0;
-  sel.innerHTML = '<option value="">Elige una plantilla…</option>' + rows.map(t => `<option value="${t.id}">${fmEsc(t.name)} (${t.page_count} pág.)</option>`).join('');
+  fmRenderCompanySelect(); fmRenderTemplateSelect();
   document.getElementById('fm-tpl-empty').style.display = rows.length === 0 ? 'block' : 'none';
   if(rows.length > 0){ document.getElementById('fm-src-template').checked = true; } else { document.getElementById('fm-src-upload').checked = true; }
   fmOnSourceChange();
 }
+
+// Compañías: todas las activas (con cuántos formularios tienen) + «Generales» si hay formularios sin compañía.
+function fmRenderCompanySelect(){
+  const cs = document.getElementById('fm-tpl-company'); if(!cs) return;
+  const keep = cs.value;
+  if(FM.noCompanyCols){ cs.style.display = 'none'; cs.innerHTML = '<option value="">Todas</option>'; return; }
+  cs.style.display = '';
+  const count = (id) => FM.templates.filter(t => t.company_id === id).length;
+  const known = new Set((FM.companies || []).map(c => c.id));
+  const extra = []; FM.templates.forEach(t => { if(t.company_id && !known.has(t.company_id) && !extra.some(x => x.id === t.company_id)) extra.push({ id: t.company_id, name: t.company_name || 'Otra compañía' }); });
+  const all = (FM.companies || []).concat(extra);
+  let h = '<option value="">Todas las compañías (' + FM.templates.length + ')</option>';
+  all.forEach(c => { const n = count(c.id); h += '<option value="' + c.id + '">' + fmEsc(c.name) + (n ? ' (' + n + ')' : ' — todavía sin formularios') + '</option>'; });
+  const gen = FM.templates.filter(t => !t.company_id).length;
+  if(gen) h += '<option value="' + FM_NO_CO + '">Generales (sin compañía) (' + gen + ')</option>';
+  cs.innerHTML = h;
+  if(keep && Array.from(cs.options).some(o => o.value === keep)) cs.value = keep;
+}
+// Formularios de la compañía elegida (o todos, agrupados por compañía).
+function fmRenderTemplateSelect(){
+  const sel = document.getElementById('fm-tpl-select'); if(!sel) return;
+  const keep = sel.value;
+  const cs = document.getElementById('fm-tpl-company'); const co = (cs && !FM.noCompanyCols) ? cs.value : '';
+  const opt = (t) => '<option value="' + t.id + '">' + fmEsc(t.name) + ' (' + t.page_count + ' pág.)' + ((t.fields || []).length ? '' : ' · sin campos marcados') + '</option>';
+  let h = '<option value="">' + (co && co !== FM_NO_CO && !FM.templates.some(t => t.company_id === co) ? 'No hay formularios de esta compañía' : 'Elige un formulario…') + '</option>';
+  if(co === FM_NO_CO) h += FM.templates.filter(t => !t.company_id).map(opt).join('');
+  else if(co) h += FM.templates.filter(t => t.company_id === co).map(opt).join('');
+  else if(FM.noCompanyCols) h += FM.templates.map(opt).join('');
+  else{
+    const groups = new Map();
+    FM.templates.forEach(t => { const k = t.company_id || ''; if(!groups.has(k)) groups.set(k, []); groups.get(k).push(t); });
+    const keys = Array.from(groups.keys()).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : fmCoName(groups.get(a)[0]).localeCompare(fmCoName(groups.get(b)[0]), 'es', { sensitivity: 'base' })));
+    keys.forEach(k => { h += '<optgroup label="' + fmEsc(k ? fmCoName(groups.get(k)[0]) : 'Generales (sin compañía)') + '">' + groups.get(k).map(opt).join('') + '</optgroup>'; });
+  }
+  sel.innerHTML = h;
+  if(keep && Array.from(sel.options).some(o => o.value === keep)) sel.value = keep;
+}
+function fmOnCompanyPick(){ fmRenderTemplateSelect(); document.getElementById('fm-tpl-select').value = ''; }
 
 function fmOnSourceChange(){
   const useTpl = document.getElementById('fm-src-template').checked;
@@ -17756,14 +17870,16 @@ function fmOnTemplatePick(){
   const t = FM.templates.find(x => x.id === id);
   const ti = document.getElementById('fm-title');
   if(t && !ti.value.trim()) ti.value = t.name;
+  if(t && (t.fields || []).length === 0) fmMsg('fm-msg1', 'success', 'Este formulario todavía no tiene los campos marcados (firma, datos…). Al continuar los marcas tú; la administradora también puede dejarlos listos en Recursos → «Formularios y documentos» → «Marcar campos».');
+  else if(document.getElementById('fm-msg1').classList.contains('success')) fmMsg('fm-msg1', '', '');
 }
 
 async function fmDeleteTemplate(){
   const id = document.getElementById('fm-tpl-select').value;
   const t = FM.templates.find(x => x.id === id);
-  if(!t){ fmMsg('fm-msg1', 'error', 'Elige primero la plantilla que quieres borrar.'); return; }
-  if(!confirm('¿Borrar la plantilla «' + t.name + '»? Los documentos que ya mandaste a firmar con ella NO se afectan.')) return;
-  try{ await fmCall({ action: 'template_archive', id }); fmMsg('fm-msg1', 'success', 'Plantilla borrada.'); await fmLoadTemplates(); }
+  if(!t){ fmMsg('fm-msg1', 'error', 'Elige primero el formulario que quieres borrar.'); return; }
+  if(!confirm('¿Borrar el formulario «' + t.name + '»? Los documentos que ya mandaste a firmar con él NO se afectan.')) return;
+  try{ await fmCall({ action: 'template_archive', id }); fmMsg('fm-msg1', 'success', 'Formulario borrado.'); await fmLoadTemplates(); }
   catch(e){ fmMsg('fm-msg1', 'error', e.message); }
 }
 
@@ -17832,6 +17948,7 @@ async function fmStart(){
       const resp = await fetch(url); if(!resp.ok) throw new Error('No se pudo leer el PDF de la plantilla.');
       bytes = new Uint8Array(await resp.arrayBuffer());
       fields = JSON.parse(JSON.stringify(tpl.fields || []));
+      fields.forEach(f => { if(f.value) f._tplValue = f.value; });   // lo escrito de fábrica en el formulario (ej. código de agencia) se conserva si se actualiza
     }else{
       const file = document.getElementById('fm-file').files[0];
       if(!file) throw new Error('Elige el archivo PDF.');
@@ -17863,12 +17980,15 @@ async function fmStart(){
     document.getElementById('fm-tpl-save-btn').style.display = (typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none';
     document.getElementById('fm-tpl-name').style.display = (typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none';
     document.getElementById('fm-tpl-name').value = useTpl ? '' : title;
+    const csv = document.getElementById('fm-tpl-company-save');
+    if(csv){ csv.innerHTML = fmCompanyOptionsHtml(''); csv.style.display = (!FM.noCompanyCols && typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none'; }
     const em = FM.client && FM.client.email ? FM.client.email : '';
     const cb = document.getElementById('fm-send-email'), lb = document.getElementById('fm-send-email-label');
     cb.checked = !!em; cb.disabled = !em;
     lb.textContent = em ? ('Mandar también el link por correo a ' + em) : 'Este cliente no tiene correo registrado (podrás copiar el link)';
     document.getElementById('fm-doc-title').textContent = title;
     fmStep(2);
+    if(useTpl && tpl && fields.length === 0) fmMsg('fm-msg2', 'success', 'Este formulario todavía no tiene campos marcados. Agrega la firma y lo que necesites con los botones de la izquierda.');
     await fmRenderPages();
     fmRenderFields(); fmRenderProps(); fmSizeBars(); fmUpdateCurPage();
     if(FM.reopen){
@@ -17919,6 +18039,7 @@ function fmRenderFields(){
     el.style.borderColor = t.color; el.style.background = t.color + '26';
     const lab = document.createElement('span'); lab.className = 'fm-flabel'; lab.style.color = t.color; lab.textContent = (f.type === 'check' ? '' : t.icon + ' ') + f.label + (f.required ? ' *' : '') + (f.type === 'check' && f.group ? ' · ' + f.group : '');
     el.appendChild(lab);
+    fmPaintValue(el, f);
     const h = document.createElement('div'); h.className = 'fm-handle'; el.appendChild(h);
     fmPos(el, f); pg.el.appendChild(el);
     fmBindField(el, h, f, pg);
@@ -17926,7 +18047,19 @@ function fmRenderFields(){
   document.getElementById('fm-count').textContent = FM.fields.length + (FM.fields.length === 1 ? ' campo' : ' campos');
   fmRenderChips();
 }
+// Lo que la agencia ya escribió dentro del documento se ve en el recuadro (como quedará en el PDF).
+function fmPaintValue(el, f){
+  const old = el.querySelector('.fm-fval'); if(old) old.remove();
+  const lab = el.querySelector('.fm-flabel');
+  const has = !!(f.value && String(f.value).trim());
+  el.classList.toggle('hasval', has);
+  if(!has){ if(lab) lab.style.display = ''; return; }
+  const v = document.createElement('span'); v.className = 'fm-fval'; v.textContent = f.type === 'check' ? '✕' : f.value; v.title = f.label;
+  if(f.type === 'check'){ v.style.cssText = 'font-size:16px; font-weight:800; margin:0 auto;'; } else if(lab) lab.style.display = 'none';
+  el.insertBefore(v, el.querySelector('.fm-handle'));
+}
 function fmBindField(el, handle, f, pg){
+  el.addEventListener('dblclick', () => { fmSelect(f.id); setTimeout(() => { const i = document.getElementById('fm-p-value'); if(i){ i.focus(); try{ i.select(); }catch(e){} } }, 30); });
   el.addEventListener('pointerdown', ev => {
     if(ev.target === handle) return;
     ev.preventDefault(); ev.stopPropagation(); fmSelect(f.id);
@@ -17989,16 +18122,51 @@ function fmRenderProps(){
       ${isCheck ? `<div style="flex:1; min-width:170px;"><label style="font-size:12px; font-weight:700;">Grupo (opcional) — «escoger una»</label>
         <input type="text" id="fm-p-group" maxlength="40" list="fm-groups" value="${fmEsc(f.group || '')}" placeholder="Ej: Tipo de seguro" oninput="fmPropGroup(this.value)">
         <datalist id="fm-groups">${fmGroups().map(g => '<option value="' + fmEsc(g) + '">').join('')}</datalist></div>` : ''}
-      <label style="display:flex; gap:6px; align-items:center; font-size:14px; cursor:pointer; margin-bottom:10px;"><input type="checkbox" id="fm-p-req" ${f.required ? 'checked' : ''} onchange="fmPropReq(this.checked)"> Obligatorio</label>
+      <label style="display:flex; gap:6px; align-items:center; font-size:14px; cursor:pointer; margin-bottom:10px;"><input type="checkbox" id="fm-p-req" ${f.required && !f.value ? 'checked' : ''} ${f.value ? 'disabled' : ''} onchange="fmPropReq(this.checked)"> Obligatorio</label>
       ${isCheck ? '<button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin-bottom:10px;" onclick="fmDupField()">➕ Otra casilla igual</button>' : ''}
       <button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin-bottom:10px; color:#B23A3A;" onclick="fmDeleteField()">🗑️ Quitar</button>
     </div>
     ${hint ? '<div class="sub" style="margin:2px 0 0; font-size:12.5px;">' + hint + '</div>' : ''}
+    ${fmValueHtml(f)}
     ${isCheck && f.group ? '<div class="sub" style="margin:4px 0 0; font-size:12.5px;">Las casillas con el grupo «' + fmEsc(f.group) + '» son de <b>escoger solo una</b>. Si una es obligatoria, el cliente tiene que escoger alguna del grupo.</div>' : ''}`;
+}
+// «Escríbelo tú»: dato que la agencia ya pone dentro del documento y el cliente no tiene que llenar.
+function fmCanHaveValue(f){ return f.type !== 'signature' && f.type !== 'initials' && !(f.type === 'check' && f.group); }
+function fmValueHtml(f){
+  if(!fmCanHaveValue(f)) return '';
+  if(f.type === 'check'){
+    return `<div class="fm-val"><label style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-p-valuechk" ${f.value ? 'checked' : ''} onchange="fmPropValueCheck(this.checked)"> ✍️ Dejarla ya marcada (el cliente no tiene que tocarla)</label></div>`;
+  }
+  const ph = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : f.type === 'name' ? 'Ej: Maria Perez' : 'Escribe aquí';
+  const btn = (f.type === 'name' && FM.client && FM.client.full_name) ? `<button type="button" class="btn-ghost" style="width:auto; padding:6px 10px; margin-top:6px;" onclick="fmUseClientName()">Usar el nombre del cliente</button>` : '';
+  return `<div class="fm-val"><label style="font-size:12px; font-weight:700;">✍️ Escríbelo tú aquí (si lo llenas, el cliente ya no lo llena: solo lo ve y firma)</label>
+    <input type="text" id="fm-p-value" maxlength="${f.type === 'name' ? 120 : f.type === 'date' ? 10 : f.type === 'number' ? 40 : 500}" value="${fmEsc(f.value || '')}" placeholder="${ph}" ${f.type === 'date' ? 'inputmode="numeric"' : ''} oninput="fmPropValue(this.value)" autocomplete="off">
+    ${btn}<div class="sub" style="margin:4px 0 0; font-size:12.5px;">Déjalo vacío si lo debe llenar el cliente.${FM.tplMode ? ' Aquí solo escribe datos que sean IGUALES para todos los clientes (por ejemplo el código de agencia).' : ' Estos datos solo se usan en este documento; no quedan guardados en el formulario.'}</div></div>`;
+}
+function fmMaskDate(v){ const d = String(v).replace(/\D/g, '').slice(0, 8); let o = d.slice(0, 2); if(d.length > 2) o += '/' + d.slice(2, 4); if(d.length > 4) o += '/' + d.slice(4); return o; }
+function fmPropValue(v){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanHaveValue(f) || f.type === 'check') return;
+  if(f.type === 'date'){ v = fmMaskDate(v); const i = document.getElementById('fm-p-value'); if(i && i.value !== v) i.value = v; }
+  if(f.type === 'number'){ v = String(v).replace(/[^0-9 .,\-\/$]/g, ''); const i = document.getElementById('fm-p-value'); if(i && i.value !== v) i.value = v; }
+  f.value = String(v || '').replace(/\u0000/g, ''); if(!f.value.trim()) delete f.value;
+  if(f.value) f.required = false;
+  FM.templateDirty = true;
+  const el = document.querySelector('#fm-pages .fm-field[data-id="' + f.id + '"]'); if(el) fmPaintValue(el, f);
+  const rq = document.getElementById('fm-p-req'); if(rq){ rq.disabled = !!f.value; if(f.value) rq.checked = false; }
+}
+function fmPropValueCheck(on){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f || f.type !== 'check') return;
+  if(on){ f.value = '1'; f.required = false; } else delete f.value;
+  FM.templateDirty = true; fmRenderFields(); fmRenderProps();
+}
+function fmUseClientName(){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f || !FM.client) return;
+  fmPropValue(FM.client.full_name || ''); const i = document.getElementById('fm-p-value'); if(i) i.value = f.value || '';
 }
 function fmPropGroup(v){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f) return;
   f.group = String(v || '').replace(/\s+/g, ' ').trim(); FM.templateDirty = true;
+  if(f.group && f.value){ delete f.value; const vb = document.querySelector('#fm-props .fm-val'); if(vb) vb.remove(); }   // las de «escoger una» las marca el cliente
   fmSyncGroupReq(f); fmRenderFields();
   const gi = document.getElementById('fm-p-group'); if(gi && document.activeElement !== gi) gi.value = f.group;
 }
@@ -18024,36 +18192,195 @@ document.addEventListener('keydown', ev => {
   if((ev.key === 'Delete' || ev.key === 'Backspace') && FM.step === 2 && FM.sel && !/^(INPUT|TEXTAREA|SELECT)$/.test((ev.target && ev.target.tagName) || '')){ ev.preventDefault(); fmDeleteField(); }
 });
 
-function fmCleanFields(){
-  return FM.fields.map(f => ({ id: f.id, type: f.type, label: String(f.label || '').replace(/\s+/g, ' ').trim(), required: !!f.required, page: f.page,
-    x: +f.x.toFixed(6), y: +f.y.toFixed(6), w: +f.w.toFixed(6), h: +f.h.toFixed(6),
-    ...(f.type === 'check' && String(f.group || '').trim() ? { group: String(f.group).replace(/\s+/g, ' ').trim() } : {}) }));
+// forTemplate = true → al guardar un formulario desde un cliente NO se guarda lo que se escribió para ese cliente
+// (solo se conserva lo que el formulario ya traía escrito de fábrica, ej. el código de agencia).
+function fmCleanFields(forTemplate){
+  return FM.fields.map(f => {
+    const o = { id: f.id, type: f.type, label: String(f.label || '').replace(/\s+/g, ' ').trim(), required: !!f.required, page: f.page,
+      x: +f.x.toFixed(6), y: +f.y.toFixed(6), w: +f.w.toFixed(6), h: +f.h.toFixed(6) };
+    if(f.type === 'check' && String(f.group || '').trim()) o.group = String(f.group).replace(/\s+/g, ' ').trim();
+    const val = forTemplate ? f._tplValue : f.value;
+    if(fmCanHaveValue(f) && val && String(val).trim()){ o.value = f.type === 'check' ? '1' : String(val).trim(); o.required = false; }
+    return o;
+  });
 }
+function fmValueError(){
+  for(const f of FM.fields){
+    if(!f.value || !fmCanHaveValue(f)) continue;
+    const v = String(f.value).trim();
+    if(f.type === 'date' && !fmValidDate(v)){ fmSelect(f.id, true); return '«' + f.label + '»: escribe una fecha válida MM/DD/AAAA (mes/día/año).'; }
+    if(f.type === 'number' && !/^[0-9][0-9 .,\-\/$]*$/.test(v)){ fmSelect(f.id, true); return '«' + f.label + '»: en un campo de número solo van números.'; }
+  }
+  return '';
+}
+function fmValidDate(s){ const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s); if(!m) return false; const mo = +m[1], da = +m[2], yr = +m[3]; if(yr < 1900 || yr > 2100 || mo < 1 || mo > 12 || da < 1) return false; return da <= new Date(yr, mo, 0).getDate(); }
 function fmValidate(){
   if(FM.fields.length === 0) return 'Agrega al menos un campo (empieza por la firma).';
   if(!FM.fields.some(f => f.type === 'signature')) return 'Falta un campo de firma: el cliente tiene que poder firmar.';
   const bad = FM.fields.find(f => !String(f.label || '').trim());
   if(bad){ fmSelect(bad.id, true); return 'Hay un campo sin nombre. Escribe qué le vas a pedir al cliente.'; }
+  const ve = fmValueError(); if(ve) return ve;
   const dup = FM.fields.filter(f => f.type === 'signature').length;
   return dup > 100 ? 'Hay demasiados campos de firma (máximo 100).' : '';
+}
+// Guardar un formulario SIN exigir que ya tenga firma (se puede ir armando poco a poco)
+function fmValidateDraft(){
+  const bad = FM.fields.find(f => !String(f.label || '').trim());
+  if(bad){ fmSelect(bad.id, true); return 'Hay un campo sin nombre. Escribe qué le vas a pedir al cliente.'; }
+  return fmValueError();
 }
 
 async function fmSaveTemplate(update){
   fmMsg('fm-msg2', '', '');
-  const err = fmValidate(); if(err){ fmMsg('fm-msg2', 'error', err); return; }
+  const draft = !!FM.tplMode;
+  const err = draft ? fmValidateDraft() : fmValidate(); if(err){ fmMsg('fm-msg2', 'error', err); return; }
   const name = document.getElementById('fm-tpl-name').value.replace(/\s+/g, ' ').trim();
-  if(!update && !name){ fmMsg('fm-msg2', 'error', 'Ponle un nombre a la plantilla (junto al botón).'); return; }
+  if((!update || draft) && !name){ fmMsg('fm-msg2', 'error', 'Ponle un nombre al formulario (junto al botón).'); return; }
   if(FM.busy) return; FM.busy = true;
   try{
-    const body = { action: 'template_save', name: update ? FM.template.name : name, fields: fmCleanFields() };
+    const body = { action: 'template_save', name: (update && !draft) ? FM.template.name : name, fields: fmCleanFields(!draft) };
+    if(draft) body.draft = true;
     if(update) body.id = FM.template.id;
     else if(FM.bytes) body.pdfBase64 = fmBytesToB64(FM.bytes);
     else throw new Error('No se pudo leer el PDF para guardarlo.');
+    // compañía: al guardar uno NUEVO o al editar desde Recursos se manda la que está elegida; al «actualizar» desde un cliente no se toca
+    const cs = document.getElementById('fm-tpl-company-save');
+    if(!FM.noCompanyCols && cs && (!update || draft)){
+      const opt = cs.options[cs.selectedIndex];
+      body.companyId = cs.value || null; body.companyName = cs.value ? opt.textContent : null;
+    }
     const r = await fmCall(body);
     FM.template = r.template; FM.source = 'template'; FM.templateDirty = false;
     if(!update){ FM.bytes = null; document.getElementById('fm-tpl-update-btn').style.display = 'inline-block'; }
-    fmMsg('fm-msg2', 'success', update ? '✓ Plantilla actualizada.' : '✓ Plantilla «' + r.template.name + '» guardada. La próxima vez la eliges en el paso 1.');
+    if(draft){
+      const hasSig = FM.fields.some(f => f.type === 'signature');
+      fmMsg('fm-msg2', 'success', '✓ Formulario «' + r.template.name + '» guardado (' + FM.fields.length + (FM.fields.length === 1 ? ' campo' : ' campos') + ').' + (hasSig ? '' : ' Todavía no tiene un campo de firma: agrégalo antes de usarlo, o el agente lo pondrá al mandarlo.'));
+      FM.fields.forEach(f => { if(f.value) f._tplValue = f.value; });
+    }
+    else fmMsg('fm-msg2', 'success', update ? '✓ Formulario actualizado.' : '✓ Formulario «' + r.template.name + '» guardado. La próxima vez lo eliges en «Agregar formulario».');
   }catch(e){ fmMsg('fm-msg2', 'error', e.message); }
+  FM.busy = false;
+}
+
+// =============== RECURSOS → «FORMULARIOS Y DOCUMENTOS» (por compañía) ===============
+// La administradora sube aquí los formularios de cada compañía. Cada uno es una plantilla de firma que recuerda
+// su compañía; al pedir firmas, el agente toca «Agregar formulario», elige la compañía y el formulario.
+async function fmLoadRecursos(){
+  const list = document.getElementById('fm-rec-list'); if(!list) return;
+  const adm = typeof isAdminUser === 'function' && isAdminUser();
+  const admBox = document.getElementById('fm-rec-admin'); if(admBox) admBox.style.display = adm ? 'block' : 'none';
+  await fmLoadCompanies();
+  let rows = [], noCo = false, err = null;
+  try{
+    let r = await sb.from('sign_templates').select('id,name,page_count,fields,updated_at,company_id,company_name').order('name', { ascending: true });
+    if(r.error && /company_id|company_name/.test(String(r.error.message || ''))){ noCo = true; r = await sb.from('sign_templates').select('id,name,page_count,fields,updated_at').order('name', { ascending: true }); }
+    if(r.error) throw r.error; rows = r.data || [];
+  }catch(e){ err = e; }
+  FM.noCompanyCols = noCo; FM.recRows = rows;
+  const warn = document.getElementById('fm-rec-msg2');
+  if(err){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
+    list.innerHTML = '<p class="sub">—</p>'; if(admBox) admBox.style.display = 'none';
+    if(warn){ warn.className = 'msg error'; warn.textContent = missing ? 'Falta correr «migracion_firma_formularios.sql» en Supabase (SQL Editor).' : 'No se pudieron cargar los formularios: ' + (err.message || err); }
+    return;
+  }
+  if(warn){ if(noCo){ warn.className = 'msg error'; warn.textContent = 'Falta correr «migracion_formularios_por_compania.sql» en Supabase (SQL Editor) para guardar los formularios por compañía.'; } else { warn.className = 'msg'; warn.textContent = ''; } }
+  if(noCo && admBox) admBox.style.display = 'none';
+  const cs = document.getElementById('fm-rec-company');
+  if(cs){ const keep = cs.value; cs.innerHTML = '<option value="">Elige la compañía…</option>' + (FM.companies || []).map(c => '<option value="' + c.id + '">' + fmEsc(c.name) + '</option>').join('') + '<option value="' + FM_NO_CO + '">General (sin compañía)</option>'; if(keep) cs.value = keep; }
+  if(rows.length === 0){ list.innerHTML = '<p class="sub">Todavía no hay formularios guardados' + (adm ? '. Sube el primero con el formulario de arriba.' : '. La administradora los sube aquí.') + '</p>'; return; }
+  const groups = new Map();
+  rows.forEach(t => { const k = noCo ? '' : (t.company_id || ''); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(t); });
+  const keys = Array.from(groups.keys()).sort((a, b) => (a === '' ? 1 : b === '' ? -1 : fmCoName(groups.get(a)[0]).localeCompare(fmCoName(groups.get(b)[0]), 'es', { sensitivity: 'base' })));
+  list.innerHTML = keys.map(k => {
+    const items = groups.get(k);
+    const title = k ? fmCoName(items[0]) : (noCo ? 'Formularios guardados' : 'Generales (sin compañía)');
+    return '<div class="fm-rec-group" data-company="' + fmEsc(k) + '" style="margin-top:14px;"><div style="font-weight:800; color:#0B1F4B; padding-bottom:4px; border-bottom:2px solid #D5DAE8;">🏢 ' + fmEsc(title) + ' <span class="sub" style="margin:0; font-weight:400;">· ' + items.length + (items.length === 1 ? ' formulario' : ' formularios') + '</span></div>'
+      + items.map(t => {
+        const nf = (t.fields || []).length;
+        const st = nf ? '<span style="color:#177A54;">✓ ' + nf + (nf === 1 ? ' campo marcado' : ' campos marcados') + '</span>' : '<span style="color:#8a6116;">⚠ sin campos marcados todavía</span>';
+        return '<div class="fm-rec-row" data-id="' + t.id + '" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 0; border-bottom:1px solid var(--line);">'
+          + '<div><div style="font-weight:700;">📄 ' + fmEsc(t.name) + '</div><div class="sub" style="margin:2px 0 0; font-size:13px;">' + t.page_count + (t.page_count === 1 ? ' página' : ' páginas') + ' · ' + st + '</div></div>'
+          + '<div style="white-space:nowrap; display:flex; gap:6px; flex-wrap:wrap;">'
+          + '<button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmRecView(\'' + t.id + '\')">👁 Ver PDF</button>'
+          + (adm ? '<button type="button" class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmOpenFormEditor(\'' + t.id + '\')">🖊️ Marcar campos</button><button type="button" class="btn-ghost" style="width:auto; padding:6px 10px; color:#B23A3A;" onclick="fmRecDelete(\'' + t.id + '\')">Eliminar</button>' : '')
+          + '</div></div>';
+      }).join('') + '</div>';
+  }).join('');
+}
+async function fmRecView(id){
+  let win = null; try{ win = window.open('', '_blank'); }catch(e){}
+  try{
+    const r = await fmCall({ action: 'template_url', id });
+    if(win){ win.location.href = r.url; } else { window.location.href = r.url; }
+  }catch(e){ if(win){ try{ win.close(); }catch(_){} } fmMsg('fm-rec-msg2', 'error', e.message); }
+}
+async function fmRecDelete(id){
+  const t = (FM.recRows || []).find(x => x.id === id); if(!t) return;
+  if(!confirm('¿Eliminar el formulario «' + t.name + '»? Los documentos que ya mandaste a firmar con él NO se afectan.')) return;
+  try{ await fmCall({ action: 'template_archive', id }); fmMsg('fm-rec-msg2', 'success', 'Formulario eliminado.'); await fmLoadRecursos(); }
+  catch(e){ fmMsg('fm-rec-msg2', 'error', e.message); }
+}
+async function fmRecUpload(){
+  fmMsg('fm-rec-msg', '', '');
+  if(FM.busy) return;
+  const cs = document.getElementById('fm-rec-company'), nm = document.getElementById('fm-rec-name'), fl = document.getElementById('fm-rec-file');
+  const name = nm.value.replace(/\s+/g, ' ').trim(); const file = fl.files[0];
+  if(!cs.value){ fmMsg('fm-rec-msg', 'error', 'Elige primero la compañía a la que pertenece el formulario.'); return; }
+  if(!name){ fmMsg('fm-rec-msg', 'error', 'Escribe el nombre del formulario (por ejemplo: «Statement of No Loss»).'); return; }
+  if(!file){ fmMsg('fm-rec-msg', 'error', 'Elige el archivo PDF.'); return; }
+  if(!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf'){ fmMsg('fm-rec-msg', 'error', 'El archivo tiene que ser un PDF.'); return; }
+  if(file.size > 8 * 1024 * 1024){ fmMsg('fm-rec-msg', 'error', 'El PDF pesa más de 8 MB. Comprímelo y vuelve a intentar.'); return; }
+  FM.busy = true; const btn = document.getElementById('fm-rec-btn'); btn.disabled = true; const old = btn.textContent; btn.textContent = 'Guardando…';
+  let savedId = null;
+  try{
+    let bytes = new Uint8Array(await file.arrayBuffer());
+    const pdfjs = await fmLoadPdfJs();
+    let doc; try{ doc = await pdfjs.getDocument({ data: bytes.slice() }).promise; }catch(e){ throw new Error('No se pudo abrir ese PDF (puede estar dañado o protegido con contraseña).'); }
+    if(doc.numPages > 30) throw new Error('El PDF tiene más de 30 páginas. Divídelo y sube solo las páginas necesarias.');
+    let prot = false; try{ prot = (await doc.getPermissions()) != null; }catch(e){}
+    if(prot){ btn.textContent = 'Preparando el PDF protegido…'; bytes = await fmFlattenPdf(doc); }
+    const opt = cs.options[cs.selectedIndex]; const isCo = cs.value !== FM_NO_CO;
+    const r = await fmCall({ action: 'template_save', name, draft: true, fields: [], pdfBase64: fmBytesToB64(bytes), companyId: isCo ? cs.value : null, companyName: isCo ? opt.textContent : null });
+    savedId = r.template.id;
+    fmMsg('fm-rec-msg', 'success', '✓ «' + name + '» quedó guardado en ' + (isCo ? opt.textContent : 'Generales') + '.' + (prot ? ' (El PDF venía protegido y lo convertí en una copia normal.)' : ''));
+    nm.value = ''; fl.value = '';
+  }catch(e){ fmMsg('fm-rec-msg', 'error', e.message || String(e)); }
+  FM.busy = false; btn.disabled = false; btn.textContent = old;
+  await fmLoadRecursos();
+  if(savedId && confirm('¿Quieres marcar ahora dónde va la firma y los datos en este formulario? (Si no, lo puedes hacer después con «Marcar campos»).')) fmOpenFormEditor(savedId);
+}
+
+// Editor de un formulario SIN cliente (desde Recursos → «Marcar campos»)
+async function fmOpenFormEditor(id){
+  const t = (FM.recRows || []).find(x => x.id === id); if(!t) return;
+  if(FM.busy) return;
+  fmReset(); FM.tplMode = true; FM.clientId = null; FM.client = null; FM.busy = true;
+  const ov = document.getElementById('fmOverlay'); ov.classList.add('fm-tplmode'); ov.style.display = 'block'; document.body.style.overflow = 'hidden';
+  document.getElementById('fm-top-title').textContent = 'Marcar campos del formulario';
+  document.getElementById('fm-client-name').textContent = (t.company_id ? fmCoName(t) : 'General') + ' · ' + t.name;
+  document.getElementById('fm-doc-title').textContent = t.name;
+  try{
+    const { url } = await fmCall({ action: 'template_url', id });
+    const resp = await fetch(url); if(!resp.ok) throw new Error('No se pudo leer el PDF del formulario.');
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    const pdfjs = await fmLoadPdfJs();
+    let doc; try{ doc = await pdfjs.getDocument({ data: bytes.slice() }).promise; }catch(e){ throw new Error('No se pudo abrir el PDF del formulario.'); }
+    FM.title = t.name; FM.source = 'template'; FM.template = t; FM.bytes = null; FM.pdf = doc;
+    FM.fields = JSON.parse(JSON.stringify(t.fields || [])); FM.fields.forEach(f => { if(f.value) f._tplValue = f.value; }); FM.sel = null; FM.templateDirty = false;
+    document.getElementById('fm-pages').innerHTML = '';
+    const nmI = document.getElementById('fm-tpl-name'); nmI.value = t.name; nmI.style.display = 'inline-block';
+    const cs = document.getElementById('fm-tpl-company-save'); cs.innerHTML = fmCompanyOptionsHtml(t.company_id || ''); cs.style.display = FM.noCompanyCols ? 'none' : 'inline-block';
+    document.getElementById('fm-tpl-save-btn').style.display = 'none';
+    const ub = document.getElementById('fm-tpl-update-btn'); ub.style.display = 'inline-block'; ub.textContent = '💾 Guardar formulario';
+    fmStep(2);
+    await fmRenderPages();
+    fmRenderFields(); fmRenderProps(); fmSizeBars(); fmUpdateCurPage();
+    fmMsg('fm-msg2', 'success', 'Marca la firma y lo que se pide en este formulario. Si hay datos que son iguales para todos los clientes (ej. el código de agencia) puedes escribirlos con «Escríbelo tú aquí». Al terminar toca «Guardar formulario».');
+    setTimeout(() => { const m = document.getElementById('fm-msg2'); if(m && m.classList.contains('success') && FM.tplMode && !FM.templateDirty) fmMsg('fm-msg2', '', ''); }, 15000);
+  }catch(e){
+    FM.busy = false; fmClose(true); alert(e.message || String(e)); return;
+  }
   FM.busy = false;
 }
 
@@ -18345,6 +18672,13 @@ function fmDismissAll(){ const s = fmSeenIds().concat(fmLastNotifIds); fmSaveSee
     loadClientDocuments = async function(clientId){
       try{ fmRefreshCardSoon(clientId); }catch(e){}
       return await orig.apply(this, arguments);
+    };
+  }
+  if(typeof loadResources === 'function'){
+    const origR = loadResources;
+    loadResources = async function(){
+      try{ fmLoadRecursos().catch(() => {}); }catch(e){}
+      return await origR.apply(this, arguments);
     };
   }
   if(typeof loadSignatureNotifications === 'function'){

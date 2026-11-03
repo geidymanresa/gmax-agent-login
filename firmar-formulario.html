@@ -47,6 +47,9 @@
   .pf.chk.done{ background:rgba(23,122,84,.10); border-color:var(--green); }
   .pf.done{ background:rgba(23,122,84,.10); border-color:var(--green); color:var(--ink); }
   .pf.next{ animation:pulse 1.2s infinite; }
+  .pf.pre, .pf.pre.done, .pf.pre.chk.done{ border-color:transparent; background:transparent; cursor:default; box-shadow:none; }
+  .pf.pre .pv{ color:#0A1A5C; }
+  .pf.pre::after{ display:none; }
   @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(37,99,235,.55);} 50%{ box-shadow:0 0 0 7px rgba(37,99,235,0);} }
   .pl{ display:block; max-width:100%; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .pv{ display:block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#0A1A5C; }
   .pf img{ max-width:100%; max-height:100%; display:block; margin:0 auto; pointer-events:none; }
@@ -164,6 +167,7 @@
     S.renderGen++; S.mustAdopt = false; S.values = {}; S.nextIds = []; S.pdf = null; S.pages = []; S.zoom = 1; S.busy = false; t0 = Date.now(); closeSheet();
     S.data = d;
     d.fields.forEach(function(f){ if(f.type === 'date' && d.today) S.values[f.id] = d.today; });
+    d.fields.forEach(function(f){ if(f.value) S.values[f.id] = f.type === 'check' ? '1' : f.value; });   // lo que la agencia ya escribió: el cliente lo ve pero no lo cambia
     var bt = d.batch ? '<div class="sub" style="font-weight:700; color:#0B1F4B;">Documento ' + d.batch.index + ' de ' + d.batch.total + '</div>' : '';
     setMain('<div class="card">' + bt + '<h1>' + esc(d.title) + '</h1><p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
       + '<div class="progress"><i id="pbar"></i></div><div class="sub" id="ptxt"></div></div><div id="msgbox"></div><div id="pages"></div>');
@@ -209,8 +213,9 @@
     }
     S.data.fields.forEach(function(f){
       var pg = S.pages[f.page - 1]; if(!pg) return;
-      var b = document.createElement('button'); b.type = 'button'; b.className = 'pf' + (f.type === 'signature' ? ' sigf' : f.type === 'initials' ? ' ini' : f.type === 'check' ? ' chk' : '') + (f.required ? '' : ' opt'); b.dataset.id = f.id;
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'pf' + (f.type === 'signature' ? ' sigf' : f.type === 'initials' ? ' ini' : f.type === 'check' ? ' chk' : '') + (f.value ? ' pre' : (f.required ? '' : ' opt')); b.dataset.id = f.id;
       b.style.left = (f.x * 100) + '%'; b.style.top = (f.y * 100) + '%'; b.style.width = (f.w * 100) + '%'; b.style.height = (f.h * 100) + '%';
+      if(f.value){ b.tabIndex = -1; b.setAttribute('aria-readonly', 'true'); }
       b.addEventListener('click', function(){ openField(f.id); });
       pg.appendChild(b);
     });
@@ -255,7 +260,7 @@
         var k = f.group.toLowerCase(); if(seen[k]) return; seen[k] = 1;
         var mem = fieldList().filter(function(x){ return x.type === 'check' && x.group && x.group.toLowerCase() === k; });
         if(mem.some(function(x){ return x.required; })) out.push({ ids: mem.map(function(x){ return x.id; }), f: mem[0], group: f.group, filled: mem.some(isFilled) });
-      } else if(f.required) out.push({ ids: [f.id], f: f, filled: isFilled(f) });
+      } else if(f.required && !f.value) out.push({ ids: [f.id], f: f, filled: isFilled(f) });
     });
     return out;
   }
@@ -312,7 +317,7 @@
   function validDate(s){ var m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s); if(!m) return false; var mo = +m[1], da = +m[2], yr = +m[3]; if(yr < 1900 || yr > 2100 || mo < 1 || mo > 12 || da < 1) return false; return da <= new Date(yr, mo, 0).getDate(); }
 
   function openField(id){
-    var f = S.data.fields.find(function(x){ return x.id === id; }); if(!f || S.busy) return;
+    var f = S.data.fields.find(function(x){ return x.id === id; }); if(!f || S.busy || f.value) return;   // lo ya escrito por la agencia no se edita
     if(f.type === 'signature') return openSignature(f);
     if(f.type === 'initials') return openInitials(f);
     if(f.type === 'check') return toggleCheck(f);
