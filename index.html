@@ -1381,6 +1381,25 @@
             <div id="renewalFollowupList"></div>
           </div>
 
+          <!-- 📤 Documentos que ya están en el CRM pero falta subir a la aseguradora (fotos del vehículo, Home Owner,
+               aseguranza previa, PIP). Se queda hasta que alguien marque «Ya se subió a la aseguradora».
+               Requiere migracion_revision_10_dias_y_subida_aseguradora.sql. -->
+          <div class="dash-card" id="carrierUploadCard" style="display:none; margin:0; background:#FFF1E3; border:2px solid #E8913A;">
+            <div style="display:inline-block; background:#C46A12; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">📤 Acción necesaria</div>
+            <h4 style="margin-top:0; color:#8A4B0B;">Pendiente de subir a la aseguradora</h4>
+            <p class="sub" style="margin:0 0 8px;">Estas pólizas siguen en esta lista hasta que subas los documentos en la página de la aseguradora y toques «Ya se subió a la aseguradora».</p>
+            <div id="carrierUploadList"></div>
+          </div>
+
+          <!-- 🆕 Revisión de póliza nueva: 10 días después de registrarla (todas las pólizas, de cualquier tipo).
+               Requiere migracion_revision_10_dias_y_subida_aseguradora.sql. -->
+          <div class="dash-card" id="openingReviewCard" style="display:none; margin:0; background:#EEF4FF; border:1.5px solid #B9CCF5;">
+            <div style="display:inline-block; background:#2F5BC4; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🆕 Póliza nueva</div>
+            <h4 style="margin-top:0; color:#1F3F8F;">Revisar póliza nueva (10 días)</h4>
+            <p class="sub" style="margin:0 0 8px;">Entra a la póliza y confirma que todo esté bien: que siga activa y que la compañía no haya pedido ningún documento.</p>
+            <div id="openingReviewList"></div>
+          </div>
+
           <!-- Revisión periódica de estatus: cada ~2.5 meses desde que empezó
                (o desde la última vez que se revisó) cada póliza activa, sin
                importar el tipo, para que Geidy confirme si el cliente sigue
@@ -1942,6 +1961,8 @@
           <!-- Transacciones pendientes de número de póliza (persistente) -->
           <div id="cd-pendingTransactions"></div>
           <div id="cd-requirementsAlerts"></div>
+          <!-- Documentos que ya están en el CRM pero que falta subir a la aseguradora (se queda hasta que se marque). -->
+          <div id="cd-carrierUploadAlerts"></div>
 
           <!-- Recibo / formularios emitidos -->
           <div class="dash-card" id="cd-receiptCard" style="display:none; border:2px solid var(--navy);">
@@ -5418,6 +5439,8 @@
     await safeLoad(loadDashboardFollowups, 'Recordatorios de seguimiento');
     await safeLoad(loadRenewals, 'Próximas renovaciones');
     await safeLoad(loadStatusReviewAlerts, 'Revisar estatus de pólizas');
+    await safeLoad(loadOpeningReviewAlerts, 'Revisar póliza nueva (10 días)');
+    await safeLoad(loadCarrierUploadPending, 'Pendiente de subir a la aseguradora');
     await safeLoad(loadVentureEftAlerts, 'Pagos automáticos Venture');
     await safeLoad(loadRenewalFollowups, 'Pólizas vencidas por confirmar');
     await safeLoad(loadPaymentChecks, 'Revisar pagos del mes');
@@ -5468,6 +5491,8 @@
       await safeAutoRefresh(loadAutoChargeAlerts, 'Cobros automáticos Venture');
       await safeAutoRefresh(loadRenewalFollowups, 'Pólizas vencidas por confirmar');
       await safeAutoRefresh(loadPaymentChecks, 'Revisar pagos del mes');
+      await safeAutoRefresh(loadOpeningReviewAlerts, 'Revisar póliza nueva (10 días)');
+      await safeAutoRefresh(loadCarrierUploadPending, 'Pendiente de subir a la aseguradora');
     }
 
     // «Pagar en Venture»: se revisa en cualquier pestaña (aviso emergente + número en «Inicio»).
@@ -5613,9 +5638,11 @@
         await q(loadRenewalFollowups, 'Pólizas vencidas por confirmar');
         await q(loadPaymentChecks, 'Revisar pagos del mes');
         await q(loadStatusReviewAlerts, 'Revisar estatus de pólizas');
+        await q(loadOpeningReviewAlerts, 'Revisar póliza nueva (10 días)');
         await q(loadVentureEftAlerts, 'Pagos automáticos Venture');
         await q(refreshBookOfBusinessQuiet, 'Libro de negocio');
       }
+      if(has('client_requirements', 'client_policies')) await q(loadCarrierUploadPending, 'Pendiente de subir a la aseguradora');
       if(has('policy_reminder_acks', 'policy_contact_log')){
         await q(loadRenewalFollowups, 'Pólizas vencidas por confirmar');
         await q(loadPaymentChecks, 'Revisar pagos del mes');
@@ -8210,6 +8237,7 @@
             <div style="font-size:13px; color:var(--slate-light);">${doc.category || 'Sin categoría'} — subido ${formatDateTimeUS(doc.uploaded_at)}</div>
           </div>
           <div style="white-space:nowrap;">
+            <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="downloadClientDocument('${doc.id}', this)">⬇️ Descargar</button>
             ${!isLocked ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="renameClientDocument('${doc.id}','${doc.file_name.replace(/'/g, "\\'")}')">Renombrar</button>` : ''}
             ${!isLocked && isAdmin ? `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="deleteClientDocument('${doc.id}','${doc.storage_path || ''}')">Eliminar</button>` : ''}
           </div>
@@ -8217,6 +8245,45 @@
       `;
     }));
     container.innerHTML = rows.join('');
+  }
+
+  // Descargar un documento de la lista del cliente.
+  //  - Archivo subido (foto, PDF, etc.): baja el archivo original con un link nuevo (los links
+  //    de la lista caducan a los 5 minutos, por eso se pide uno al momento).
+  //  - Documento interno (recibo, endorsement, cancelación...): abre el documento y lo manda a
+  //    imprimir / guardar como PDF. Solo se puede si el cliente ya firmó (igual que antes).
+  async function downloadClientDocument(id, btn){
+    const doc = currentClientDocuments.find(d => d.id === id);
+    if(!doc) return;
+    const oldText = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; btn.textContent = 'Preparando…'; }
+    try{
+      if(isInternalFormDocument(doc)){
+        const viewerFn = doc.category === 'Formulario de Endorsement' ? showEndorsementForm : (doc.category === 'Formulario de Cancelación' ? showCancellationForm : (doc.category === 'Formulario de Reinstalación' ? showReinstatementForm : (doc.category === 'Autorización de Pago Automático' ? showAutoPayConsentForm : showReceipt)));
+        await viewerFn(doc.receipt_transaction_id);
+        const content = document.getElementById('cd-receiptContent');
+        if(content && content.style.display !== 'none' && content.innerHTML.trim()){
+          downloadReceiptPDF();
+        }else{
+          alert('Este documento todavía no se puede descargar porque falta la firma del cliente. Cuando firme, aparece el botón de descargar.');
+        }
+        return;
+      }
+      if(!doc.storage_path){ alert('Este documento no tiene un archivo para descargar.'); return; }
+      // Si le cambiaron el nombre y quedó sin extensión, se la devolvemos para que abra bien.
+      const ext = (doc.storage_path.match(/\.[A-Za-z0-9]{1,5}$/) || [''])[0];
+      let fileName = doc.file_name || 'documento';
+      if(ext && !/\.[A-Za-z0-9]{1,5}$/.test(fileName)) fileName += ext;
+      const { data: signed, error } = await sb.storage.from('client-documents').createSignedUrl(doc.storage_path, 120, { download: fileName });
+      if(error || !signed){ alert('No se pudo preparar la descarga: ' + ((error && error.message) || 'sin acceso al archivo')); return; }
+      const a = document.createElement('a');
+      a.href = signed.signedUrl; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); a.remove();
+    }catch(e){
+      alert('No se pudo descargar: ' + (e.message || e));
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = oldText; }
+    }
   }
 
   async function renameClientDocument(id, currentName){
@@ -8636,6 +8703,8 @@
     { key: 'liability', label: 'Liability' },
     { key: 'comprehensive_collision', label: 'Comprehensive and Collision' },
     { key: 'uninsured_underinsured', label: 'Uninsured/Underinsured Motorist' },
+    // PIP: igual que Comprehensive/Collision, cualquier cobertura que no sea solo Liability pide las 6 fotos del vehículo.
+    { key: 'pip', label: 'PIP (Personal Injury Protection)' },
     { key: 'rental_reimbursement', label: 'Rental Reimbursement' },
     { key: 'roadside_assistance', label: 'Roadside Assistance' }
   ];
@@ -9766,7 +9835,9 @@
     }
     const dueDateISO = toISODateLocal(addBusinessDays(new Date(), REQUIREMENT_DEADLINE_DAYS));
     for(const [title, items] of newRequirements){
-      await sb.from('client_requirements').insert({
+      // insertRequirementRow marca como «hay que subirlo a la aseguradora» las fotos del vehículo,
+      // la prueba de Home Owner y la de aseguranza previa (ver sección REVISIÓN 10 DÍAS).
+      await insertRequirementRow({
         client_id: currentClientId,
         transaction_id: insertedTx.id,
         policy_id: policyId,
@@ -10822,6 +10893,7 @@
       .eq('resolved', false)
       .order('created_at', { ascending: false });
     renderRequirementsAlerts(reqs || []);
+    try{ await loadClientCarrierUploads(clientId); }catch(e){ console.warn('Pendiente de subir a la aseguradora (perfil):', e); }
   }
 
   function businessDaysRemaining(dueDateISO){
@@ -11378,6 +11450,183 @@
     }
   }
   // =================== FIN REVISAR ESTATUS DE PÓLIZAS ===================
+
+  // ===================== REVISIÓN DE PÓLIZA NUEVA (10 DÍAS) + DOCUMENTOS PENDIENTES DE SUBIR A LA ASEGURADORA =====================
+  // Pedido de Geidy (03 nov 2026), dos cosas independientes. Requieren correr
+  // migracion_revision_10_dias_y_subida_aseguradora.sql.
+  //
+  // 1) A los 10 días de REGISTRAR cualquier póliza (cualquier tipo de seguro y
+  //    de compañía) sale un aviso en Inicio para entrar a la póliza y revisar
+  //    que todo esté bien: que siga activa y que la compañía no haya pedido
+  //    algún documento. Se cuenta desde client_policies.created_at (cuando se
+  //    capturó/vendió), no desde la fecha efectiva. Se queda hasta que se marque
+  //    «Todo bien» (client_policies.opening_review_at) o se cancele la póliza.
+  //    Para no inundar el tablero con pólizas viejas, solo cuenta de los 10 a los
+  //    45 días de haberla registrado.
+  // 2) Los documentos que se suben al CRM y además hay que subir a la página
+  //    de la aseguradora (fotos del vehículo con Comprehensive/Collision/PIP,
+  //    prueba de Home Owner, prueba de aseguranza previa) se marcan al crear el
+  //    requisito (client_requirements.needs_carrier_upload). Esa alerta NO
+  //    depende del visto bueno de Underwriting: sigue saliendo (Inicio y perfil
+  //    del cliente) hasta que alguien toque «Ya se subió a la aseguradora»
+  //    (carrier_uploaded_at), con el nombre de cada documento.
+  const OPENING_REVIEW_DAYS = 10;
+  const OPENING_REVIEW_MAX_AGE_DAYS = 45;
+  const CARRIER_UPLOAD_TITLES = [
+    'Fotos del vehículo',
+    'Fotos del vehículo agregado',
+    'Prueba de propiedad de casa (Home Owner)',
+    'Prueba de aseguranza previa'
+  ];
+  function requirementNeedsCarrierUpload(title){ return CARRIER_UPLOAD_TITLES.indexOf(title) !== -1; }
+
+  // Crea un requisito. Si es de los que hay que subir a la aseguradora lo marca;
+  // si la migración todavía no se corrió (la columna no existe) lo crea igual sin
+  // la marca, para nunca perder el requisito de documentos por eso.
+  async function insertRequirementRow(row){
+    if(!requirementNeedsCarrierUpload(row.title)) return sb.from('client_requirements').insert(row);
+    const res = await sb.from('client_requirements').insert(Object.assign({ needs_carrier_upload: true }, row));
+    if(res && res.error) return sb.from('client_requirements').insert(row);
+    return res;
+  }
+
+  async function loadOpeningReviewAlerts(){
+    const card = document.getElementById('openingReviewCard');
+    const list = document.getElementById('openingReviewList');
+    if(!card || !list) return;
+
+    const { data, error } = await sb.from('client_policies')
+      .select('*, client:client_id(full_name)')
+      .neq('status', 'cancelled');
+    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+
+    if(!('opening_review_at' in data[0])){
+      // La migración todavía no se corrió: se avisa en vez de mostrar todas las pólizas como pendientes.
+      card.style.display = 'block';
+      list.innerHTML = '<p class="sub" style="color:#8a3030; margin:0;">Falta correr <b>migracion_revision_10_dias_y_subida_aseguradora.sql</b> en Supabase para activar este aviso.</p>';
+      return;
+    }
+
+    const hoy = new Date(); hoy.setHours(0,0,0,0);
+    const due = data.map(p => {
+      if(p.opening_review_at || !p.created_at) return null;
+      const createdISO = toISODateLocal(new Date(p.created_at));
+      const age = Math.round((hoy - isoToLocalDate(createdISO)) / 86400000);
+      if(age < OPENING_REVIEW_DAYS || age > OPENING_REVIEW_MAX_AGE_DAYS) return null;
+      return { p, age, createdISO };
+    }).filter(Boolean).sort((a, b) => b.age - a.age);
+
+    if(due.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = due.map(({ p, age, createdISO }) => `
+      <div class="opening-review-row" data-policy-id="${p.id}" style="padding:10px 0; border-bottom:1px solid #C9D8F7; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="cursor:pointer; flex:1;" onclick="goToClientFromUnderwriting('${p.client_id}')">
+          <strong>${escapeHtml(p.client ? p.client.full_name : 'Cliente')}</strong> — ${escapeHtml(INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || '')}
+          con ${escapeHtml(p.company || '—')} ${p.policy_number ? '(#' + escapeHtml(p.policy_number) + ')' : ''}
+          <span class="sub">— se registró el ${formatDateUS(createdISO) || '—'} (hace ${age} días)</span>
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#177A54; border-color:#A9DFC4;" onclick="confirmOpeningReviewOk('${p.id}', event)">✅ Todo bien</button>
+          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#8a3030; border-color:#E3B8B8;" onclick="goToMarkPolicyCancelledFromDashboard('${p.client_id}', '${p.id}', event)">🚫 Cancelada</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // «Todo bien»: deja constancia de que se revisó y la quita de la lista.
+  async function confirmOpeningReviewOk(policyId, evt){
+    if(evt) evt.stopPropagation();
+    const { error } = await sb.from('client_policies')
+      .update({ opening_review_at: new Date().toISOString() })
+      .eq('id', policyId);
+    if(error){ alert('No se pudo guardar la revisión: ' + error.message); return; }
+    await loadOpeningReviewAlerts();
+  }
+
+  // ---- Documentos pendientes de subir a la aseguradora ----
+  function carrierUploadRequirementHtml(r){
+    const checklist = r.checklist || [];
+    const faltanCrm = checklist.filter(i => !i.done);
+    const itemsHtml = checklist.map(i => `
+      <li style="margin:2px 0;">${i.done ? '✓' : '⏳'} <span class="carrier-doc-name">${escapeHtml(i.label)}</span>${i.done ? '' : ' <span style="color:#8a3030;">(falta subirlo al CRM)</span>'}</li>
+    `).join('');
+    const accionHtml = faltanCrm.length === 0
+      ? `<button type="button" class="btn-primary" style="width:auto; padding:6px 14px; font-size:13px;" onclick="markCarrierUploaded('${r.id}', event)">📤 Ya se subió a la aseguradora</button>`
+      : `<span class="sub" style="margin:0;">Primero sube ${faltanCrm.length === 1 ? 'el documento que falta' : 'los ' + faltanCrm.length + ' documentos que faltan'} al CRM.</span>`;
+    return `
+      <div class="carrier-upload-req" data-req-id="${r.id}" style="margin-top:8px; padding:8px 10px; background:#fff; border:1px solid #F1CFA8; border-radius:8px;">
+        <div style="font-weight:700; font-size:13.5px;">${escapeHtml(r.title)}</div>
+        <ul style="margin:6px 0 8px 18px; padding:0; font-size:12.5px; list-style:none;">${itemsHtml}</ul>
+        ${accionHtml}
+      </div>
+    `;
+  }
+
+  async function loadCarrierUploadPending(){
+    const card = document.getElementById('carrierUploadCard');
+    const list = document.getElementById('carrierUploadList');
+    if(!card || !list) return;
+    const { data, error } = await sb.from('client_requirements')
+      .select('*, client:client_id(full_name), policy:policy_id(company, policy_number, status)')
+      .eq('needs_carrier_upload', true)
+      .is('carrier_uploaded_at', null)
+      .order('created_at', { ascending: true });
+    // Sin la migración la consulta falla: no se muestra nada (no se molesta con un error).
+    if(error || !data){ card.style.display = 'none'; return; }
+    const rows = data.filter(r => !r.policy || r.policy.status !== 'cancelled');
+    if(rows.length === 0){ card.style.display = 'none'; return; }
+
+    const groups = {};
+    rows.forEach(r => { const k = r.policy_id || ('c' + r.client_id); (groups[k] = groups[k] || []).push(r); });
+    card.style.display = 'block';
+    list.innerHTML = Object.keys(groups).map(k => {
+      const rs = groups[k], first = rs[0];
+      return `
+        <div class="carrier-upload-group" style="padding:10px 0; border-bottom:1px solid #F1CFA8;">
+          <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${first.client_id}')">
+            <strong>${escapeHtml(first.client ? first.client.full_name : 'Cliente')}</strong>
+            — ${escapeHtml(first.policy ? (first.policy.company || '—') : '—')} ${first.policy && first.policy.policy_number ? '(#' + escapeHtml(first.policy.policy_number) + ')' : ''}
+            <span class="sub">— esta póliza está pendiente de que se suban los documentos a la aseguradora</span>
+          </div>
+          ${rs.map(carrierUploadRequirementHtml).join('')}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Mismo aviso dentro del perfil del cliente (se queda aunque Underwriting ya haya dado el visto bueno).
+  async function loadClientCarrierUploads(clientId){
+    const box = document.getElementById('cd-carrierUploadAlerts');
+    if(!box) return;
+    const { data, error } = await sb.from('client_requirements')
+      .select('*, policy:policy_id(company, policy_number, status)')
+      .eq('client_id', clientId)
+      .eq('needs_carrier_upload', true)
+      .is('carrier_uploaded_at', null)
+      .order('created_at', { ascending: true });
+    const rows = (error || !data) ? [] : data.filter(r => !r.policy || r.policy.status !== 'cancelled');
+    if(rows.length === 0){ box.innerHTML = ''; return; }
+    box.innerHTML = `
+      <div class="dash-card" style="background:#FFF1E3; border:2px solid #E8913A; margin-bottom:14px;">
+        <h4 style="margin-top:0; color:#8A4B0B;">📤 Pendiente de subir a la aseguradora</h4>
+        <p class="sub">Esta alerta sigue hasta que subas los documentos en la página de la aseguradora y toques «Ya se subió a la aseguradora».</p>
+        ${rows.map(r => `<div style="font-size:12.5px; margin-top:8px; color:var(--slate-light);">${escapeHtml(r.policy ? (r.policy.company || '') + (r.policy.policy_number ? ' (#' + r.policy.policy_number + ')' : '') : '')}</div>${carrierUploadRequirementHtml(r)}`).join('')}
+      </div>
+    `;
+  }
+
+  async function markCarrierUploaded(requirementId, evt){
+    if(evt) evt.stopPropagation();
+    if(!confirm('¿Confirmas que ya subiste estos documentos a la página de la aseguradora? Esto quita la alerta.')) return;
+    const { data: { session } } = await sb.auth.getSession();
+    const { error } = await sb.from('client_requirements')
+      .update({ carrier_uploaded_at: new Date().toISOString(), carrier_uploaded_by: session.user.id })
+      .eq('id', requirementId);
+    if(error){ alert('No se pudo marcar: ' + error.message); return; }
+    await loadCarrierUploadPending();
+    if(currentClientId) await loadClientCarrierUploads(currentClientId);
+  }
+  // =================== FIN REVISIÓN 10 DÍAS + SUBIDA A LA ASEGURADORA ===================
 
   // ===================== PÓLIZAS VENCIDAS (¿SE RENOVÓ?) + REVISIÓN DE PAGOS MENSUALES =====================
   // 1) Renovaciones: desde el día que vence una póliza (y hasta que Geidy lo
