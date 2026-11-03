@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pago — GMAX All Insurance</title>
+<style>
+  body { margin:0; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; background:#F4F7FB; color:#1b2430; display:flex; min-height:100vh; align-items:center; justify-content:center; padding:16px; }
+  .box { background:#fff; border-radius:16px; box-shadow:0 8px 30px rgba(20,40,80,.12); max-width:460px; width:100%; padding:32px 26px; text-align:center; }
+  .icon { font-size:46px; }
+  h1 { font-size:22px; margin:10px 0 6px; }
+  p { color:#3b4a5e; line-height:1.5; margin:8px 0; }
+  .en { color:#6b7a8d; font-size:14px; border-top:1px solid #e3e8ef; margin-top:18px; padding-top:14px; }
+  small { color:#6b7a8d; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="icon" id="icon">✅</div>
+  <h1 id="t-es">¡Gracias! Recibimos su pago</h1>
+  <p id="p-es">Si pagó con tarjeta, ya quedó registrado. Si pagó con su cuenta bancaria, el banco puede tardar de 3 a 5 días hábiles en confirmarlo; nosotros lo veremos apenas llegue.</p>
+  <p class="en"><strong id="t-en">Thank you! We received your payment.</strong><br><span id="p-en">Card payments are recorded right away. Bank-account payments can take 3–5 business days to clear.</span></p>
+  <p><small>GMAX All Insurance · (832) 480-0217</small></p>
+</div>
+<script>
+  // Si el cliente canceló desde la pantalla de pago, el mensaje cambia (el link sigue sirviendo hasta que venza)
+  try {
+    if (new URLSearchParams(location.search).get('status') === 'cancelled') {
+      document.getElementById('icon').textContent = 'ℹ️';
+      document.getElementById('t-es').textContent = 'No se completó el pago';
+      document.getElementById('p-es').textContent = 'No se le cobró nada. Si todavía quiere pagar, vuelva a abrir el link que le enviamos por correo (sirve por 24 horas) o llámenos.';
+      document.getElementById('t-en').textContent = 'The payment was not completed.';
+      document.getElementById('p-en').textContent = 'You were not charged. To pay, open the link we emailed you again (valid for 24 hours) or call us.';
+    }
+  } catch (e) {}
+</script>
+</body>
+</html>

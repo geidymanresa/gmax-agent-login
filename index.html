@@ -988,6 +988,10 @@
 
 
 
+
+
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1037,6 +1041,10 @@
       #fmOverlay.fm-tplmode #fm-step2 .fm-bar .fm-tplwrap{ display:flex !important; gap:8px; flex-wrap:wrap; align-items:center; }
       #fmOverlay .fm-val{ margin-top:8px; padding:8px 10px; border:1.5px dashed #0B1F4B55; border-radius:10px; background:#F7F9FE; }
       #fmOverlay .fm-field .fm-fval{ font-size:12px; font-weight:600; color:#0A1A5C; padding:0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
+      #fmOverlay .fm-sw{ width:26px; height:26px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1.5px #CBD5E1; cursor:pointer; padding:0; }
+      #fmOverlay .fm-sw.on{ box-shadow:0 0 0 3px #0B1F4B; }
+      #fmOverlay .btn-ghost.fm-sz{ width:auto; padding:5px 9px; font-size:13px; margin:0; }
+      #fmOverlay #fm-p-size{ padding:6px 8px; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; font:inherit; font-size:14px; }
       #fmOverlay .fm-field.hasval{ background:rgba(255,255,255,.55) !important; border-style:dashed; }
       /* Los avisos del paso 2 (ej. error al crear el link) se quedan a la vista aunque estés abajo en el documento */
       #fmOverlay #fm-msg2{ position:sticky; top:calc(var(--fm-top-h, 58px) + 8px); z-index:8; box-shadow:0 4px 14px rgba(13,20,36,.22); font-size:14.5px; font-weight:600; border:1.5px solid currentColor; }
@@ -1121,8 +1129,8 @@
                 <button type="button" class="fm-tool" style="border-color:#0891B2; color:#0891B2;" onclick="fmAddField('check')"><span class="fm-ti">☑️</span><span class="fm-tl">Casilla</span></button>
                 <button type="button" class="fm-tool" style="border-color:#BE185D; color:#BE185D;" onclick="fmAddField('initials')"><span class="fm-ti">🖊️</span><span class="fm-tl">Iniciales</span></button>
               </div>
-              <div class="fm-listbox" style="margin-top:12px;"><span style="font-size:12.5px; font-weight:700;">Campos (<span id="fm-count">0 campos</span>)</span><div class="fm-chips" id="fm-chips" style="margin-top:6px;"></div></div>
               <div id="fm-props"></div>
+              <div class="fm-listbox" style="margin-top:12px;"><span style="font-size:12.5px; font-weight:700;">Campos (<span id="fm-count">0 campos</span>)</span><div class="fm-chips" id="fm-chips" style="margin-top:6px;"></div></div>
             </aside>
             <div class="fm-main">
               <div class="fm-box">
@@ -1318,6 +1326,10 @@
 
 
 
+
+
+
+
         <!-- Retos y objetivos opcionales, creados por la administradora para
              TODOS los agentes (no obligatorios como la meta de 5 pólizas). Solo
              se muestra si hay al menos un reto vigente ahora mismo. -->
@@ -1449,6 +1461,15 @@
             <h4 style="margin-top:0; color:#7A4F00;">Ya se les retiró el dinero — entra a Venture y haz el pago</h4>
             <p class="sub" style="margin:0 0 8px;">A estos clientes Stripe ya les cobró la mensualidad. Haz el pago dentro de Venture y luego toca «Ya pagué en Venture» para quitarlos de la lista.</p>
             <div id="venturePayList"></div>
+          </div>
+
+          <!-- 🔗 PAGOS POR LINK: cuando un cliente paga el link de pago (tarjeta o cuenta bancaria), o el banco lo rechaza.
+               Lo llena stripe-webhook en client_transactions — requiere migracion_link_de_pago.sql. -->
+          <div class="dash-card" id="linkPayCard" style="display:none; margin:0; background:#E9F7F0; border:2px solid #4FB58A;">
+            <div style="display:inline-block; background:#177A54; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔗 Pago por link</div>
+            <h4 style="margin-top:0; color:#177A54;">Clientes que acaban de pagar su link</h4>
+            <p class="sub" style="margin:0 0 8px;">Toca «Listo» cuando lo hayas visto — se guarda el recibo en Documentos y se quita de esta lista.</p>
+            <div id="linkPayList"></div>
           </div>
 
           <!-- Resultado de cada cobro automático con tarjeta (ver sección "Pago
@@ -2278,8 +2299,7 @@
                 <label>Método de pago</label>
                 <select id="tx-metodopago" onchange="onPaymentMethodChange()">
                   <option value="tarjeta">Tarjeta (manual, por el CRM)</option>
-                  <option value="link">Enviar link de pago al cliente</option>
-                  <option value="ach">ACH / Cuenta bancaria</option>
+                  <option value="link">Enviar link de pago al cliente (tarjeta o cuenta bancaria)</option>
                 </select>
                 <p class="sub" id="tx-metodopago-nota" style="margin-top:4px;"></p>
               </div>
@@ -2296,9 +2316,15 @@
                 <label style="color:#177A54;">Correo del cliente para enviar el link de pago</label>
                 <input type="email" id="tx-link-email" placeholder="correo@ejemplo.com">
                 <p class="sub" style="margin-top:6px;">Se llena automático con el correo guardado del cliente — puedes cambiarlo si quieres enviarlo a otro correo.</p>
+                <label style="color:#177A54; margin-top:12px; display:block;">¿Cómo puede pagar el cliente?</label>
+                <select id="tx-link-mode" onchange="recalcTransaction()">
+                  <option value="both">Con tarjeta o con cuenta bancaria (el cliente escoge)</option>
+                  <option value="bank">Solo con cuenta bancaria (ACH — comisión más baja)</option>
+                </select>
+                <p class="sub" style="margin-top:6px;">El link dura 24 horas. El cliente recibe el link por correo y tú lo puedes copiar para mandárselo por WhatsApp o mensaje. Cuando pague, el CRM lo marca solo y te avisa en Inicio.</p>
               </div>
 
-              <!-- Link de pago / ACH: todavía no conectados de verdad -->
+              <!-- Aviso informativo del método de pago -->
               <div class="msg" id="tx-metodoPendienteMsg" style="display:none; background:#EAF1FB; color:#1E4FA0;"></div>
 
               <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
@@ -2818,6 +2844,10 @@
 
 
 
+
+
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3187,6 +3217,10 @@
           <div id="fm-rec-list"><p class="sub">Cargando...</p></div>
         </div>
 <!-- ===== FIRMAS-RECURSOS-END ===== -->
+
+
+
+
 
 
 
@@ -5495,6 +5529,7 @@
     await safeLoad(loadAutoChargeAlerts, 'Cobros automáticos Venture');
     await safeLoad(loadVenturePayAlerts, 'Pagar en Venture');
     await safeLoad(loadVentureDueAlerts, 'Toca cobrar (Venture)');
+    await safeLoad(loadLinkPayAlerts, 'Pagos por link');
     await safeLoad(loadLeads, 'Leads');
     await safeLoad(() => setBookOfBusinessRange('today'), 'Libro de negocio');
     await safeLoad(() => setConversionRange('month'), 'Conversión de cotizaciones');
@@ -5546,6 +5581,7 @@
     // «Pagar en Venture»: se revisa en cualquier pestaña (aviso emergente + número en «Inicio»).
     await safeAutoRefresh(loadVenturePayAlerts, 'Pagar en Venture');
     await safeAutoRefresh(loadVentureDueAlerts, 'Toca cobrar (Venture)');
+    await safeAutoRefresh(loadLinkPayAlerts, 'Pagos por link');
 
     // Respaldo cuando el tiempo real todavía no está activado: refresca también
     // la lista de Clientes y los números de Inicio cada 20 segundos.
@@ -9156,11 +9192,6 @@
       linkEmailBlock.style.display = 'block';
       const emailInput = document.getElementById('tx-link-email');
       if(!emailInput.value) emailInput.value = currentClientEmail || '';
-      pendienteMsg.style.display = 'block';
-      pendienteMsg.textContent = 'El envío real del link de pago todavía no está conectado — por ahora esto solo calcula y guarda la referencia.';
-    } else if(metodo === 'ach'){
-      pendienteMsg.style.display = 'block';
-      pendienteMsg.textContent = 'El cobro real por ACH todavía no está conectado — por ahora esto solo calcula y guarda la referencia.';
     }
     recalcTransaction();
   }
@@ -9233,21 +9264,23 @@
     const chargeBase = serviceFee + (collectsDeposit ? cargoAmount : 0);
 
     const metodoPago = document.getElementById('tx-metodopago').value || 'tarjeta';
+    // Link de pago: si se ofrece SOLO cuenta bancaria, la comisión es la de ACH (0.8%, tope $5.00); si el cliente puede escoger
+    // tarjeta o banco, se calcula con la de tarjeta (2.9% + $0.30) para que nunca falte dinero.
+    const linkBankOnly = metodoPago === 'link' && (document.getElementById('tx-link-mode') || {}).value === 'bank';
     let metodoLabel = '';
-    if(metodoPago === 'ach'){
-      metodoLabel = 'ACH, 0.8% (tope $5.00)';
+    if(linkBankOnly){
+      metodoLabel = 'Link de pago · cuenta bancaria, 0.8% (tope $5.00)';
     } else {
-      // Tarjeta manual y Link de pago cobran la misma tarifa: 2.9% + $0.30
       metodoLabel = metodoPago === 'link' ? 'Link de pago, 2.9% + $0.30' : 'Tarjeta, 2.9% + $0.30';
     }
-    const { fee: processingFee, total } = calcStripeGrossUp(chargeBase, metodoPago);
+    const { fee: processingFee, total } = calcStripeGrossUp(chargeBase, linkBankOnly ? 'ach' : metodoPago);
 
     const metodoNota = document.getElementById('tx-metodopago-nota');
     if(metodoNota){
-      metodoNota.textContent = metodoPago === 'ach'
-        ? 'Más barato para montos grandes: 0.8% del total, con tope de $5.00 sin importar qué tan alto sea el cobro.'
+      metodoNota.textContent = linkBankOnly
+        ? 'El cliente paga solo con su cuenta bancaria: comisión de 0.8% del total, con tope de $5.00 sin importar qué tan alto sea el cobro. El banco tarda de 3 a 5 días hábiles en confirmar.'
         : (metodoPago === 'link'
-          ? 'El cliente recibe un link y paga por su cuenta — misma tarifa que tarjeta manual.'
+          ? 'El cliente recibe un link y escoge si paga con tarjeta o con su cuenta bancaria. El total incluye la comisión de tarjeta (2.9% + $0.30); si paga con cuenta bancaria, Stripe te cobra menos y la diferencia te queda a ti.'
           : 'El agente cobra la tarjeta directo desde el CRM.');
     }
 
@@ -9550,6 +9583,11 @@
     let stripePaymentIntentId = null;
     let stripeCheckoutSessionId = null;
     let paymentLinkUrl = null;
+    let paymentLinkExpiresAt = null;
+    let paymentLinkEmailSent = false;
+    let paymentLinkEmailError = null;
+    let paymentLinkBankEnabled = true;
+    const paymentLinkMode = (document.getElementById('tx-link-mode') || {}).value === 'bank' ? 'bank' : 'both';
     let cardBrand = null;
     let cardLast4 = null;
     if(metodoPago === 'tarjeta'){
@@ -9633,14 +9671,21 @@
       }
       showMsg('newTransactionMsg','success','Creando el link de pago, un momento...');
       try {
+        const { data: { session: linkSession } } = await sb.auth.getSession();
+        const linkIdemKey = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '-' + Math.random());
         const resp = await fetch(SUPABASE_URL + '/functions/v1/create-payment-link', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (linkSession ? linkSession.access_token : SUPABASE_ANON_KEY), 'apikey': SUPABASE_ANON_KEY },
           body: JSON.stringify({
+            action: 'create',
             amount: totalACobrar,
             description: 'GMAX All Insurance - ' + (SERVICE_TYPE_LABELS[tipo] || tipo),
             clientEmail: linkEmail,
-            clientName: document.getElementById('cd-nombre').textContent
+            clientName: document.getElementById('cd-nombre').textContent,
+            clientId: currentClientId,
+            mode: paymentLinkMode,
+            returnBase: new URL('pago-completado.html', location.href).href,
+            idempotencyKey: linkIdemKey
           })
         });
         const linkData = await resp.json();
@@ -9650,6 +9695,10 @@
         }
         stripeCheckoutSessionId = linkData.sessionId;
         paymentLinkUrl = linkData.url;
+        paymentLinkExpiresAt = linkData.expiresAt || null;
+        paymentLinkEmailSent = !!linkData.emailSent;
+        paymentLinkEmailError = linkData.emailError || null;
+        paymentLinkBankEnabled = linkData.bankEnabled !== false;
       } catch(err){
         showMsg('newTransactionMsg','error','Error de conexión al crear el link de pago: ' + err.message);
         return;
@@ -9779,6 +9828,8 @@
       payment_link_email: metodoPago === 'link' ? (document.getElementById('tx-link-email').value || null) : null,
       stripe_checkout_session_id: stripeCheckoutSessionId,
       payment_link_url: paymentLinkUrl,
+      payment_link_expires_at: metodoPago === 'link' ? paymentLinkExpiresAt : null,
+      payment_link_mode: metodoPago === 'link' ? paymentLinkMode : null,
       monthly_payment: tipo === 'nueva_poliza' ? (parseFloat(document.getElementById('tx-pago-mensual').value) || 0) : null,
       endorsement_details: combinedEndorsoDetails,
       cancellation_type: tipo === 'cancelacion' ? cancelTipo : null,
@@ -9932,7 +9983,8 @@
     }
 
     if(metodoPago === 'link' && paymentLinkUrl){
-      showMsg('newTransactionMsg','success', `Link de pago creado${document.getElementById('tx-link-email').value ? ' y enviado por correo' : ''}. También puedes copiarlo y mandarlo tú misma: ${paymentLinkUrl}`);
+      showMsg('newTransactionMsg','success', 'Link de pago creado. Quedó registrado como «Esperando pago» — cuando el cliente pague, el CRM lo marca solo.');
+      showPaymentLinkDialog({ url: paymentLinkUrl, email: document.getElementById('tx-link-email').value, emailSent: paymentLinkEmailSent, emailError: paymentLinkEmailError, expiresAt: paymentLinkExpiresAt, bankEnabled: paymentLinkBankEnabled, mode: paymentLinkMode, total: totalACobrar });
     }
 
     document.getElementById('newTransactionForm').reset();
@@ -9986,8 +10038,8 @@
         <td>$${Number(t.total_reference || 0).toFixed(2)}</td>
         <td>${formatDateUS(t.created_at?.split('T')[0])}</td>
         <td>${t.status === 'completada'
-          ? `<button class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="showReceipt('${t.id}')">Ver Recibo</button>`
-          : (t.status === 'pendiente_poliza' ? '<span class="badge pending">Pendiente</span>' : '—')}</td>
+          ? `<button class="btn-ghost" style="width:auto; padding:6px 14px;" onclick="showReceipt('${t.id}')">Ver Recibo</button>${t.paid_via ? `<div class="sub" style="margin-top:3px;">Pagó por link ${t.paid_via === 'us_bank_account' ? 'con cuenta bancaria' : 'con tarjeta'}</div>` : ''}`
+          : (t.status === 'pendiente_poliza' ? '<span class="badge pending">Pendiente</span>' : (paymentLinkStatusCell(t) || '—'))}</td>
         <td>${isSA ? `<button class="btn-ghost" style="width:auto; padding:6px 10px; color:#C23B3B; border-color:#F0C6C6;" onclick="deleteTransaction('${t.id}')">Eliminar</button>` : ''}</td>
       </tr>
     `).join('');
@@ -10750,7 +10802,7 @@
     // de "Nueva transacción", para que la agente se lo diga al cliente.
     let notaDeposito = '';
     const cardLine = (t.card_brand && t.card_last4)
-      ? `<div><div class="label" style="font-size:12px; color:var(--slate-light);">Tarjeta</div><div>${CARD_BRAND_LABELS[t.card_brand] || t.card_brand} terminada en ${t.card_last4}</div></div>`
+      ? `<div><div class="label" style="font-size:12px; color:var(--slate-light);">${t.paid_via === 'us_bank_account' ? 'Cuenta bancaria' : 'Tarjeta'}</div><div>${escapeHtml(CARD_BRAND_LABELS[t.card_brand] || t.card_brand)} terminada en ${escapeHtml(t.card_last4)}</div></div>`
       : '';
 
     const contentHtml = `
@@ -12853,6 +12905,157 @@
       first.setDate(Math.min(day, dim)); const iso = toISODateLocal(first); if(iso >= base) return iso;
     }
     return '';
+  }
+  // ---------- 🔗 Link de pago (el cliente paga con tarjeta o con cuenta bancaria) ----------
+  // Lo crea la Edge Function create-payment-link (Stripe Checkout); cuando el cliente paga, stripe-webhook marca la transacción
+  // y aquí sale el aviso en Inicio. Requiere migracion_link_de_pago.sql.
+  const CREATE_PAYMENT_LINK_URL = SUPABASE_URL + '/functions/v1/create-payment-link';
+  let linkPayKnownIds = null;          // ids ya vistos en esta sesión (para avisar solo de los nuevos)
+  const linkPayRows = {};
+  const LINK_STATUS_LABELS = { pendiente_pago: 'Esperando pago', procesando_ach: 'Banco procesando', pago_fallido: 'Pago falló', link_vencido: 'Link vencido' };
+
+  async function callPaymentLinkFn(body){
+    const { data: { session } } = await sb.auth.getSession();
+    const resp = await fetch(CREATE_PAYMENT_LINK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY), 'apikey': SUPABASE_ANON_KEY },
+      body: JSON.stringify({ returnBase: new URL('pago-completado.html', location.href).href, ...body })
+    });
+    let data = {}; try { data = await resp.json(); } catch(e){}
+    return { ok: resp.ok && !data.error, data };
+  }
+  function copyTextToClipboard(text){
+    try { return navigator.clipboard.writeText(text); } catch(e){ return Promise.reject(e); }
+  }
+  function showPaymentLinkDialog(o){
+    const old = document.getElementById('payLinkDialog'); if(old) old.remove();
+    const ov = document.createElement('div'); ov.id = 'payLinkDialog';
+    ov.style.cssText = 'position:fixed; inset:0; background:rgba(15,25,40,.55); z-index:9998; display:flex; align-items:center; justify-content:center; padding:16px;';
+    const exp = o.expiresAt ? formatDateTimeUS(o.expiresAt) : '';
+    const mailLine = o.email
+      ? (o.emailSent ? `<div style="color:#177A54; font-weight:700;">✓ Se lo mandé por correo a ${escapeHtml(o.email)}.</div>`
+        : `<div style="color:#B23A3A; font-weight:700;">✕ El correo no salió${o.emailError ? ': ' + escapeHtml(o.emailError) : ''}. Copia el link y mándaselo tú.</div>`)
+      : '';
+    const bankLine = o.bankEnabled === false
+      ? `<div style="margin-top:8px; padding:10px 12px; background:#FFF4D6; border:1.5px solid #E3A81F; border-radius:8px; color:#7A4F00; font-size:14px;">⚠ Tu cuenta de Stripe todavía no tiene activado «ACH Direct Debit», así que este link solo deja pagar con <strong>tarjeta</strong>. Para aceptar cuenta bancaria: Stripe → Settings → Payment methods → ACH Direct Debit.</div>`
+      : `<div style="margin-top:8px; color:#3b4a5e; font-size:14px;">${o.mode === 'bank' ? '🏦 El cliente puede pagar solo con su cuenta bancaria.' : '💳🏦 El cliente escoge si paga con tarjeta o con su cuenta bancaria.'} Los pagos con cuenta bancaria tardan de 3 a 5 días hábiles en confirmarse.</div>`;
+    ov.innerHTML = `
+      <div style="background:#fff; border-radius:16px; max-width:560px; width:100%; padding:22px; box-shadow:0 12px 40px rgba(0,0,0,.35); max-height:92vh; overflow:auto;">
+        <h3 style="margin:0 0 4px;">🔗 Link de pago listo — $${Number(o.total || 0).toFixed(2)}</h3>
+        <p class="sub" style="margin:0 0 12px;">${exp ? 'Sirve hasta el ' + exp + '. ' : ''}Si vence, en la transacción tocas «Link nuevo».</p>
+        ${mailLine}
+        <input id="payLinkDialogInput" type="text" readonly value="${escapeHtml(o.url)}" style="width:100%; margin-top:10px; font-size:13px;" onclick="this.select()">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <button class="btn-primary" style="width:auto; padding:10px 18px;" id="payLinkDialogCopy">📋 Copiar link</button>
+          <button class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="document.getElementById('payLinkDialog').remove()">Cerrar</button>
+        </div>
+        ${bankLine}
+        <p class="sub" style="margin:12px 0 0;">Quedó guardado en el perfil del cliente como «Esperando pago». Cuando pague, el CRM lo marca solo y te avisa en Inicio.</p>
+      </div>`;
+    document.body.appendChild(ov);
+    document.getElementById('payLinkDialogCopy').onclick = function(){
+      copyTextToClipboard(o.url).then(function(){ document.getElementById('payLinkDialogCopy').textContent = '✓ Copiado'; }).catch(function(){ const i = document.getElementById('payLinkDialogInput'); i.focus(); i.select(); });
+    };
+  }
+  function paymentLinkExpired(t){ return !t.payment_link_expires_at || new Date(t.payment_link_expires_at).getTime() < Date.now() + 5 * 60000; }
+  // Lo que se ve en la columna «Recibo» de la lista de transacciones cuando la transacción nació de un link de pago
+  function paymentLinkStatusCell(t){
+    const btn = (label, fn, extra) => `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px; margin:3px 4px 0 0;${extra || ''}" onclick="${fn}('${t.id}', this)">${label}</button>`;
+    if(t.status === 'pendiente_pago'){
+      if(paymentLinkExpired(t)) return `<span class="badge pending">⌛ Link vencido</span><div>${btn('🔄 Link nuevo', 'regeneratePaymentLink')}</div>`;
+      return `<span class="badge pending">⏳ Esperando pago</span><div class="sub" style="margin-top:3px;">${t.payment_link_expires_at ? 'Vence ' + formatDateTimeUS(t.payment_link_expires_at) : ''}</div><div>${btn('📋 Copiar link', 'copyPaymentLink')}${btn('✉️ Reenviar', 'resendPaymentLink')}</div>`;
+    }
+    if(t.status === 'procesando_ach') return `<span class="badge pending">🏦 Banco procesando</span><div class="sub" style="margin-top:3px;">El cliente ya autorizó su cuenta. El banco tarda de 3 a 5 días hábiles; cuando llegue el dinero se marca solo.</div>`;
+    if(t.status === 'pago_fallido') return `<span class="badge" style="background:#FBE3E3; color:#B23A3A;">✕ Pago falló</span><div class="sub" style="margin-top:3px;">El banco o la tarjeta lo rechazó.</div><div>${btn('🔄 Link nuevo', 'regeneratePaymentLink')}</div>`;
+    if(t.status === 'link_vencido') return `<span class="badge pending">⌛ Link vencido</span><div>${btn('🔄 Link nuevo', 'regeneratePaymentLink')}</div>`;
+    return null;
+  }
+  async function copyPaymentLink(txId, btnEl){
+    const { data: t } = await sb.from('client_transactions').select('payment_link_url, payment_link_expires_at').eq('id', txId).single();
+    if(!t || !t.payment_link_url){ alert('Esta transacción no tiene link guardado.'); return; }
+    if(paymentLinkExpired(t)){ alert('Ese link ya venció. Toca «Link nuevo».'); await loadClientTransactions(currentClientId); return; }
+    copyTextToClipboard(t.payment_link_url).then(function(){ if(btnEl) btnEl.textContent = '✓ Copiado'; ventureToast('📋 Link copiado — pégalo en WhatsApp o en un mensaje'); })
+      .catch(function(){ window.prompt('Copia el link:', t.payment_link_url); });
+  }
+  async function resendPaymentLink(txId, btnEl){
+    if(btnEl){ btnEl.disabled = true; btnEl.textContent = 'Enviando…'; }
+    const r = await callPaymentLinkFn({ action: 'resend', transactionId: txId });
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = '✉️ Reenviar'; }
+    if(!r.ok){ alert('No se pudo reenviar: ' + (r.data.error || 'error desconocido')); if(currentClientId) await loadClientTransactions(currentClientId); return; }
+    if(r.data.emailSent) ventureToast('✉️ Link reenviado por correo');
+    else alert('El correo no salió' + (r.data.emailError ? ': ' + r.data.emailError : '') + '. Usa «Copiar link» y mándaselo tú.');
+  }
+  async function regeneratePaymentLink(txId, btnEl){
+    if(!confirm('¿Crear un link de pago NUEVO para esta transacción?\n\nEl link anterior deja de funcionar y se le manda el nuevo por correo al cliente.')) return;
+    if(btnEl){ btnEl.disabled = true; btnEl.textContent = 'Creando…'; }
+    const r = await callPaymentLinkFn({ action: 'regenerate', transactionId: txId });
+    if(btnEl){ btnEl.disabled = false; btnEl.textContent = '🔄 Link nuevo'; }
+    if(!r.ok){ alert('No se pudo crear el link nuevo: ' + (r.data.error || 'error desconocido')); if(currentClientId) await loadClientTransactions(currentClientId); return; }
+    if(currentClientId) await loadClientTransactions(currentClientId);
+    const { data: t } = await sb.from('client_transactions').select('total_reference, payment_link_email, payment_link_mode').eq('id', txId).single();
+    showPaymentLinkDialog({ url: r.data.url, email: t ? t.payment_link_email : '', emailSent: r.data.emailSent, emailError: r.data.emailError, expiresAt: r.data.expiresAt, bankEnabled: true, mode: t ? t.payment_link_mode : 'both', total: t ? t.total_reference : 0 });
+  }
+  // ---- Aviso en Inicio: pagos por link que acaban de llegar (o que fallaron) ----
+  async function loadLinkPayAlerts(){
+    if(!currentProfile) return;
+    const card = document.getElementById('linkPayCard'); const list = document.getElementById('linkPayList');
+    let q = sb.from('client_transactions').select('*, client:client_id(full_name)').eq('payment_link_seen', false).is('deleted_at', null).order('paid_at', { ascending: true }).limit(50);
+    if(!isAdminUser()) q = q.eq('created_by', currentProfile.id);
+    const { data, error } = await q;
+    if(error){ if(card) card.style.display = 'none'; return; }       // falta correr migracion_link_de_pago.sql → no se muestra nada
+    const rows = data || [];
+    rows.forEach(r => { linkPayRows[r.id] = r; });
+    const ids = new Set(rows.map(r => r.id));
+    const nameOf = (r) => r.client ? r.client.full_name : 'un cliente';
+    if(linkPayKnownIds){
+      const fresh = rows.filter(r => !linkPayKnownIds.has(r.id));
+      if(fresh.length){ const f = fresh[0];
+        const msg = f.status === 'pago_fallido'
+          ? '⚠ Falló el pago por link de ' + nameOf(f)
+          : '✅ ' + nameOf(f) + ' pagó $' + Number(f.total_reference || 0).toFixed(2) + (f.paid_via === 'us_bank_account' ? ' con su cuenta bancaria' : ' con su tarjeta');
+        ventureToast(msg + (fresh.length > 1 ? ' (y ' + (fresh.length - 1) + ' más)' : '')); }
+    } else if(rows.length){
+      ventureToast('💵 Tienes ' + rows.length + ' pago' + (rows.length === 1 ? '' : 's') + ' por link para revisar en Inicio');
+    }
+    linkPayKnownIds = ids;
+    if(!card || !list) return;
+    if(!rows.length){ card.style.display = 'none'; return; }
+    card.style.display = 'block';
+    list.innerHTML = rows.map(r => {
+      const failed = r.status === 'pago_fallido';
+      const how = r.paid_via === 'us_bank_account' ? `🏦 con su cuenta bancaria ${escapeHtml(r.card_brand || '')}${r.card_last4 ? ' ••' + escapeHtml(r.card_last4) : ''}` : `💳 con su tarjeta ${escapeHtml(CARD_BRAND_LABELS[r.card_brand] || r.card_brand || '')}${r.card_last4 ? ' ••' + escapeHtml(r.card_last4) : ''}`;
+      return `
+      <div style="padding:10px 0; border-bottom:1px solid #A9DFC4; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div style="flex:1; min-width:210px;">
+          <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${r.client_id}')"><strong>${escapeHtml(nameOf(r))}</strong> — ${escapeHtml(SERVICE_TYPE_LABELS[r.transaction_type] || r.transaction_type || '')}</div>
+          ${failed
+            ? `<div style="margin-top:2px; color:#B23A3A; font-weight:700;">✕ Falló el pago de $${Number(r.total_reference || 0).toFixed(2)} — el banco lo rechazó. Entra al cliente y toca «Link nuevo».</div>`
+            : `<div style="margin-top:2px;">✅ Pagó <strong>$${Number(r.total_reference || 0).toFixed(2)}</strong> ${how}${r.paid_at ? ' el ' + formatDateTimeUS(r.paid_at) : ''}</div>`}
+        </div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <button class="btn-ghost" style="width:auto; padding:8px 10px;" onclick="goToClientFromUnderwriting('${r.client_id}')">Ver cliente</button>
+          <button class="btn" style="width:auto; padding:8px 12px; background:#177A54; color:#fff; font-weight:700; border:0; border-radius:8px; cursor:pointer;" onclick="markLinkPaySeen('${r.id}', event)">✓ Listo</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+  async function markLinkPaySeen(id, ev){
+    if(ev && ev.target){ ev.target.disabled = true; }
+    const r = linkPayRows[id];
+    // Pago terminado de un servicio normal: se guarda el recibo en Documentos (igual que cuando se cobra con tarjeta en el CRM)
+    if(r && r.status === 'completada' && !['nueva_poliza', 'cancelacion', 'reinstalacion', 'endorsement'].includes(r.transaction_type)){
+      try {
+        let pn = 's/n';
+        if(r.policy_id){ const { data: pol } = await sb.from('client_policies').select('policy_number').eq('id', r.policy_id).single(); if(pol && pol.policy_number) pn = pol.policy_number; }
+        const { data: { session } } = await sb.auth.getSession();
+        await insertInternalDocumentOnce({ client_id: r.client_id, file_name: `Recibo - ${INSURANCE_TYPE_LABELS[r.product] || r.product || 'Transacción'} - #${pn}`, storage_path: null, category: 'Recibo', receipt_transaction_id: r.id, uploaded_by: session.user.id });
+      } catch(e){ console.error('No se pudo guardar el recibo del pago por link:', e); }
+    }
+    const { error } = await sb.from('client_transactions').update({ payment_link_seen: true }).eq('id', id);
+    if(error){ alert('No se pudo marcar: ' + error.message); if(ev && ev.target) ev.target.disabled = false; return; }
+    delete linkPayRows[id]; if(linkPayKnownIds) linkPayKnownIds.delete(id);
+    await loadLinkPayAlerts();
+    if(currentClientId && r && r.client_id === currentClientId){ try{ await loadClientTransactions(currentClientId); await loadClientDocuments(currentClientId); }catch(e){} }
   }
   function ventureToast(text){
     let t = document.getElementById('ventureToast');
@@ -17607,6 +17810,10 @@ async function saSaveSettings(){
 
 
 
+
+
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -18034,7 +18241,7 @@ async function fmRenderPages(){
     el.appendChild(cv);
     const tag = document.createElement('div'); tag.className = 'fm-pagetag'; tag.textContent = 'Página ' + i + ' de ' + FM.pdf.numPages; el.appendChild(tag);
     wrap.appendChild(el);
-    FM.pages.push({ el, cv, n: i });
+    FM.pages.push({ el, cv, n: i, ptW: v1.width, ptH: v1.height });
     await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
     el.addEventListener('pointerdown', ev => { if(ev.target === el || ev.target === cv) fmSelect(null); });
   }
@@ -18060,6 +18267,14 @@ function fmRenderFields(){
   fmRenderChips();
 }
 // Lo que la agencia ya escribió dentro del documento se ve en el recuadro (como quedará en el PDF).
+const FM_INK = '#0d1a59';   // color de la letra si no eligen otro (el de siempre)
+const FM_COLORS = [['#0d1a59', 'Azul oscuro'], ['#000000', 'Negro'], ['#1d4ed8', 'Azul'], ['#c23b3b', 'Rojo'], ['#177a54', 'Verde'], ['#6b7280', 'Gris']];
+function fmCanStyle(f){ return ['name', 'date', 'text', 'number', 'check'].includes(f.type); }
+// Tamaño «automático» (el que usa el PDF si no se elige uno): hasta 11 pt, según lo alto del recuadro.
+function fmAutoSize(f){ const pg = FM.pages[f.page - 1]; const hPt = pg && pg.ptH ? f.h * pg.ptH : 26; return Math.round(Math.min(11, Math.max(6, hPt * 0.72)) * 2) / 2; }
+let fmMeasureCtx = null;
+function fmTextWidth(txt, sizePx){ if(!fmMeasureCtx) fmMeasureCtx = document.createElement('canvas').getContext('2d'); fmMeasureCtx.font = sizePx + 'px Helvetica, Arial, sans-serif'; return fmMeasureCtx.measureText(txt).width; }
+// Lo que la agencia ya escribió dentro del documento se ve en el recuadro (como quedará en el PDF: mismo tamaño y color).
 function fmPaintValue(el, f){
   const old = el.querySelector('.fm-fval'); if(old) old.remove();
   const lab = el.querySelector('.fm-flabel');
@@ -18067,7 +18282,21 @@ function fmPaintValue(el, f){
   el.classList.toggle('hasval', has);
   if(!has){ if(lab) lab.style.display = ''; return; }
   const v = document.createElement('span'); v.className = 'fm-fval'; v.textContent = f.type === 'check' ? '✕' : f.value; v.title = f.label;
-  if(f.type === 'check'){ v.style.cssText = 'font-size:16px; font-weight:800; margin:0 auto;'; } else if(lab) lab.style.display = 'none';
+  const color = /^#[0-9a-fA-F]{6}$/.test(String(f.color || '')) ? f.color : FM_INK; v.style.color = color;
+  if(f.type === 'check'){ v.style.cssText += 'font-size:16px; font-weight:800; margin:0 auto;'; }
+  else{
+    if(lab) lab.style.display = 'none';
+    const pg = FM.pages[f.page - 1];
+    if(pg && pg.ptW && pg.el.clientWidth){
+      const scale = pg.el.clientWidth / pg.ptW;
+      let pt = Number(f.fontSize) >= 6 ? Number(f.fontSize) : fmAutoSize(f);
+      const boxW = f.w * pg.el.clientWidth - 4;
+      const wraps = f.type === 'text' && f.h * pg.ptH >= 24;
+      if(!wraps){ while(pt > 6 && fmTextWidth(String(f.value), pt * scale) > boxW) pt -= 0.5; }   // igual que el PDF: si no cabe, se achica
+      v.style.fontSize = (pt * scale) + 'px'; v.style.whiteSpace = wraps ? 'normal' : 'nowrap'; v.style.overflow = 'hidden'; v.style.lineHeight = '1.18';
+      v.dataset.pt = String(pt);
+    }
+  }
   el.insertBefore(v, el.querySelector('.fm-handle'));
 }
 function fmBindField(el, handle, f, pg){
@@ -18140,7 +18369,7 @@ function fmRenderProps(){
   const hint = isCheck ? 'Ejemplo: «Auto», «Casa». El cliente toca la casilla en el documento para marcarla.'
     : (f.type === 'initials' ? 'El cliente dibuja sus iniciales una vez y se ponen en todos los recuadros de iniciales que toque.' : '');
   box.innerHTML = `
-    ${fmValueHtml(f)}
+    ${fmValueHtml(f)}${fmStyleHtml(f)}
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
       <div style="flex:1; min-width:180px;"><label style="font-size:12px; font-weight:700;">${t.icon} ${t.label} — ${isCheck ? 'nombre de esta opción' : 'qué le vas a pedir al cliente'}</label>
         <input type="text" id="fm-p-label" maxlength="80" value="${fmEsc(f.label)}" oninput="fmPropLabel(this.value)"></div>
@@ -18163,9 +18392,50 @@ function fmValueHtml(f){
   }
   const ph = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : f.type === 'name' ? 'Ej: Maria Perez' : 'Escribe aquí';
   const btn = (f.type === 'name' && FM.client && FM.client.full_name) ? `<button type="button" class="btn-ghost" style="width:auto; padding:6px 10px; margin-top:6px;" onclick="fmUseClientName()">Usar el nombre del cliente</button>` : '';
-  return `<div class="fm-val"><label style="font-size:12px; font-weight:700;">✍️ Escríbelo tú aquí (si lo llenas, el cliente ya no lo llena: solo lo ve y firma)</label>
+  return `<div class="fm-val"><label style="font-size:12px; font-weight:700;">✍️ Escríbelo tú aquí</label>
     <input type="text" id="fm-p-value" maxlength="${f.type === 'name' ? 120 : f.type === 'date' ? 10 : f.type === 'number' ? 40 : 500}" value="${fmEsc(f.value || '')}" placeholder="${ph}" ${f.type === 'date' ? 'inputmode="numeric"' : ''} oninput="fmPropValue(this.value)" autocomplete="off">
-    ${btn}<div class="sub" style="margin:4px 0 0; font-size:12.5px;">Déjalo vacío si lo debe llenar el cliente.${FM.tplMode ? ' Aquí solo escribe datos que sean IGUALES para todos los clientes (por ejemplo el código de agencia).' : ' Estos datos solo se usan en este documento; no quedan guardados en el formulario.'}</div></div>`;
+    ${btn}<div class="sub" style="margin:4px 0 0; font-size:12.5px;">El cliente ya no lo llena: solo lo ve y firma. Vacío = lo llena el cliente.${FM.tplMode ? ' Aquí solo datos IGUALES para todos los clientes (ej. código de agencia).' : ' Solo se usa en este documento.'}</div></div>`;
+}
+// Tamaño y color de la letra del campo (lo que escribe la agencia o lo que escribe el cliente).
+function fmStyleHtml(f){
+  if(!fmCanStyle(f)) return '';
+  const isCheck = f.type === 'check';
+  const cur = /^#[0-9a-fA-F]{6}$/.test(String(f.color || '')) ? f.color.toLowerCase() : '';
+  const sw = FM_COLORS.map(([c, n]) => `<button type="button" class="fm-sw${(cur || FM_INK) === c ? ' on' : ''}" title="${n}" aria-label="${n}" style="background:${c};" onclick="fmPropColor('${c}')"></button>`).join('');
+  const size = isCheck ? '' : `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
+      <span style="font-size:12px; font-weight:700; min-width:50px;">Tamaño</span>
+      <button type="button" class="btn-ghost fm-sz" aria-label="Letra más chica" onclick="fmBumpSize(-1)">A−</button>
+      <input type="number" id="fm-p-size" min="6" max="48" step="0.5" value="${f.fontSize ? f.fontSize : ''}" placeholder="Auto" oninput="fmPropSize(this.value)" style="width:70px;">
+      <button type="button" class="btn-ghost fm-sz" aria-label="Letra más grande" onclick="fmBumpSize(1)">A+</button>
+      <button type="button" class="btn-ghost fm-sz" onclick="fmPropSize('')" title="Que el tamaño se ajuste solo al recuadro">Auto</button>
+      <span class="sub" style="margin:0; font-size:12px;">puntos (6 a 48)</span></div>`;
+  return `<div class="fm-val" id="fm-style-box"><div style="font-size:12px; font-weight:700; margin-bottom:6px;">🔤 Letra de este campo</div>${size}
+    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"><span style="font-size:12px; font-weight:700; min-width:50px;">Color</span>${sw}
+      <input type="color" id="fm-p-color" value="${cur || FM_INK}" oninput="fmPropColor(this.value)" title="Otro color" aria-label="Otro color" style="width:34px; height:30px; padding:0; border:1.5px solid #CBD5E1; border-radius:6px; background:#fff;">
+      ${cur ? '<button type="button" class="btn-ghost fm-sz" onclick="fmPropColor(\'\')">Normal</button>' : ''}</div>
+    <div class="sub" style="margin:6px 0 0; font-size:12px;">${isCheck ? 'Color de la X de la casilla.' : 'Si el texto no cabe en el recuadro, se achica solo; agranda el recuadro para que se vea del tamaño que elegiste.'}</div></div>`;
+}
+function fmRepaintSel(){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; FM.templateDirty = true; const el = document.querySelector('#fm-pages .fm-field[data-id="' + f.id + '"]'); if(el) fmPaintValue(el, f); }
+function fmPropSize(v){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanStyle(f)) return;
+  const n = parseFloat(String(v).replace(',', '.'));
+  if(!isFinite(n) || n <= 0){ delete f.fontSize; const i = document.getElementById('fm-p-size'); if(i && v === '') i.value = ''; }
+  else f.fontSize = Math.min(48, Math.max(6, Math.round(n * 2) / 2));
+  fmRepaintSel();
+}
+function fmBumpSize(d){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanStyle(f)) return;
+  const cur = Number(f.fontSize) >= 6 ? Number(f.fontSize) : fmAutoSize(f);
+  f.fontSize = Math.min(48, Math.max(6, cur + d)); const i = document.getElementById('fm-p-size'); if(i) i.value = f.fontSize;
+  fmRepaintSel();
+}
+function fmPropColor(c){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanStyle(f)) return;
+  if(/^#[0-9a-fA-F]{6}$/.test(String(c || ''))) f.color = String(c).toLowerCase(); else delete f.color;
+  fmRepaintSel();
+  const box = document.getElementById('fm-style-box'); if(box){ const cur = f.color || FM_INK; box.querySelectorAll('.fm-sw').forEach(b => b.classList.toggle('on', (b.getAttribute('onclick') || '').indexOf("'" + cur + "'") >= 0));
+    const ci = document.getElementById('fm-p-color'); if(ci && document.activeElement !== ci) ci.value = cur;
+    if(!document.activeElement || document.activeElement.id !== 'fm-p-color') box.outerHTML = fmStyleHtml(f); }
 }
 function fmMaskDate(v){ const d = String(v).replace(/\D/g, '').slice(0, 8); let o = d.slice(0, 2); if(d.length > 2) o += '/' + d.slice(2, 4); if(d.length > 4) o += '/' + d.slice(4); return o; }
 function fmPropValue(v){
@@ -18223,6 +18493,10 @@ function fmCleanFields(forTemplate){
     const o = { id: f.id, type: f.type, label: String(f.label || '').replace(/\s+/g, ' ').trim(), required: !!f.required, page: f.page,
       x: +f.x.toFixed(6), y: +f.y.toFixed(6), w: +f.w.toFixed(6), h: +f.h.toFixed(6) };
     if(f.type === 'check' && String(f.group || '').trim()) o.group = String(f.group).replace(/\s+/g, ' ').trim();
+    if(fmCanStyle(f)){
+      if(f.type !== 'check' && Number(f.fontSize) >= 6 && Number(f.fontSize) <= 48) o.fontSize = Math.round(Number(f.fontSize) * 2) / 2;
+      if(/^#[0-9a-fA-F]{6}$/.test(String(f.color || ''))) o.color = String(f.color).toLowerCase();
+    }
     const val = forTemplate ? f._tplValue : f.value;
     if(fmCanHaveValue(f) && val && String(val).trim()){ o.value = f.type === 'check' ? '1' : String(val).trim(); o.required = false; }
     return o;
@@ -20326,7 +20600,8 @@ function pwBusy(b){ PW.busy = b; document.querySelectorAll('#tab-pagina button, 
   }
   function formatDateTimeUS(value){
     if(!value) return '';
-    return new Date(value).toLocaleString('en-US');
+    // MM/DD/AAAA, h:mm AM/PM (siempre con ceros: 11/03/2026)
+    return new Date(value).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
   // ---- Campos de fecha con máscara fija MM/DD/AAAA (no depende del
