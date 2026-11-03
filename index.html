@@ -986,6 +986,8 @@
 
 
 
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1019,6 +1021,7 @@
       #fmOverlay .fm-side{ position:sticky; top:calc(var(--fm-top-h, 58px) + 10px); z-index:6; flex:0 0 250px; width:250px; max-height:calc(100vh - var(--fm-top-h, 58px) - var(--fm-bar-h, 64px) - 24px); overflow-y:auto; -webkit-overflow-scrolling:touch; background:#fff; border:1.5px solid var(--line, #E3E6EE); border-radius:12px; padding:12px; box-sizing:border-box; }
       #fmOverlay .fm-side .fm-tools{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
       #fmOverlay .fm-side .fm-tool{ padding:9px 6px; font-size:13px; text-align:center; }
+      #fmOverlay .fm-side .fm-tool-type{ font-size:14px; padding:11px 6px; }
       #fmOverlay .fm-side-title{ font-weight:700; font-size:13px; margin:0 0 8px; }
       #fmOverlay .fm-curpage{ background:#EEF2FB; color:#0B1F4B; border-radius:8px; padding:6px 8px; font-size:12.5px; font-weight:700; margin:0 0 10px; text-align:center; }
       #fmOverlay .fm-side .fm-chips{ margin-top:6px; }
@@ -1109,6 +1112,7 @@
               <div class="fm-side-title">Agregar campo</div>
               <div class="fm-curpage" id="fm-curpage" title="Página que estás viendo: ahí se agrega el campo">Pág. 1</div>
               <div class="fm-tools">
+                <button type="button" class="fm-tool fm-tool-type" id="fm-type-btn" style="border-color:#0B1F4B; color:#fff; background:#0B1F4B; grid-column:1/-1;" onclick="fmAddTyped()" title="Escribe tú un dato dentro del documento (nombre, fecha, número de póliza…). El cliente solo lo ve y firma."><span class="fm-ti">⌨️</span><span class="fm-tl">Escribir en el documento</span></button>
                 <button type="button" class="fm-tool" style="border-color:#C23B3B; color:#C23B3B;" onclick="fmAddField('signature')"><span class="fm-ti">✍️</span><span class="fm-tl">Firma</span></button>
                 <button type="button" class="fm-tool" style="border-color:#2563EB; color:#2563EB;" onclick="fmAddField('name')"><span class="fm-ti">👤</span><span class="fm-tl">Nombre</span></button>
                 <button type="button" class="fm-tool" style="border-color:#7C3AED; color:#7C3AED;" onclick="fmAddField('date')"><span class="fm-ti">📅</span><span class="fm-tl">Fecha</span></button>
@@ -1123,7 +1127,7 @@
             <div class="fm-main">
               <div class="fm-box">
                 <div style="font-weight:700; margin-bottom:4px;" id="fm-doc-title"></div>
-                <p class="sub" style="margin:0;">Baja hasta la página que quieras y toca un botón de la barra: el campo aparece en la página que estás viendo. Arrástralo a su lugar y, con el cuadrito oscuro de la esquina, cámbiale el tamaño. <b>*</b> = obligatorio. La barra se queda fija mientras bajas por el documento.</p>
+                <p class="sub" style="margin:0;">Baja hasta la página que quieras y toca un botón de la barra: el campo aparece en la página que estás viendo. Arrástralo a su lugar y, con el cuadrito oscuro de la esquina, cámbiale el tamaño. <b>*</b> = obligatorio. <b>Para escribir tú un dato en el documento</b> (nombre, fecha, póliza…) toca <b>⌨️ Escribir en el documento</b>, ponlo donde va y escríbelo; el cliente solo lo ve y firma.</p>
               </div>
               <div class="msg" id="fm-msg2"></div>
               <div id="fm-pages-holder"><div id="fm-pages"></div></div>
@@ -1294,6 +1298,8 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
 
 
 
@@ -2810,6 +2816,8 @@
 
 
 
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3179,6 +3187,8 @@
           <div id="fm-rec-list"><p class="sub">Cargando...</p></div>
         </div>
 <!-- ===== FIRMAS-RECURSOS-END ===== -->
+
+
 
 
         <div class="dash-card">
@@ -17595,6 +17605,8 @@ async function saSaveSettings(){
 
 
 
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -18105,18 +18117,31 @@ function fmAddField(type){
   FM.fields.push(f); FM.templateDirty = true; FM.sel = f.id;
   fmRenderFields(); fmRenderProps();
 }
+// «Escribir en el documento»: pone un recuadro de texto ya listo para que la agencia escriba el dato.
+function fmAddTyped(){
+  const before = FM.fields.length; fmAddField('text');
+  if(FM.fields.length === before) return;
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f) return;
+  f.label = 'Dato escrito'; f.required = false; FM.templateDirty = true;
+  fmRenderFields(); fmRenderProps();
+  const el = document.querySelector('#fm-pages .fm-field[data-id="' + f.id + '"]'); if(el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  fmMsg('fm-msg2', 'success', 'Escribe el dato en el cuadro «Escríbelo tú aquí» (en la barra) y arrastra el recuadro al lugar del documento donde va.');
+  setTimeout(() => { const m = document.getElementById('fm-msg2'); if(m && m.classList.contains('success')) fmMsg('fm-msg2', '', ''); }, 8000);
+  setTimeout(() => { const i = document.getElementById('fm-p-value'); if(i){ i.scrollIntoView({ block: 'nearest' }); try{ i.focus(); }catch(e){} } }, 60);
+}
 function fmGroups(){ const g = []; FM.fields.forEach(f => { if(f.type === 'check' && f.group && !g.some(x => x.toLowerCase() === f.group.toLowerCase())) g.push(f.group); }); return g; }
 function fmRenderProps(){
   const box = document.getElementById('fm-props');
   const f = FM.fields.find(x => x.id === FM.sel);
   box.classList.toggle('fm-empty', !f);
-  if(!f){ box.innerHTML = '<span class="sub" style="margin:0;">Toca un campo en el documento para cambiarle el nombre, marcarlo obligatorio u opcional, o borrarlo.</span>'; return; }
+  if(!f){ box.innerHTML = '<span class="sub" style="margin:0;">Toca un campo en el documento para cambiarle el nombre, escribirle un dato tú, marcarlo obligatorio u opcional, o borrarlo. Para escribir un dato nuevo toca «⌨️ Escribir en el documento».</span>'; return; }
   const t = FM_TYPES[f.type];
   const isCheck = f.type === 'check';
   const hint = isCheck ? 'Ejemplo: «Auto», «Casa». El cliente toca la casilla en el documento para marcarla.'
     : (f.type === 'initials' ? 'El cliente dibuja sus iniciales una vez y se ponen en todos los recuadros de iniciales que toque.' : '');
   box.innerHTML = `
-    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+    ${fmValueHtml(f)}
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
       <div style="flex:1; min-width:180px;"><label style="font-size:12px; font-weight:700;">${t.icon} ${t.label} — ${isCheck ? 'nombre de esta opción' : 'qué le vas a pedir al cliente'}</label>
         <input type="text" id="fm-p-label" maxlength="80" value="${fmEsc(f.label)}" oninput="fmPropLabel(this.value)"></div>
       ${isCheck ? `<div style="flex:1; min-width:170px;"><label style="font-size:12px; font-weight:700;">Grupo (opcional) — «escoger una»</label>
@@ -18127,7 +18152,6 @@ function fmRenderProps(){
       <button type="button" class="btn-ghost" style="width:auto; padding:9px 14px; margin-bottom:10px; color:#B23A3A;" onclick="fmDeleteField()">🗑️ Quitar</button>
     </div>
     ${hint ? '<div class="sub" style="margin:2px 0 0; font-size:12.5px;">' + hint + '</div>' : ''}
-    ${fmValueHtml(f)}
     ${isCheck && f.group ? '<div class="sub" style="margin:4px 0 0; font-size:12.5px;">Las casillas con el grupo «' + fmEsc(f.group) + '» son de <b>escoger solo una</b>. Si una es obligatoria, el cliente tiene que escoger alguna del grupo.</div>' : ''}`;
 }
 // «Escríbelo tú»: dato que la agencia ya pone dentro del documento y el cliente no tiene que llenar.
@@ -18273,7 +18297,7 @@ async function fmLoadRecursos(){
   let rows = [], noCo = false, err = null;
   try{
     let r = await sb.from('sign_templates').select('id,name,page_count,fields,updated_at,company_id,company_name').order('name', { ascending: true });
-    if(r.error && /company_id|company_name/.test(String(r.error.message || ''))){ noCo = true; r = await sb.from('sign_templates').select('id,name,page_count,fields,updated_at').order('name', { ascending: true }); }
+    if(r.error && /company_id|company_name/.test(String(r.error.message || ''))){ noCo = true; FM.coErr = String(r.error.message || r.error.code || ''); r = await sb.from('sign_templates').select('id,name,page_count,fields,updated_at').order('name', { ascending: true }); }
     if(r.error) throw r.error; rows = r.data || [];
   }catch(e){ err = e; }
   FM.noCompanyCols = noCo; FM.recRows = rows;
@@ -18284,7 +18308,7 @@ async function fmLoadRecursos(){
     if(warn){ warn.className = 'msg error'; warn.textContent = missing ? 'Falta correr «migracion_firma_formularios.sql» en Supabase (SQL Editor).' : 'No se pudieron cargar los formularios: ' + (err.message || err); }
     return;
   }
-  if(warn){ if(noCo){ warn.className = 'msg error'; warn.textContent = 'Falta correr «migracion_formularios_por_compania.sql» en Supabase (SQL Editor) para guardar los formularios por compañía.'; } else { warn.className = 'msg'; warn.textContent = ''; } }
+  if(warn){ if(noCo){ warn.className = 'msg error'; warn.textContent = 'Falta correr «migracion_formularios_por_compania.sql» en Supabase (SQL Editor) para guardar los formularios por compañía. Si ya la corriste: en el SQL Editor corre  notify pgrst, \'reload schema\';  espera 10 segundos y recarga (Ctrl+Shift+R). Detalle técnico: ' + (FM.coErr || 'sin detalle'); } else { warn.className = 'msg'; warn.textContent = ''; } }
   if(noCo && admBox) admBox.style.display = 'none';
   const cs = document.getElementById('fm-rec-company');
   if(cs){ const keep = cs.value; cs.innerHTML = '<option value="">Elige la compañía…</option>' + (FM.companies || []).map(c => '<option value="' + c.id + '">' + fmEsc(c.name) + '</option>').join('') + '<option value="' + FM_NO_CO + '">General (sin compañía)</option>'; if(keep) cs.value = keep; }
