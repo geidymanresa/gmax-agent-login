@@ -283,7 +283,7 @@
       } else if(filled){
         if(f.type === 'signature') b.innerHTML = '<img alt="Tu firma" src="' + S.sig + '">';
         else if(f.type === 'initials') b.innerHTML = '<img alt="Tus iniciales" src="' + S.initials + '">';
-        else b.innerHTML = '<span class="pv">' + esc(S.values[f.id]) + '</span>';
+        else { b.innerHTML = '<span class="pv">' + esc(S.values[f.id]) + '</span>'; if(f.color && /^#[0-9a-f]{6}$/.test(f.color)){ var pv = b.querySelector('.pv'); if(pv) pv.style.color = f.color; } }
       } else b.innerHTML = '<span class="pl">' + esc(f.label) + (f.required ? ' *' : ' (opcional)') + '</span>';
     });
     $('nextbtn').textContent = left.length ? 'Siguiente campo →' : 'Revisar y firmar ✓';
@@ -322,18 +322,19 @@
     if(f.type === 'initials') return openInitials(f);
     if(f.type === 'check') return toggleCheck(f);
     var cur = S.values[id] || '';
-    var hint = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : '';
+    var hint = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : f.type === 'phone' ? '(713) 555-1234' : '';
     var extra = '';
     if(f.type === 'name' && S.data.nameHint) extra = '<div class="row" style="margin-top:8px;"><button type="button" class="btn ghost" id="sugg">Usar «' + esc(S.data.nameHint) + '»</button></div>';
     if(f.type === 'date') extra = '<div class="row" style="margin-top:8px;"><button type="button" class="btn ghost" id="today">Poner la fecha de hoy</button></div>';
-    var input = f.type === 'text' && f.h * (S.pages[f.page - 1].clientHeight) >= 40
-      ? '<textarea id="fin" maxlength="500" placeholder="' + esc(hint) + '">' + esc(cur) + '</textarea>'
-      : '<input type="text" id="fin" maxlength="' + (f.type === 'name' ? 120 : f.type === 'number' ? 40 : f.type === 'date' ? 10 : 500) + '" value="' + esc(cur) + '" placeholder="' + esc(hint) + '" autocomplete="off"' + (f.type === 'number' ? ' inputmode="decimal"' : f.type === 'date' ? ' inputmode="numeric"' : '') + '>';
+    var input = (f.type === 'text' || f.type === 'address') && f.h * (S.pages[f.page - 1].clientHeight) >= 40
+      ? '<textarea id="fin" maxlength="' + (f.type === 'address' ? 200 : 500) + '" placeholder="' + esc(hint) + '">' + esc(cur) + '</textarea>'
+      : '<input type="text" id="fin" maxlength="' + (f.type === 'name' ? 120 : f.type === 'number' ? 40 : f.type === 'date' ? 10 : f.type === 'phone' ? 20 : f.type === 'address' ? 200 : 500) + '" value="' + esc(cur) + '" placeholder="' + esc(hint) + '" autocomplete="off"' + (f.type === 'number' ? ' inputmode="decimal"' : f.type === 'date' ? ' inputmode="numeric"' : f.type === 'phone' ? ' inputmode="tel"' : '') + '>';
     showSheet('<h2>' + esc(f.label) + (f.required ? ' <span style="color:#C23B3B">*</span>' : ' <span class="sub">(opcional)</span>') + '</h2><div class="err" id="ferr" style="display:none;"></div>' + input + extra
       + '<div class="row"><button type="button" class="btn ghost" id="fcancel">Cancelar</button><button type="button" class="btn" id="fok">Guardar</button></div>');
     var inp = $('fin'); setTimeout(function(){ try{ inp.focus(); }catch(e){} }, 80);
     if(f.type === 'date') inp.addEventListener('input', function(){ inp.value = maskDate(inp.value); });
     if(f.type === 'number') inp.addEventListener('input', function(){ inp.value = inp.value.replace(/[^0-9 .,\-\/$]/g, ''); });
+    if(f.type === 'phone') inp.addEventListener('input', function(){ inp.value = inp.value.replace(/[^0-9+()\-. ]/g, ''); });
     if($('sugg')) $('sugg').addEventListener('click', function(){ inp.value = S.data.nameHint; });
     if($('today')) $('today').addEventListener('click', function(){ inp.value = S.data.today || ''; });
     $('fcancel').addEventListener('click', closeSheet);
@@ -343,6 +344,7 @@
       if(!v && f.required) err = 'Este campo es obligatorio.';
       else if(v && f.type === 'date' && !validDate(v)) err = 'Escribe una fecha válida: MM/DD/AAAA.';
       else if(v && f.type === 'number' && !/^[0-9][0-9 .,\-\/$]*$/.test(v)) err = 'Escribe solo números.';
+      else if(v && f.type === 'phone' && !/^(?=(?:.*\d){7,})[0-9+()\-. ]{7,20}$/.test(v)) err = 'Escribe un teléfono válido (mínimo 7 números).';
       if(err){ var e = $('ferr'); e.textContent = err; e.style.display = 'block'; return; }
       if(v) S.values[id] = v; else delete S.values[id];
       closeSheet(); refresh();

@@ -992,6 +992,9 @@
 
 
 
+
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1043,6 +1046,7 @@
       #fmOverlay .fm-field .fm-fval{ font-size:12px; font-weight:600; color:#0A1A5C; padding:0 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; pointer-events:none; }
       #fmOverlay .fm-sw{ width:26px; height:26px; border-radius:50%; border:2px solid #fff; box-shadow:0 0 0 1.5px #CBD5E1; cursor:pointer; padding:0; }
       #fmOverlay .fm-sw.on{ box-shadow:0 0 0 3px #0B1F4B; }
+      #fmOverlay .fm-preset.on{ background:#0B1F4B; color:#fff; border-color:#0B1F4B; }
       #fmOverlay .btn-ghost.fm-sz{ width:auto; padding:5px 9px; font-size:13px; margin:0; }
       #fmOverlay #fm-p-size{ padding:6px 8px; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; font:inherit; font-size:14px; }
       #fmOverlay .fm-field.hasval{ background:rgba(255,255,255,.55) !important; border-style:dashed; }
@@ -1128,6 +1132,8 @@
                 <button type="button" class="fm-tool" style="border-color:#D97706; color:#D97706;" onclick="fmAddField('number')"><span class="fm-ti">🔢</span><span class="fm-tl">Número</span></button>
                 <button type="button" class="fm-tool" style="border-color:#0891B2; color:#0891B2;" onclick="fmAddField('check')"><span class="fm-ti">☑️</span><span class="fm-tl">Casilla</span></button>
                 <button type="button" class="fm-tool" style="border-color:#BE185D; color:#BE185D;" onclick="fmAddField('initials')"><span class="fm-ti">🖊️</span><span class="fm-tl">Iniciales</span></button>
+                <button type="button" class="fm-tool" style="border-color:#65A30D; color:#65A30D;" onclick="fmAddField('address')"><span class="fm-ti">🏠</span><span class="fm-tl">Dirección</span></button>
+                <button type="button" class="fm-tool" style="border-color:#475569; color:#475569;" onclick="fmAddField('phone')"><span class="fm-ti">📞</span><span class="fm-tl">Teléfono</span></button>
               </div>
               <div id="fm-props"></div>
               <div class="fm-listbox" style="margin-top:12px;"><span style="font-size:12.5px; font-weight:700;">Campos (<span id="fm-count">0 campos</span>)</span><div class="fm-chips" id="fm-chips" style="margin-top:6px;"></div></div>
@@ -1306,6 +1312,9 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
+
 
 
 
@@ -2848,6 +2857,9 @@
 
 
 
+
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3217,6 +3229,9 @@
           <div id="fm-rec-list"><p class="sub">Cargando...</p></div>
         </div>
 <!-- ===== FIRMAS-RECURSOS-END ===== -->
+
+
+
 
 
 
@@ -17814,6 +17829,9 @@ async function saSaveSettings(){
 
 
 
+
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -17827,7 +17845,9 @@ const FM_TYPES = {
   text:      { label: 'Texto',   icon: '🔤', color: '#0E8F6B', def: 'Texto',             req: false, w: 240, h: 26 },
   number:    { label: 'Número',  icon: '🔢', color: '#D97706', def: 'Número',            req: false, w: 170, h: 26 },
   check:     { label: 'Casilla', icon: '☑️', color: '#0891B2', def: 'Opción',            req: false, w: 24,  h: 24 },
-  initials:  { label: 'Iniciales', icon: '🖊️', color: '#BE185D', def: 'Iniciales del cliente', req: true, w: 90, h: 36 }
+  initials:  { label: 'Iniciales', icon: '🖊️', color: '#BE185D', def: 'Iniciales del cliente', req: true, w: 90, h: 36 },
+  address:   { label: 'Dirección', icon: '🏠', color: '#65A30D', def: 'Dirección', req: false, w: 300, h: 26 },
+  phone:     { label: 'Teléfono',  icon: '📞', color: '#475569', def: 'Teléfono', req: false, w: 150, h: 26 }
 };
 const FM_STATUS_UI = {
   firmado:    { text: '✓ Firmado',            cls: 'active'  },
@@ -17921,8 +17941,9 @@ async function fmOpen(clientId){
   document.body.style.overflow = 'hidden';
   fmStep(1);
   try{
-    const { data: c } = await sb.from('clients').select('id,full_name,email').eq('id', clientId).single();
-    FM.client = c || null;
+    let cq = await sb.from('clients').select('id,full_name,email,phone,address,city,state,zip').eq('id', clientId).single();
+    if(cq.error) cq = await sb.from('clients').select('id,full_name,email').eq('id', clientId).single();   // por si alguna columna no existe
+    FM.client = cq.data || null;
   }catch(e){ FM.client = null; }
   document.getElementById('fm-client-name').textContent = FM.client ? FM.client.full_name : '';
   await fmLoadTemplates();
@@ -18269,7 +18290,10 @@ function fmRenderFields(){
 // Lo que la agencia ya escribió dentro del documento se ve en el recuadro (como quedará en el PDF).
 const FM_INK = '#0d1a59';   // color de la letra si no eligen otro (el de siempre)
 const FM_COLORS = [['#0d1a59', 'Azul oscuro'], ['#000000', 'Negro'], ['#1d4ed8', 'Azul'], ['#c23b3b', 'Rojo'], ['#177a54', 'Verde'], ['#6b7280', 'Gris']];
-function fmCanStyle(f){ return ['name', 'date', 'text', 'number', 'check'].includes(f.type); }
+function fmCanStyle(f){ return ['name', 'date', 'text', 'number', 'address', 'phone', 'check'].includes(f.type); }
+// Tamaños de letra: de 3 a 48 puntos. Botones rápidos para no tener que adivinar el número.
+const FM_MIN_PT = 3, FM_MAX_PT = 48;
+const FM_SIZE_PRESETS = [[4, 'Mini'], [5, 'Muy chico'], [7, 'Chico'], [9, 'Mediano'], [11, 'Estándar'], [14, 'Grande'], [20, 'Enorme']];
 // Tamaño «automático» (el que usa el PDF si no se elige uno): hasta 11 pt, según lo alto del recuadro.
 function fmAutoSize(f){ const pg = FM.pages[f.page - 1]; const hPt = pg && pg.ptH ? f.h * pg.ptH : 26; return Math.round(Math.min(11, Math.max(6, hPt * 0.72)) * 2) / 2; }
 let fmMeasureCtx = null;
@@ -18289,10 +18313,11 @@ function fmPaintValue(el, f){
     const pg = FM.pages[f.page - 1];
     if(pg && pg.ptW && pg.el.clientWidth){
       const scale = pg.el.clientWidth / pg.ptW;
-      let pt = Number(f.fontSize) >= 6 ? Number(f.fontSize) : fmAutoSize(f);
+      let pt = Number(f.fontSize) >= FM_MIN_PT ? Number(f.fontSize) : fmAutoSize(f);
       const boxW = f.w * pg.el.clientWidth - 4;
-      const wraps = f.type === 'text' && f.h * pg.ptH >= 24;
-      if(!wraps){ while(pt > 6 && fmTextWidth(String(f.value), pt * scale) > boxW) pt -= 0.5; }   // igual que el PDF: si no cabe, se achica
+      const wraps = (f.type === 'text' || f.type === 'address') && f.h * pg.ptH >= 24;
+      const floorPt = Math.min(6, pt);
+      if(!wraps){ while(pt > floorPt && fmTextWidth(String(f.value), pt * scale) > boxW) pt -= 0.5; }   // igual que el PDF: si no cabe, se achica
       v.style.fontSize = (pt * scale) + 'px'; v.style.whiteSpace = wraps ? 'normal' : 'nowrap'; v.style.overflow = 'hidden'; v.style.lineHeight = '1.18';
       v.dataset.pt = String(pt);
     }
@@ -18390,10 +18415,13 @@ function fmValueHtml(f){
   if(f.type === 'check'){
     return `<div class="fm-val"><label style="display:flex; gap:6px; align-items:center; font-size:13.5px; cursor:pointer;"><input type="checkbox" id="fm-p-valuechk" ${f.value ? 'checked' : ''} onchange="fmPropValueCheck(this.checked)"> ✍️ Dejarla ya marcada (el cliente no tiene que tocarla)</label></div>`;
   }
-  const ph = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : f.type === 'name' ? 'Ej: Maria Perez' : 'Escribe aquí';
-  const btn = (f.type === 'name' && FM.client && FM.client.full_name) ? `<button type="button" class="btn-ghost" style="width:auto; padding:6px 10px; margin-top:6px;" onclick="fmUseClientName()">Usar el nombre del cliente</button>` : '';
+  const ph = f.type === 'date' ? 'MM/DD/AAAA' : f.type === 'number' ? 'Solo números' : f.type === 'name' ? 'Ej: Maria Perez' : f.type === 'phone' ? 'Ej: (713) 555-1234' : f.type === 'address' ? 'Ej: 123 Main St, Houston, TX 77001' : 'Escribe aquí';
+  const useBtn = (txt, fn) => `<button type="button" class="btn-ghost" style="width:auto; padding:6px 10px; margin-top:6px;" onclick="${fn}()">${txt}</button>`;
+  const btn = (f.type === 'name' && FM.client && FM.client.full_name) ? useBtn('Usar el nombre del cliente', 'fmUseClientName')
+    : (f.type === 'address' && fmClientAddress()) ? useBtn('Usar la dirección del cliente', 'fmUseClientAddress')
+    : (f.type === 'phone' && FM.client && FM.client.phone) ? useBtn('Usar el teléfono del cliente', 'fmUseClientPhone') : '';
   return `<div class="fm-val"><label style="font-size:12px; font-weight:700;">✍️ Escríbelo tú aquí</label>
-    <input type="text" id="fm-p-value" maxlength="${f.type === 'name' ? 120 : f.type === 'date' ? 10 : f.type === 'number' ? 40 : 500}" value="${fmEsc(f.value || '')}" placeholder="${ph}" ${f.type === 'date' ? 'inputmode="numeric"' : ''} oninput="fmPropValue(this.value)" autocomplete="off">
+    <input type="text" id="fm-p-value" maxlength="${f.type === 'name' ? 120 : f.type === 'date' ? 10 : f.type === 'number' ? 40 : f.type === 'phone' ? 20 : f.type === 'address' ? 200 : 500}" value="${fmEsc(f.value || '')}" placeholder="${ph}" ${f.type === 'date' ? 'inputmode="numeric"' : f.type === 'phone' ? 'inputmode="tel"' : ''} oninput="fmPropValue(this.value)" autocomplete="off">
     ${btn}<div class="sub" style="margin:4px 0 0; font-size:12.5px;">El cliente ya no lo llena: solo lo ve y firma. Vacío = lo llena el cliente.${FM.tplMode ? ' Aquí solo datos IGUALES para todos los clientes (ej. código de agencia).' : ' Solo se usa en este documento.'}</div></div>`;
 }
 // Tamaño y color de la letra del campo (lo que escribe la agencia o lo que escribe el cliente).
@@ -18405,10 +18433,11 @@ function fmStyleHtml(f){
   const size = isCheck ? '' : `<div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:8px;">
       <span style="font-size:12px; font-weight:700; min-width:50px;">Tamaño</span>
       <button type="button" class="btn-ghost fm-sz" aria-label="Letra más chica" onclick="fmBumpSize(-1)">A−</button>
-      <input type="number" id="fm-p-size" min="6" max="48" step="0.5" value="${f.fontSize ? f.fontSize : ''}" placeholder="Auto" oninput="fmPropSize(this.value)" style="width:70px;">
+      <input type="number" id="fm-p-size" min="3" max="48" step="0.5" value="${f.fontSize ? f.fontSize : ''}" placeholder="Auto" oninput="fmPropSize(this.value)" style="width:70px;">
       <button type="button" class="btn-ghost fm-sz" aria-label="Letra más grande" onclick="fmBumpSize(1)">A+</button>
       <button type="button" class="btn-ghost fm-sz" onclick="fmPropSize('')" title="Que el tamaño se ajuste solo al recuadro">Auto</button>
-      <span class="sub" style="margin:0; font-size:12px;">puntos (6 a 48)</span></div>`;
+      <span class="sub" style="margin:0; font-size:12px;">puntos (3 a 48)</span></div>
+    <div class="fm-presets" style="display:flex; gap:5px; flex-wrap:wrap; margin:0 0 8px;">${FM_SIZE_PRESETS.map(([n, l]) => `<button type="button" class="btn-ghost fm-sz fm-preset${Number(f.fontSize) === n ? ' on' : ''}" title="${n} puntos" onclick="fmPropSize(${n})" style="font-size:12px;">${l}</button>`).join('')}</div>`;
   return `<div class="fm-val" id="fm-style-box"><div style="font-size:12px; font-weight:700; margin-bottom:6px;">🔤 Letra de este campo</div>${size}
     <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;"><span style="font-size:12px; font-weight:700; min-width:50px;">Color</span>${sw}
       <input type="color" id="fm-p-color" value="${cur || FM_INK}" oninput="fmPropColor(this.value)" title="Otro color" aria-label="Otro color" style="width:34px; height:30px; padding:0; border:1.5px solid #CBD5E1; border-radius:6px; background:#fff;">
@@ -18420,14 +18449,18 @@ function fmPropSize(v){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanStyle(f)) return;
   const n = parseFloat(String(v).replace(',', '.'));
   if(!isFinite(n) || n <= 0){ delete f.fontSize; const i = document.getElementById('fm-p-size'); if(i && v === '') i.value = ''; }
-  else f.fontSize = Math.min(48, Math.max(6, Math.round(n * 2) / 2));
+  else f.fontSize = Math.min(FM_MAX_PT, Math.max(FM_MIN_PT, Math.round(n * 2) / 2));
   fmRepaintSel();
+  fmMarkPresets(f);
 }
+// Resalta el botón rápido que coincide con el tamaño elegido
+function fmMarkPresets(f){ document.querySelectorAll('#fm-style-box .fm-preset').forEach((b, i) => b.classList.toggle('on', FM_SIZE_PRESETS[i] && Number(f.fontSize) === FM_SIZE_PRESETS[i][0])); }
 function fmBumpSize(d){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanStyle(f)) return;
-  const cur = Number(f.fontSize) >= 6 ? Number(f.fontSize) : fmAutoSize(f);
-  f.fontSize = Math.min(48, Math.max(6, cur + d)); const i = document.getElementById('fm-p-size'); if(i) i.value = f.fontSize;
+  const cur = Number(f.fontSize) >= FM_MIN_PT ? Number(f.fontSize) : fmAutoSize(f);
+  f.fontSize = Math.min(FM_MAX_PT, Math.max(FM_MIN_PT, cur + d)); const i = document.getElementById('fm-p-size'); if(i) i.value = f.fontSize;
   fmRepaintSel();
+  fmMarkPresets(f);
 }
 function fmPropColor(c){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanStyle(f)) return;
@@ -18442,6 +18475,7 @@ function fmPropValue(v){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f || !fmCanHaveValue(f) || f.type === 'check') return;
   if(f.type === 'date'){ v = fmMaskDate(v); const i = document.getElementById('fm-p-value'); if(i && i.value !== v) i.value = v; }
   if(f.type === 'number'){ v = String(v).replace(/[^0-9 .,\-\/$]/g, ''); const i = document.getElementById('fm-p-value'); if(i && i.value !== v) i.value = v; }
+  if(f.type === 'phone'){ v = String(v).replace(/[^0-9+()\-. ]/g, ''); const i = document.getElementById('fm-p-value'); if(i && i.value !== v) i.value = v; }
   f.value = String(v || '').replace(/\u0000/g, ''); if(!f.value.trim()) delete f.value;
   if(f.value) f.required = false;
   FM.templateDirty = true;
@@ -18453,6 +18487,14 @@ function fmPropValueCheck(on){
   if(on){ f.value = '1'; f.required = false; } else delete f.value;
   FM.templateDirty = true; fmRenderFields(); fmRenderProps();
 }
+// Dirección completa del cliente (calle, ciudad, estado y código postal) tal como está en su perfil
+function fmClientAddress(){
+  const c = FM.client; if(!c || !c.address) return '';
+  const tail = [c.city, [c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  return String(c.address).trim() + (tail ? ', ' + tail : '');
+}
+function fmUseClientAddress(){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; fmPropValue(fmClientAddress()); const i = document.getElementById('fm-p-value'); if(i) i.value = f.value || ''; }
+function fmUseClientPhone(){ const f = FM.fields.find(x => x.id === FM.sel); if(!f || !FM.client) return; fmPropValue(FM.client.phone || ''); const i = document.getElementById('fm-p-value'); if(i) i.value = f.value || ''; }
 function fmUseClientName(){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f || !FM.client) return;
   fmPropValue(FM.client.full_name || ''); const i = document.getElementById('fm-p-value'); if(i) i.value = f.value || '';
@@ -18494,7 +18536,7 @@ function fmCleanFields(forTemplate){
       x: +f.x.toFixed(6), y: +f.y.toFixed(6), w: +f.w.toFixed(6), h: +f.h.toFixed(6) };
     if(f.type === 'check' && String(f.group || '').trim()) o.group = String(f.group).replace(/\s+/g, ' ').trim();
     if(fmCanStyle(f)){
-      if(f.type !== 'check' && Number(f.fontSize) >= 6 && Number(f.fontSize) <= 48) o.fontSize = Math.round(Number(f.fontSize) * 2) / 2;
+      if(f.type !== 'check' && Number(f.fontSize) >= FM_MIN_PT && Number(f.fontSize) <= FM_MAX_PT) o.fontSize = Math.round(Number(f.fontSize) * 2) / 2;
       if(/^#[0-9a-fA-F]{6}$/.test(String(f.color || ''))) o.color = String(f.color).toLowerCase();
     }
     const val = forTemplate ? f._tplValue : f.value;
@@ -18508,6 +18550,7 @@ function fmValueError(){
     const v = String(f.value).trim();
     if(f.type === 'date' && !fmValidDate(v)){ fmSelect(f.id, true); return '«' + f.label + '»: escribe una fecha válida MM/DD/AAAA (mes/día/año).'; }
     if(f.type === 'number' && !/^[0-9][0-9 .,\-\/$]*$/.test(v)){ fmSelect(f.id, true); return '«' + f.label + '»: en un campo de número solo van números.'; }
+    if(f.type === 'phone' && !/^(?=(?:.*\d){7,})[0-9+()\-. ]{7,20}$/.test(v)){ fmSelect(f.id, true); return '«' + f.label + '»: el teléfono no es válido (mínimo 7 números).'; }
   }
   return '';
 }
