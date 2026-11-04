@@ -169,7 +169,10 @@
     d.fields.forEach(function(f){ if(f.type === 'date' && d.today) S.values[f.id] = d.today; });
     d.fields.forEach(function(f){ if(f.value) S.values[f.id] = f.type === 'check' ? '1' : f.value; });   // lo que la agencia ya escribió: el cliente lo ve pero no lo cambia
     var bt = d.batch ? '<div class="sub" style="font-weight:700; color:#0B1F4B;">Documento ' + d.batch.index + ' de ' + d.batch.total + '</div>' : '';
-    setMain('<div class="card">' + bt + '<h1>' + esc(d.title) + '</h1><p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
+    var multi = d.chain && d.chain.total > 1;   // documento que firman varias personas, una tras otra
+    if(multi) bt = '<div class="sub" style="font-weight:700; color:#0B1F4B;">Firma ' + d.chain.index + ' de ' + d.chain.total + '</div>';
+    var ct = multi ? chainList(d.chain) + (d.chain.index > 1 ? '<p class="sub" style="margin:6px 0 0;">En el documento ya puedes ver lo que firmaron las personas anteriores. Tú solo llenas y firmas tus recuadros.</p>' : '') : '';
+    setMain('<div class="card">' + bt + '<h1>' + esc(d.title) + '</h1>' + ct + '<p class="sub">Toca cada recuadro de color para llenarlo. Al final toca «Revisar y firmar».</p>'
       + '<div class="progress"><i id="pbar"></i></div><div class="sub" id="ptxt"></div></div><div id="msgbox"></div><div id="pages"></div>');
     var bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<div class="bartxt" id="btxt"></div><div class="progress"><i id="pbar2"></i></div><button class="btn" id="nextbtn">Siguiente →</button>'; document.body.appendChild(bar);
     $('nextbtn').addEventListener('click', onNext);
@@ -190,6 +193,11 @@
     var rt; window.addEventListener('resize', function(){ layout(); syncBar(); clearTimeout(rt); rt = setTimeout(function(){ var w = $('pages') ? $('pages').clientWidth : 0; if(w && Math.abs(w - S.lastW) > S.lastW * 0.12) drawCanvases(); }, 300); });
     window.addEventListener('orientationchange', function(){ setTimeout(function(){ layout(); syncBar(); drawCanvases(); }, 350); });
     if(window.visualViewport){ var vv = window.visualViewport; var fit = function(){ var sh = $('sheet'); if(!sh || sh.style.display !== 'block') return; var off = Math.max(0, window.innerHeight - vv.height - vv.offsetTop); sh.style.bottom = off + 'px'; sh.style.maxHeight = Math.round(vv.height * 0.94) + 'px'; }; vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+  }
+  // Personas que firman este documento, una tras otra (✅ ya firmó · 👉 eres tú · ⏳ falta)
+  function chainList(c){
+    return '<div style="text-align:left; margin:8px 0 4px;">' + c.items.map(function(it){
+      return '<div style="display:flex; gap:8px; align-items:center; padding:4px 2px; font-size:14px;"><span>' + (it.status === 'firmado' ? '✅' : (it.status === 'actual' ? '👉' : '⏳')) + '</span><span style="flex:1;' + (it.status === 'actual' ? ' font-weight:700;' : '') + '">' + esc(it.name) + (it.status === 'actual' ? ' (tú)' : '') + '</span></div>'; }).join('') + '</div>';
   }
   // Lista de los documentos del paquete con su estado (✓ firmado / ⏳ falta)
   function batchList(b, downloads){
@@ -464,6 +472,13 @@
         msgScreen('🎉', '¡Firmaste los ' + r.batch.total + ' documentos!', 'Gracias por hacer negocios con GMAX All Insurance. Tu agente ya recibió los documentos firmados y te mandamos tu copia por correo. Ya puedes cerrar esta página.',
           batchList(r.batch, r.batch.downloads) + '<p class="sub" style="margin-top:12px;">Las flechas ⬇ de descarga solo funcionan unos minutos.</p>');
       }
+      return;
+    }
+    if(r.ok && r.chain){
+      closeSheet(); document.querySelector('.bar') && document.querySelector('.bar').remove(); var zc2 = $('zoomc'); if(zc2) zc2.remove(); window.scrollTo(0, 0);
+      var dlb = r.downloadUrl ? '<p style="margin-top:16px;"><a class="btn" href="' + esc(r.downloadUrl) + '" target="_blank" rel="noopener">⬇ Descargar mi copia</a></p><p class="sub">El botón de descarga solo funciona unos minutos.</p>' : '';
+      if(r.chain.done) msgScreen('🎉', r.chain.total > 1 ? '¡Ya firmaron todas las personas!' : '¡Firma enviada con éxito!', 'Gracias por hacer negocios con GMAX All Insurance. ' + (r.chain.total > 1 ? 'Eras la última: el documento ya quedó completo y se le mandó a tu agente y a cada persona que firmó.' : 'Tu agente ya recibió el documento firmado.') + ' Ya puedes cerrar esta página.', dlb);
+      else msgScreen('✅', '¡Tu firma quedó guardada!', (r.chain.nextName ? 'Ahora le toca firmar a ' + esc(r.chain.nextName) + '; ya le mandamos su link. ' : 'Falta que firmen las demás personas. ') + 'Cuando todos terminen, recibirás por correo el documento completo. Ya puedes cerrar esta página.', dlb);
       return;
     }
     if(r.ok){ closeSheet(); document.querySelector('.bar') && document.querySelector('.bar').remove(); window.scrollTo(0, 0);

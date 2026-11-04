@@ -748,6 +748,9 @@
         <button class="dash-nav-btn" data-tab="libro" onclick="switchTab('libro')">📖 Libro de negocio</button>
         <button class="dash-nav-btn" data-tab="aseguradoras" id="navAseguradoras" onclick="switchTab('aseguradoras')">🏢 Aseguradoras</button>
         <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
+<!-- ===== FIRMAS-NAV-START ===== -->
+        <button class="dash-nav-btn" data-tab="firmas" id="navFirmas" onclick="switchTab('firmas')">✍️ Firma de documentos</button>
+<!-- ===== FIRMAS-NAV-END ===== -->
         <button class="dash-nav-btn" data-tab="companias" id="navCompanias" onclick="switchTab('companias')" style="display:none;">Compañías</button>
         <button class="dash-nav-btn" data-tab="servicefees" id="navServiceFees" onclick="switchTab('servicefees')" style="display:none;">Service Fees</button>
         <button class="dash-nav-btn" data-tab="tesoreria" id="navTesoreria" onclick="switchTab('tesoreria')" style="display:none;">Tesorería</button>
@@ -995,6 +998,9 @@
 
 
 
+
+
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1052,7 +1058,15 @@
       #fmOverlay .fm-field.hasval{ background:rgba(255,255,255,.55) !important; border-style:dashed; }
       /* Los avisos del paso 2 (ej. error al crear el link) se quedan a la vista aunque estés abajo en el documento */
       #fmOverlay #fm-msg2{ position:sticky; top:calc(var(--fm-top-h, 58px) + 8px); z-index:8; box-shadow:0 4px 14px rgba(13,20,36,.22); font-size:14.5px; font-weight:600; border:1.5px solid currentColor; }
+      /* Modo «Firma de documentos» (varias personas, sin cliente) */
+      #fmOverlay.fm-chainmode .fm-tplwrap, #fmOverlay.fm-chainmode #fm-bar-more, #fmOverlay.fm-chainmode #fm-add-btn{ display:none !important; }
+      #fmOverlay .fm-signer-row{ display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap; }
+      #fmOverlay .fm-sn{ width:26px; height:26px; border-radius:50%; background:#0B1F4B; color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; flex:0 0 26px; }
+      #fmOverlay .fm-signer-row input{ flex:1 1 180px; min-width:0; padding:9px 10px; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; font:inherit; font-size:14px; box-sizing:border-box; }
+      #fmOverlay .fm-signer-row button{ width:auto; padding:6px 9px; margin:0; font-size:13px; }
+      #fmOverlay #fm-signer-pick select, #fmOverlay #fm-p-signer{ width:100%; box-sizing:border-box; padding:7px 8px; border:1.5px solid var(--line, #E3E6EE); border-radius:8px; font:inherit; font-size:13.5px; background:#fff; }
       @media (max-width:820px){
+        #fmOverlay #fm-signer-pick select{ font-size:11px; padding:3px 2px; }
         #fmOverlay .fm-body{ padding:10px; }
         #fmOverlay .fm-work{ gap:8px; }
         #fmOverlay .fm-side{ flex:0 0 60px; width:60px; padding:6px 4px; border-radius:10px; }
@@ -1093,6 +1107,13 @@
         <!-- Paso 1 -->
         <div id="fm-step1">
           <div class="fm-box" id="fm-queue-box" style="display:none; background:#EEF2FB; border-color:#B9C6E6;"></div>
+          <div class="fm-box" id="fm-signers-box" style="display:none;">
+            <div style="font-weight:700; margin-bottom:4px;">👥 ¿Quién firma? (en este orden)</div>
+            <p class="sub" style="margin:0 0 10px;">Firman <b>una tras otra</b>: cuando firma la primera persona, a la segunda le llega su link por correo automáticamente, y así sucesivamente. Cada una ve la firma de las anteriores y solo llena sus propios recuadros. El correo es obligatorio desde la persona 2 (la primera puede recibir el link por donde tú quieras).</p>
+            <div id="fm-signers-list"></div>
+            <button type="button" class="btn-ghost" id="fm-signers-add" style="width:auto; padding:8px 14px; margin:2px 0 0;" onclick="fmAddSigner()">➕ Agregar otra persona</button>
+            <div class="msg" id="fm-msg-signers" style="margin-top:8px;"></div>
+          </div>
           <div class="fm-box">
             <div class="msg" id="fm-msg1"></div>
             <div class="form-row"><label>Título del documento <span style="color:#C23B3B;">*</span></label>
@@ -1121,6 +1142,10 @@
         <div id="fm-step2" style="display:none;">
           <div class="fm-work">
             <aside class="fm-side" id="fm-side" aria-label="Herramientas para agregar campos">
+              <div id="fm-signer-pick" style="display:none; margin-bottom:10px;">
+                <div class="fm-side-title">Los campos nuevos son de:</div>
+                <select id="fm-cur-signer" onchange="fmPickSigner(this.value)" aria-label="Persona a la que le toca llenar los campos nuevos"></select>
+              </div>
               <div class="fm-side-title">Agregar campo</div>
               <div class="fm-curpage" id="fm-curpage" title="Página que estás viendo: ahí se agrega el campo">Pág. 1</div>
               <div class="fm-tools">
@@ -1167,7 +1192,7 @@
           <div class="fm-box">
             <h4 style="margin-top:0;">✅ Listo</h4>
             <div class="msg" id="fm-msg3"></div>
-            <label style="font-size:13px; font-weight:700;">Link de firma para el cliente</label>
+            <label style="font-size:13px; font-weight:700;" id="fm-link-label">Link de firma para el cliente</label>
             <input type="text" id="fm-link" readonly onclick="this.select()" style="width:100%; padding:10px; border:1.5px solid var(--line); border-radius:8px; font-size:13.5px; margin:6px 0 10px;">
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button type="button" class="btn-primary" id="fm-copy-btn" style="width:auto; padding:11px 22px; margin:0;" onclick="fmCopyLink()">📋 Copiar link</button>
@@ -1175,7 +1200,7 @@
               <button type="button" class="btn-ghost" style="width:auto; padding:11px 18px;" onclick="fmClose(true)">Cerrar</button>
             </div>
             <p class="sub" id="fm-done-exp" style="margin:12px 0 0;"></p>
-            <p class="sub" style="margin:6px 0 0;">Cuando el cliente firme, te sale «✓ Firmado» en su perfil y en el Inicio, y el PDF firmado queda en Documentos.</p>
+            <p class="sub" style="margin:6px 0 0;" id="fm-done-note">Cuando el cliente firme, te sale «✓ Firmado» en su perfil y en el Inicio, y el PDF firmado queda en Documentos.</p>
           </div>
         </div>
       </div>
@@ -1312,6 +1337,9 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
+
+
 
 
 
@@ -2860,6 +2888,9 @@
 
 
 
+
+
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3240,6 +3271,9 @@
 
 
 
+
+
+
         <div class="dash-card">
           <h4>🏢 Información de aseguradoras</h4>
           <p class="sub" style="margin-bottom:10px;">Teléfonos, códigos de agencia y notas por aseguradora.</p>
@@ -3253,6 +3287,40 @@
       </section>
 
       <!-- TAB: ASEGURADORAS (con las que el agente está activo/apuntado) -->
+
+
+<!-- ===== FIRMAS-TAB-START ===== -->
+      <section class="dash-tab" id="tab-firmas" style="display:none;">
+        <h2>✍️ Firma de documentos</h2>
+        <p class="sub">Documentos que firman una o varias personas y que <b>no son de un cliente en específico</b> (contratos, acuerdos, autorizaciones…). Los documentos de un cliente se mandan desde su perfil.</p>
+        <div class="dash-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <h4 style="margin:0;">Mis documentos para firmar</h4>
+            <button type="button" class="btn-primary" style="width:auto; padding:9px 18px; margin:0;" id="fm-chain-newbtn" onclick="fmOpenChain()">➕ Nuevo documento para firmar</button>
+          </div>
+          <p class="sub">Sube un PDF, marca dónde firma y llena cada persona y escribe quién firma, <b>en orden</b>. Cuando firma la primera, a la segunda le llega su link por correo solo (y así hasta la última). Al final, el PDF completo les llega a todas y a ti. Cada persona ve la firma de las anteriores y solo llena sus propios recuadros.</p>
+          <div class="msg" id="fm-chain-msg"></div>
+          <div class="dash-table-wrap">
+            <table class="dash-table">
+              <thead><tr><th>Fecha</th><th>Documento</th><th>Personas (en orden)</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="fm-chain-list"><tr><td colspan="5">—</td></tr></tbody>
+            </table>
+          </div>
+          <div id="fm-chain-events" style="display:none; margin-top:12px; padding:12px 14px; background:#F7F8FB; border:1px solid var(--line); border-radius:10px;"></div>
+        </div>
+        <div class="dash-card">
+          <h4 style="margin:0 0 4px;">📂 Documentos mandados a clientes</h4>
+          <p class="sub">Los últimos 40 que se mandaron a firmar desde el perfil de un cliente (para verlos y descargarlos aquí también).</p>
+          <div class="dash-table-wrap">
+            <table class="dash-table">
+              <thead><tr><th>Fecha</th><th>Cliente</th><th>Documento</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="fm-clientdocs-list"><tr><td colspan="5">—</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+<!-- ===== FIRMAS-TAB-END ===== -->
+
       <section class="dash-tab" id="tab-aseguradoras" style="display:none;">
         <h2>Aseguradoras</h2>
         <p class="sub">Las aseguradoras con las que estás activo(a) y tu código con cada una. Haz clic en el nombre de la compañía para ir directo a su portal de login.</p>
@@ -5637,7 +5705,7 @@
     'clients', 'client_policies', 'client_transactions', 'client_documents',
     'client_requirements', 'client_vehicles', 'client_quotes', 'signature_requests',
     'client_alerts', 'agent_alerts', 'client_auto_charges', 'policy_reminder_acks',
-    'client_notes', 'agent_applications', 'policy_contact_log', 'sign_requests'
+    'client_notes', 'agent_applications', 'policy_contact_log', 'sign_requests', 'sign_chains'
   ];
   let realtimeChannels = [];
   let realtimeStarted = false;
@@ -5725,6 +5793,8 @@
 
     if(has('client_auto_charges')) await q(loadVenturePayAlerts, 'Pagar en Venture');
     if(has('client_auto_charges', 'client_policies')) await q(loadVentureDueAlerts, 'Toca cobrar (Venture)');
+
+    if(isTabVisible('tab-firmas') && has('sign_requests', 'sign_chains')) await q(fmLoadFirmasTab, 'Firma de documentos');
 
     // 2) Inicio: avisos y tarjetas del dashboard.
     if(isTabVisible('tab-inicio')){
@@ -17832,6 +17902,9 @@ async function saSaveSettings(){
 
 
 
+
+
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -17858,7 +17931,7 @@ const FM_STATUS_UI = {
 function fmEventLabel(e){
   const d = e.detail || {};
   if(d.kind === 'signed_copy'){
-    const who = d.to === 'cliente' ? 'al cliente' : 'a la agencia';
+    const who = d.to === 'cliente' ? 'al cliente' : d.to === 'firmante' ? 'a la persona que firmó' : 'a la agencia';
     return (e.event === 'emailed' ? 'Se mandó la copia del documento firmado ' : 'No se pudo mandar la copia del firmado ') + who + (d.emails && d.emails.length ? ' (' + d.emails.join(', ') + ')' : '');
   }
   return FM_EVENT_LABELS[e.event] || e.event;
@@ -17870,7 +17943,8 @@ const FM_EVENT_LABELS = {
 };
 const FM = { clientId: null, client: null, source: 'upload', template: null, templates: [], bytes: null, pdf: null, pages: [], fields: [],
   sel: null, title: '', created: null, pdfjsP: null, busy: false, cardTimer: null, step: 1, templateDirty: false, queue: [],
-  companies: [], noCompanyCols: false, tplMode: false, recRows: [] };
+  companies: [], noCompanyCols: false, tplMode: false, recRows: [],
+  mode: 'client', signers: [], curSigner: 1, chains: [], chainReqs: [] };   // mode 'chain' = «Firma de documentos» (varias personas, sin cliente)
 
 function fmEsc(s){ return (typeof escapeHtml === 'function') ? escapeHtml(String(s == null ? '' : s)) : String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function fmClamp(n, a, b){ return Math.min(b, Math.max(a, n)); }
@@ -17922,7 +17996,12 @@ function fmLoadPdfJs(){
 function fmReset(){
   FM.source = 'upload'; FM.template = null; FM.bytes = null; FM.pdf = null; FM.pages = []; FM.fields = []; FM.sel = null;
   FM.title = ''; FM.created = null; FM.step = 1; FM.templateDirty = false; FM.busy = false; FM.reopen = null; FM.queue = []; FM.tplMode = false;
-  const ovr = document.getElementById('fmOverlay'); if(ovr) ovr.classList.remove('fm-tplmode');
+  FM.mode = 'client'; FM.signers = []; FM.curSigner = 1;
+  const ovr = document.getElementById('fmOverlay'); if(ovr){ ovr.classList.remove('fm-tplmode'); ovr.classList.remove('fm-chainmode'); }
+  const sbx = document.getElementById('fm-signers-box'); if(sbx) sbx.style.display = 'none';
+  const lbl = document.getElementById('fm-link-label'); if(lbl) lbl.textContent = 'Link de firma para el cliente';
+  const dn = document.getElementById('fm-done-note'); if(dn) dn.textContent = 'Cuando el cliente firme, te sale «✓ Firmado» en su perfil y en el Inicio, y el PDF firmado queda en Documentos.';
+  const deb = document.getElementById('fm-done-email-btn'); if(deb) deb.textContent = '✉️ Enviar por correo al cliente';
   const ttl = document.getElementById('fm-top-title'); if(ttl) ttl.textContent = 'Firmar documento';
   const pg = document.getElementById('fm-pages'); if(pg) pg.innerHTML = '';
   ['fm-msg1', 'fm-msg2', 'fm-msg3'].forEach(id => fmMsg(id, '', ''));
@@ -17950,18 +18029,26 @@ async function fmOpen(clientId){
 }
 
 function fmClose(force){
+  const wasChain = FM.mode === 'chain';
   if(FM.tplMode){
     if(!force && FM.templateDirty && !confirm('Hay cambios sin guardar en este formulario. Si sales, se pierden. ¿Salir?')) return;
     document.getElementById('fmOverlay').style.display = 'none'; document.body.style.overflow = '';
     fmReset(); fmLoadRecursos().catch(() => {}); return;
   }
-  if(!force && ((FM.step === 2 && FM.fields.length > 0) || (FM.step !== 3 && FM.queue && FM.queue.length > 0)) && !confirm('Vas a salir sin crear el link' + (FM.queue && FM.queue.length ? ' de los ' + (FM.queue.length + (FM.step === 2 ? 1 : 0)) + ' documentos' : '') + '. Se pierden los campos que marcaste (si no los guardaste como plantilla). ¿Salir?')) return;
+  if(!force && ((FM.step === 2 && FM.fields.length > 0) || (FM.step !== 3 && FM.queue && FM.queue.length > 0)) && !confirm('Vas a salir sin ' + (wasChain ? 'crear el documento' : 'crear el link') + (FM.queue && FM.queue.length ? ' de los ' + (FM.queue.length + (FM.step === 2 ? 1 : 0)) + ' documentos' : '') + '. Se pierden los campos que marcaste (si no los guardaste como plantilla). ¿Salir?')) return;
   document.getElementById('fmOverlay').style.display = 'none';
   document.body.style.overflow = '';
   fmReset();
-  if(FM.clientId) fmRefreshCardSoon(FM.clientId);
+  if(wasChain) fmLoadFirmasTab().catch(() => {});
+  else if(FM.clientId) fmRefreshCardSoon(FM.clientId);
 }
 
+// Texto del botón principal del paso 2
+function fmCreateBtnText(){
+  if(FM.mode === 'chain') return FM.signers.length > 1 ? 'Crear y mandar a la persona 1 →' : 'Crear link de firma →';
+  const qn = (FM.queue || []).length;
+  return qn > 0 ? 'Crear link de los ' + (qn + 1) + ' documentos →' : 'Crear link de firma →';
+}
 function fmStep(n){
   FM.step = n;
   [1, 2, 3].forEach(i => { document.getElementById('fm-step' + i).style.display = (i === n) ? 'block' : 'none'; });
@@ -17969,7 +18056,10 @@ function fmStep(n){
   if(FM.tplMode){ document.getElementById('fm-stepnum').textContent = 'Marca dónde va cada cosa y toca «Guardar formulario»'; }
   else document.getElementById('fm-stepnum').textContent = pre + (n === 1 ? 'Paso 1 de 3 · Elige el documento' : n === 2 ? 'Paso 2 de 3 · Marca dónde va cada cosa' : 'Paso 3 de 3 · Listo para enviar');
   fmRenderQueue();
-  const cb2 = document.getElementById('fm-create-btn'); if(cb2 && !FM.busy) cb2.textContent = qn > 0 ? 'Crear link de los ' + (qn + 1) + ' documentos →' : 'Crear link de firma →';
+  const cb2 = document.getElementById('fm-create-btn'); if(cb2 && (!FM.busy || FM.mode === 'chain')) cb2.textContent = fmCreateBtnText();
+  const sbx = document.getElementById('fm-signers-box'); if(sbx) sbx.style.display = (FM.mode === 'chain' && n === 1) ? 'block' : 'none';
+  const pk = document.getElementById('fm-signer-pick'); if(pk) pk.style.display = (FM.mode === 'chain' && n === 2 && FM.signers.length > 1) ? 'block' : 'none';
+  if(FM.mode === 'chain' && n === 2) fmRenderSignerPick();
   const ov = document.getElementById('fmOverlay'); if(ov) ov.scrollTop = 0;
   const body = ov && ov.querySelector('.fm-body'); if(body) body.classList.toggle('fm-wide', n === 2);
   if(n === 2){
@@ -17993,7 +18083,7 @@ function fmSizeBars(){
   if(bar && bar.offsetHeight) ov.style.setProperty('--fm-bar-h', bar.offsetHeight + 'px');
   if(bar){
     const sv = document.getElementById('fm-tpl-save-btn'), up = document.getElementById('fm-tpl-update-btn');
-    const has = [sv, up].some(b => b && b.style.display !== 'none');
+    const has = FM.mode !== 'chain' && [sv, up].some(b => b && b.style.display !== 'none');
     bar.classList.toggle('fm-has-tpl', has); if(!has) bar.classList.remove('fm-open');
   }
 }
@@ -18172,7 +18262,8 @@ async function fmStart(){
   if(FM.busy) return;
   fmMsg('fm-msg1', '', '');
   const title = document.getElementById('fm-title').value.replace(/\s+/g, ' ').trim();
-  if(!title){ fmMsg('fm-msg1', 'error', 'Escribe el título del documento (por ejemplo: «Cambio de dirección»).'); return; }
+  if(FM.mode === 'chain'){ const se = fmChainCheckSigners(); if(se){ fmMsg('fm-msg-signers', 'error', se); fmMsg('fm-msg1', '', ''); return; } fmMsg('fm-msg-signers', '', ''); }
+  if(!title){ fmMsg('fm-msg1', 'error', FM.mode === 'chain' ? 'Escribe el título del documento (por ejemplo: «Contrato de agencia»).' : 'Escribe el título del documento (por ejemplo: «Cambio de dirección»).'); return; }
   const useTpl = !FM.reopen && document.getElementById('fm-src-template').checked;
   FM.busy = true;
   const btn = document.getElementById('fm-start-btn'); btn.disabled = true; btn.textContent = 'Abriendo el documento…';
@@ -18222,10 +18313,12 @@ async function fmStart(){
     document.getElementById('fm-tpl-name').value = useTpl ? '' : title;
     const csv = document.getElementById('fm-tpl-company-save');
     if(csv){ csv.innerHTML = fmCompanyOptionsHtml(''); csv.style.display = (!FM.noCompanyCols && typeof isAdminUser === 'function' && isAdminUser()) ? 'inline-block' : 'none'; }
-    const em = FM.client && FM.client.email ? FM.client.email : '';
+    const chainM = FM.mode === 'chain';
+    const em = chainM ? String((FM.signers[0] && FM.signers[0].email) || '').trim() : (FM.client && FM.client.email ? FM.client.email : '');
     const cb = document.getElementById('fm-send-email'), lb = document.getElementById('fm-send-email-label');
     cb.checked = !!em; cb.disabled = !em;
-    lb.textContent = em ? ('Mandar también el link por correo a ' + em) : 'Este cliente no tiene correo registrado (podrás copiar el link)';
+    lb.textContent = chainM ? (em ? ('Mandar el link de ' + FM.signers[0].name + ' por correo a ' + em) : ('Escribiste a ' + FM.signers[0].name + ' sin correo: al terminar copia su link y mándaselo tú')) : em ? ('Mandar también el link por correo a ' + em) : 'Este cliente no tiene correo registrado (podrás copiar el link)';
+    if(chainM) FM.curSigner = 1;
     document.getElementById('fm-doc-title').textContent = title;
     fmStep(2);
     if(useTpl && tpl && fields.length === 0) fmMsg('fm-msg2', 'success', 'Este formulario todavía no tiene campos marcados. Agrega la firma y lo que necesites con los botones de la izquierda.');
@@ -18277,7 +18370,8 @@ function fmRenderFields(){
     const t = FM_TYPES[f.type] || FM_TYPES.text;
     const el = document.createElement('div'); el.className = 'fm-field' + (FM.sel === f.id ? ' sel' : ''); el.dataset.id = f.id; el.dataset.type = f.type;
     el.style.borderColor = t.color; el.style.background = t.color + '26';
-    const lab = document.createElement('span'); lab.className = 'fm-flabel'; lab.style.color = t.color; lab.textContent = (f.type === 'check' ? '' : t.icon + ' ') + f.label + (f.required ? ' *' : '') + (f.type === 'check' && f.group ? ' · ' + f.group : '');
+    const lab = document.createElement('span'); lab.className = 'fm-flabel'; lab.style.color = t.color; lab.textContent = fmSignerTag(f) + (f.type === 'check' ? '' : t.icon + ' ') + f.label + (f.required ? ' *' : '') + (f.type === 'check' && f.group ? ' · ' + f.group : '');
+    if(FM.mode === 'chain') el.style.boxShadow = 'inset 5px 0 0 ' + fmSignerColor(f.signer);
     el.appendChild(lab);
     fmPaintValue(el, f);
     const h = document.createElement('div'); h.className = 'fm-handle'; el.appendChild(h);
@@ -18349,11 +18443,12 @@ function fmRenderChips(){
   if(FM.fields.length === 0){ box.innerHTML = '<span class="sub" style="margin:0;">Todavía no hay campos. Toca un botón de la barra para agregar uno.</span>'; return; }
   box.innerHTML = FM.fields.map((f, i) => {
     const t = FM_TYPES[f.type] || FM_TYPES.text;
-    return `<button type="button" class="fm-chip${FM.sel === f.id ? ' sel' : ''}" style="border-color:${t.color};" onclick="fmSelect('${f.id}', true)">${t.icon} ${fmEsc(f.label)}${f.required ? ' *' : ''} <small>· pág. ${f.page}</small></button>`;
+    return `<button type="button" class="fm-chip${FM.sel === f.id ? ' sel' : ''}" style="border-color:${t.color};" onclick="fmSelect('${f.id}', true)">${fmSignerTag(f)}${t.icon} ${fmEsc(f.label)}${f.required ? ' *' : ''} <small>· pág. ${f.page}</small></button>`;
   }).join('');
 }
 function fmSelect(id, scroll){
   FM.sel = id || null;
+  if(FM.mode === 'chain' && FM.sel){ const sf = FM.fields.find(x => x.id === FM.sel); if(sf && sf.signer){ FM.curSigner = sf.signer; const cs = document.getElementById('fm-cur-signer'); if(cs) cs.value = String(sf.signer); } }
   document.querySelectorAll('#fm-pages .fm-field').forEach(e => e.classList.toggle('sel', e.dataset.id === FM.sel));
   fmRenderChips(); fmRenderProps();
   if(scroll && id){ const el = document.querySelector('#fm-pages .fm-field[data-id="' + id + '"]'); if(el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
@@ -18368,6 +18463,7 @@ function fmAddField(type){
   const w = fmClamp(t.w / r.width, type === 'check' ? 0.022 : 0.05, 0.9), h = fmClamp(t.h / r.height, 0.02, 0.5);
   const cy = fmClamp((vh - r.top) / r.height, h / 2, 1 - h / 2);
   const f = { id: fmId(), type, label: t.def, required: t.req, page: pg.n, x: fmClamp(0.5 - w / 2, 0, 1 - w), y: fmClamp(cy - h / 2, 0, 1 - h), w, h };
+  if(FM.mode === 'chain'){ f.signer = FM.curSigner || 1; f.label = fmChainLabel(t.def, f.signer); }
   FM.fields.push(f); FM.templateDirty = true; FM.sel = f.id;
   fmRenderFields(); fmRenderProps();
 }
@@ -18394,9 +18490,9 @@ function fmRenderProps(){
   const hint = isCheck ? 'Ejemplo: «Auto», «Casa». El cliente toca la casilla en el documento para marcarla.'
     : (f.type === 'initials' ? 'El cliente dibuja sus iniciales una vez y se ponen en todos los recuadros de iniciales que toque.' : '');
   box.innerHTML = `
-    ${fmValueHtml(f)}${fmStyleHtml(f)}
+    ${fmSignerPropHtml(f)}${fmValueHtml(f)}${fmStyleHtml(f)}
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-top:10px;">
-      <div style="flex:1; min-width:180px;"><label style="font-size:12px; font-weight:700;">${t.icon} ${t.label} — ${isCheck ? 'nombre de esta opción' : 'qué le vas a pedir al cliente'}</label>
+      <div style="flex:1; min-width:180px;"><label style="font-size:12px; font-weight:700;">${t.icon} ${t.label} — ${isCheck ? 'nombre de esta opción' : 'qué le vas a pedir ' + (FM.mode === 'chain' ? 'a la persona' : 'al cliente')}</label>
         <input type="text" id="fm-p-label" maxlength="80" value="${fmEsc(f.label)}" oninput="fmPropLabel(this.value)"></div>
       ${isCheck ? `<div style="flex:1; min-width:170px;"><label style="font-size:12px; font-weight:700;">Grupo (opcional) — «escoger una»</label>
         <input type="text" id="fm-p-group" maxlength="40" list="fm-groups" value="${fmEsc(f.group || '')}" placeholder="Ej: Tipo de seguro" oninput="fmPropGroup(this.value)">
@@ -18422,7 +18518,7 @@ function fmValueHtml(f){
     : (f.type === 'phone' && FM.client && FM.client.phone) ? useBtn('Usar el teléfono del cliente', 'fmUseClientPhone') : '';
   return `<div class="fm-val"><label style="font-size:12px; font-weight:700;">✍️ Escríbelo tú aquí</label>
     <input type="text" id="fm-p-value" maxlength="${f.type === 'name' ? 120 : f.type === 'date' ? 10 : f.type === 'number' ? 40 : f.type === 'phone' ? 20 : f.type === 'address' ? 200 : 500}" value="${fmEsc(f.value || '')}" placeholder="${ph}" ${f.type === 'date' ? 'inputmode="numeric"' : f.type === 'phone' ? 'inputmode="tel"' : ''} oninput="fmPropValue(this.value)" autocomplete="off">
-    ${btn}<div class="sub" style="margin:4px 0 0; font-size:12.5px;">El cliente ya no lo llena: solo lo ve y firma. Vacío = lo llena el cliente.${FM.tplMode ? ' Aquí solo datos IGUALES para todos los clientes (ej. código de agencia).' : ' Solo se usa en este documento.'}</div></div>`;
+    ${btn}<div class="sub" style="margin:4px 0 0; font-size:12.5px;">${FM.mode === 'chain' ? 'La persona ya no lo llena: solo lo ve y firma. Vacío = lo llena ella.' : 'El cliente ya no lo llena: solo lo ve y firma. Vacío = lo llena el cliente.'}${FM.tplMode ? ' Aquí solo datos IGUALES para todos los clientes (ej. código de agencia).' : ' Solo se usa en este documento.'}</div></div>`;
 }
 // Tamaño y color de la letra del campo (lo que escribe la agencia o lo que escribe el cliente).
 function fmStyleHtml(f){
@@ -18515,11 +18611,11 @@ function fmSyncGroupReq(f){
 function fmDupField(){
   const f = FM.fields.find(x => x.id === FM.sel); if(!f || f.type !== 'check') return;
   if(FM.fields.length >= 60){ fmMsg('fm-msg2', 'error', 'Máximo 60 campos por documento.'); return; }
-  const n = { id: fmId(), type: 'check', label: 'Opción', required: f.required, group: f.group || '', page: f.page, x: f.x, y: fmClamp(f.y + f.h + 0.012, 0, 1 - f.h), w: f.w, h: f.h };
+  const n = { id: fmId(), type: 'check', label: 'Opción', required: f.required, group: f.group || '', ...(FM.mode === 'chain' ? { signer: f.signer || 1 } : {}), page: f.page, x: f.x, y: fmClamp(f.y + f.h + 0.012, 0, 1 - f.h), w: f.w, h: f.h };
   FM.fields.push(n); FM.templateDirty = true; FM.sel = n.id; fmRenderFields(); fmRenderProps();
   setTimeout(() => { const i = document.getElementById('fm-p-label'); if(i){ i.focus(); i.select(); } }, 30);
 }
-function fmPropLabel(v){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; f.label = v; FM.templateDirty = true; const el = document.querySelector('#fm-pages .fm-field[data-id="' + f.id + '"] .fm-flabel'); if(el){ const t = FM_TYPES[f.type]; el.textContent = (f.type === 'check' ? '' : t.icon + ' ') + (v || '…') + (f.required ? ' *' : '') + (f.type === 'check' && f.group ? ' · ' + f.group : ''); } fmRenderChips(); }
+function fmPropLabel(v){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; f.label = v; FM.templateDirty = true; const el = document.querySelector('#fm-pages .fm-field[data-id="' + f.id + '"] .fm-flabel'); if(el){ const t = FM_TYPES[f.type]; el.textContent = fmSignerTag(f) + (f.type === 'check' ? '' : t.icon + ' ') + (v || '…') + (f.required ? ' *' : '') + (f.type === 'check' && f.group ? ' · ' + f.group : ''); } fmRenderChips(); }
 function fmPropReq(v){ const f = FM.fields.find(x => x.id === FM.sel); if(!f) return; f.required = !!v; fmSyncGroupReq(f); FM.templateDirty = true; fmRenderFields(); }
 function fmDeleteField(){ if(!FM.sel) return; FM.fields = FM.fields.filter(x => x.id !== FM.sel); FM.sel = null; FM.templateDirty = true; fmRenderFields(); fmRenderProps(); }
 document.addEventListener('keydown', ev => {
@@ -18535,6 +18631,7 @@ function fmCleanFields(forTemplate){
     const o = { id: f.id, type: f.type, label: String(f.label || '').replace(/\s+/g, ' ').trim(), required: !!f.required, page: f.page,
       x: +f.x.toFixed(6), y: +f.y.toFixed(6), w: +f.w.toFixed(6), h: +f.h.toFixed(6) };
     if(f.type === 'check' && String(f.group || '').trim()) o.group = String(f.group).replace(/\s+/g, ' ').trim();
+    if(FM.mode === 'chain') o.signer = f.signer || 1;
     if(fmCanStyle(f)){
       if(f.type !== 'check' && Number(f.fontSize) >= FM_MIN_PT && Number(f.fontSize) <= FM_MAX_PT) o.fontSize = Math.round(Number(f.fontSize) * 2) / 2;
       if(/^#[0-9a-fA-F]{6}$/.test(String(f.color || ''))) o.color = String(f.color).toLowerCase();
@@ -18561,6 +18658,14 @@ function fmValidate(){
   const bad = FM.fields.find(f => !String(f.label || '').trim());
   if(bad){ fmSelect(bad.id, true); return 'Hay un campo sin nombre. Escribe qué le vas a pedir al cliente.'; }
   const ve = fmValueError(); if(ve) return ve;
+  if(FM.mode === 'chain'){
+    for(let i = 0; i < FM.signers.length; i++){
+      if(!FM.fields.some(f => (f.signer || 1) === i + 1 && f.type === 'signature')){
+        FM.curSigner = i + 1; fmRenderSignerPick();
+        return 'Falta el campo de firma de ' + FM.signers[i].name + '. Elige «Los campos nuevos son de: ' + (i + 1) + '. ' + FM.signers[i].name + '» a la izquierda y toca «Firma».';
+      }
+    }
+  }
   const dup = FM.fields.filter(f => f.type === 'signature').length;
   return dup > 100 ? 'Hay demasiados campos de firma (máximo 100).' : '';
 }
@@ -18789,6 +18894,13 @@ async function fmCreate(){
   if(FM.busy) return; FM.busy = true;
   const btn = document.getElementById('fm-create-btn'); btn.disabled = true; btn.textContent = 'Creando…';
   try{
+    if(FM.mode === 'chain'){
+      const body = { action: 'chain_create', title: FM.title, fields: fmCleanFields(), signers: FM.signers.map(x => ({ name: x.name.trim(), email: String(x.email || '').trim() })), linkBase: fmLinkBase() };
+      if(FM.source === 'template' && FM.template) body.templateId = FM.template.id; else body.pdfBase64 = fmBytesToB64(FM.bytes);
+      if(document.getElementById('fm-send-email').checked && FM.signers[0].email) body.emailTo = true;
+      const r = await fmCall(body); FM.created = r; fmShowDone(r);
+      FM.busy = false; btn.disabled = false; btn.textContent = fmCreateBtnText(); return;
+    }
     if(FM.queue.length > 0){
       const r = await fmCreateBatch(btn, !!(document.getElementById('fm-send-email').checked && FM.client && FM.client.email));
       FM.created = r; fmShowDone(r); FM.busy = false; btn.disabled = false; fmStep(3); return;
@@ -18802,10 +18914,11 @@ async function fmCreate(){
     if(FM.reopen && FM.reopen.replaces){ try{ await fmCall({ action: 'cancel', requestId: FM.reopen.replaces }); r.replacedOld = true; }catch(e){ r.replacedOld = false; } }
     fmShowDone(r);
   }catch(e){ fmMsg('fm-msg2', 'error', e.message); }
-  FM.busy = false; btn.disabled = false; btn.textContent = (FM.queue.length > 0 ? 'Crear link de los ' + (FM.queue.length + 1) + ' documentos →' : 'Crear link de firma →');
+  FM.busy = false; btn.disabled = false; btn.textContent = fmCreateBtnText();
 }
 
 function fmShowDone(r){
+  if(FM.mode === 'chain') return fmShowDoneChain(r);
   fmStep(3);
   document.getElementById('fm-link').value = r.link;
   const exp = r.expiresAt ? new Date(r.expiresAt).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' }) : '';
@@ -18830,7 +18943,7 @@ async function fmCopyLink(){
 }
 // Desde el paso 3: mandar por correo (esto genera un link NUEVO; el que se copió antes deja de servir)
 async function fmDoneEmail(){
-  const to = FM.client && FM.client.email; if(!to || !FM.created) return;
+  const to = FM.mode === 'chain' ? (FM.signers[0] && FM.signers[0].email) : (FM.client && FM.client.email); if(!to || !FM.created) return;
   if(!confirm('Se va a mandar el link a ' + to + '. Esto crea un link nuevo (el que ya copiaste deja de servir). ¿Continuar?')) return;
   const b = document.getElementById('fm-done-email-btn'); b.disabled = true;
   try{
@@ -18968,6 +19081,244 @@ async function fmCardEvents(id){
   }catch(e){ panel.innerHTML = '<p class="sub" style="color:#B23A3A;">No se pudo cargar el historial: ' + fmEsc(e.message || e) + '</p>'; }
 }
 
+// =============== FIRMA DE DOCUMENTOS (barra principal): varias personas, una tras otra, sin cliente ===============
+// Un documento lo firman de 1 a 6 personas EN ORDEN. Al crearlo, la persona 1 recibe su link; cuando firma, el servidor
+// (sign-public) le manda solo su link a la persona 2, y así hasta la última. Cada persona tiene sus propios campos.
+const FM_MAX_SIGNERS = 6;
+const FM_SIGNER_COLORS = ['#0B1F4B', '#C23B3B', '#177A54', '#7C3AED', '#D97706', '#0891B2'];
+function fmSignerColor(n){ return FM_SIGNER_COLORS[((n || 1) - 1) % FM_SIGNER_COLORS.length]; }
+function fmSignerTag(f){ return (FM.mode === 'chain') ? 'P' + (f.signer || 1) + ' · ' : ''; }
+function fmChainLabel(def, n){
+  const sg = FM.signers[n - 1]; const base = String(def || '').replace(/ del cliente$/i, '');
+  return (base + (sg && sg.name ? ' — ' + sg.name : '')).slice(0, 80);
+}
+function fmIsEmail(x){ return /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]{2,}$/.test(x) && x.length <= 200; }
+
+async function fmOpenChain(){
+  fmReset();
+  FM.mode = 'chain'; FM.clientId = null; FM.client = null; FM.signers = [{ name: '', email: '' }, { name: '', email: '' }];
+  const ov = document.getElementById('fmOverlay'); ov.classList.add('fm-chainmode'); ov.style.display = 'block'; document.body.style.overflow = 'hidden';
+  document.getElementById('fm-top-title').textContent = 'Firma de documentos';
+  document.getElementById('fm-client-name').textContent = 'Sin cliente';
+  fmStep(1); fmRenderSigners();
+  await fmLoadTemplates();
+}
+function fmRenderSigners(){
+  const box = document.getElementById('fm-signers-list'); if(!box) return;
+  const n = FM.signers.length;
+  box.innerHTML = FM.signers.map((s, i) => `<div class="fm-signer-row" data-i="${i}"><span class="fm-sn" style="background:${fmSignerColor(i + 1)};">${i + 1}</span>
+      <input type="text" class="fm-s-name" maxlength="60" placeholder="Nombre de la persona ${i + 1}" value="${fmEsc(s.name)}" oninput="fmSignerEdit(${i}, 'name', this.value)" aria-label="Nombre de la persona ${i + 1}">
+      <input type="email" class="fm-s-email" maxlength="200" placeholder="${i === 0 ? 'Correo (opcional)' : 'Correo (obligatorio)'}" value="${fmEsc(s.email)}" oninput="fmSignerEdit(${i}, 'email', this.value)" aria-label="Correo de la persona ${i + 1}">
+      <button type="button" class="btn-ghost" ${i === 0 ? 'disabled' : ''} onclick="fmMoveSigner(${i}, -1)" title="Subir (que firme antes)" aria-label="Subir">↑</button>
+      <button type="button" class="btn-ghost" ${i === n - 1 ? 'disabled' : ''} onclick="fmMoveSigner(${i}, 1)" title="Bajar (que firme después)" aria-label="Bajar">↓</button>
+      <button type="button" class="btn-ghost" ${n <= 1 ? 'disabled' : ''} style="color:#B23A3A;" onclick="fmRemoveSigner(${i})" title="Quitar a esta persona" aria-label="Quitar">✕</button></div>`).join('');
+  const add = document.getElementById('fm-signers-add'); if(add){ add.disabled = n >= FM_MAX_SIGNERS; add.textContent = n >= FM_MAX_SIGNERS ? 'Máximo ' + FM_MAX_SIGNERS + ' personas' : '➕ Agregar otra persona'; }
+}
+function fmSignerEdit(i, k, v){ if(FM.signers[i]) FM.signers[i][k] = v; }
+function fmAddSigner(){
+  if(FM.signers.length >= FM_MAX_SIGNERS) return;
+  FM.signers.push({ name: '', email: '' }); fmRenderSigners();
+  const inp = document.querySelectorAll('#fm-signers-list .fm-s-name'); if(inp.length) inp[inp.length - 1].focus();
+}
+function fmRemoveSigner(i){ if(FM.signers.length <= 1) return; FM.signers.splice(i, 1); fmRenderSigners(); }
+function fmMoveSigner(i, d){
+  const j = i + d; if(j < 0 || j >= FM.signers.length) return;
+  const t = FM.signers[i]; FM.signers[i] = FM.signers[j]; FM.signers[j] = t; fmRenderSigners();
+}
+// Revisa nombres y correos de las personas (devuelve el texto del error, o '' si todo está bien)
+function fmChainCheckSigners(){
+  for(let i = 0; i < FM.signers.length; i++){
+    const s = FM.signers[i]; s.name = String(s.name || '').replace(/\s+/g, ' ').trim(); s.email = String(s.email || '').trim();
+    if(!s.name) return 'Escribe el nombre de la persona ' + (i + 1) + '.';
+    if(s.email && !fmIsEmail(s.email)) return 'El correo de ' + s.name + ' no es válido.';
+    if(!s.email && i > 0) return 'Falta el correo de ' + s.name + ': su link se le manda solo cuando le toque firmar.';
+  }
+  return '';
+}
+function fmRenderSignerPick(){
+  const sel = document.getElementById('fm-cur-signer'); if(!sel) return;
+  sel.innerHTML = FM.signers.map((s, i) => '<option value="' + (i + 1) + '">' + (i + 1) + '. ' + fmEsc(s.name) + '</option>').join('');
+  sel.value = String(FM.curSigner || 1);
+}
+function fmPickSigner(v){ FM.curSigner = parseInt(v, 10) || 1; }
+function fmSignerPropHtml(f){
+  if(FM.mode !== 'chain' || FM.signers.length < 2) return '';
+  return `<div class="fm-val"><label style="font-size:12px; font-weight:700;" for="fm-p-signer">👥 Este campo lo llena / firma:</label>
+    <select id="fm-p-signer" onchange="fmPropSigner(this.value)">${FM.signers.map((s, i) => `<option value="${i + 1}"${(f.signer || 1) === i + 1 ? ' selected' : ''}>${i + 1}. ${fmEsc(s.name)}</option>`).join('')}</select></div>`;
+}
+function fmPropSigner(v){
+  const f = FM.fields.find(x => x.id === FM.sel); if(!f) return;
+  f.signer = parseInt(v, 10) || 1; FM.curSigner = f.signer; FM.templateDirty = true;
+  const cs = document.getElementById('fm-cur-signer'); if(cs) cs.value = String(f.signer);
+  fmRenderFields(); fmRenderProps();
+}
+function fmShowDoneChain(r){
+  fmStep(3);
+  const s1 = FM.signers[0], s2 = FM.signers[1], total = FM.signers.length;
+  document.getElementById('fm-link').value = r.link;
+  document.getElementById('fm-link-label').textContent = 'Link de firma de ' + s1.name + (total > 1 ? ' (persona 1 de ' + total + ')' : '');
+  const exp = r.expiresAt ? new Date(r.expiresAt).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' }) : '';
+  document.getElementById('fm-done-exp').textContent = exp ? 'El link vence el ' + exp + '.' : '';
+  const nextTxt = total > 1 ? ' Cuando ' + s1.name + ' firme, a ' + s2.name + ' le llega su link por correo automáticamente' + (total > 2 ? ' (y así con las demás personas)' : '') + '.' : '';
+  if(r.emailed) fmMsg('fm-msg3', 'success', '✓ Documento creado. Se mandó el link a ' + s1.name + ' (' + r.emailedTo + ').' + nextTxt);
+  else if(r.emailError) fmMsg('fm-msg3', 'error', 'El documento se creó pero el correo de ' + s1.name + ' no se pudo mandar: ' + r.emailError + ' Copia su link y mándaselo tú.' + nextTxt);
+  else fmMsg('fm-msg3', 'success', '✓ Documento creado. Copia el link de ' + s1.name + ' y mándaselo (mensaje de texto, WhatsApp, etc.).' + nextTxt);
+  document.getElementById('fm-done-email-btn').textContent = '✉️ Enviar por correo a ' + s1.name;
+  document.getElementById('fm-done-email-btn').style.display = (r.emailed || !s1.email) ? 'none' : 'inline-block';
+  document.getElementById('fm-done-note').textContent = 'Sigue cómo va en «Firma de documentos» (barra principal): ahí ves quién ya firmó, a quién le toca, y puedes reenviar un link, cambiar un correo o cancelar. Cuando firmen todos, el PDF completo te llega por correo y queda guardado.';
+  fmCopyText(r.link).catch(() => {});
+}
+
+// ---- lista de documentos ----
+function fmChainMsg(type, text){ fmMsg('fm-chain-msg', type, text); }
+async function fmLoadFirmasTab(){ await Promise.all([fmLoadChains().catch(() => {}), fmLoadClientDocs().catch(() => {})]); }
+async function fmLoadChains(){
+  const tb = document.getElementById('fm-chain-list'); if(!tb) return;
+  let chains = [], reqs = [], err = null;
+  try{
+    const c = await sb.from('sign_chains').select('id,title,signers,status,current_pos,created_at,completed_at,cancelled_at,created_by_name').order('created_at', { ascending: false }).limit(60);
+    if(c.error) throw c.error; chains = c.data || [];
+    if(chains.length){
+      const q = await sb.from('sign_requests').select('id,chain_id,chain_pos,status,signer_name,signed_at,emailed_to,emailed_at,first_viewed_at,expires_at,link_issued_at,signed_path').in('chain_id', chains.map(x => x.id));
+      if(q.error) throw q.error; reqs = q.data || [];
+    }
+  }catch(e){ err = e; }
+  const btn = document.getElementById('fm-chain-newbtn');
+  if(err){
+    const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
+    fmChainMsg('error', missing ? 'Falta correr «migracion_firma_varias_personas.sql» en Supabase (SQL Editor) para poder usar esta sección.' : 'No se pudo cargar esta sección: ' + (err.message || err));
+    tb.innerHTML = '<tr><td colspan="5">—</td></tr>'; if(btn) btn.disabled = missing; return;
+  }
+  if(btn) btn.disabled = false;
+  const km = document.getElementById('fm-chain-msg'); if(km && km.classList.contains('error') && /migracion_firma|No se pudo cargar/.test(km.textContent)) fmChainMsg('', '');
+  FM.chains = chains; FM.chainReqs = reqs;
+  if(chains.length === 0){ tb.innerHTML = '<tr><td colspan="5">Todavía no has mandado ningún documento a firmar desde aquí. Toca «Nuevo documento para firmar».</td></tr>'; return; }
+  const now = Date.now(); const isAdm = typeof isAdminUser === 'function' && isAdminUser();
+  tb.innerHTML = chains.map(ch => {
+    const sg = Array.isArray(ch.signers) ? ch.signers : []; const mine = reqs.filter(r => r.chain_id === ch.id).sort((a, b) => a.chain_pos - b.chain_pos);
+    const cur = mine.find(r => r.status === 'pendiente' || r.status === 'procesando'); const lastSigned = mine.filter(r => r.status === 'firmado').pop();
+    const stalled = ch.status === 'en_curso' && !cur && lastSigned && lastSigned.chain_pos < sg.length;
+    const people = sg.map((p, i) => {
+      const r = mine.find(x => x.chain_pos === i + 1);
+      let icon = '⏳', sub = '';
+      if(ch.status === 'cancelada' && (!r || r.status !== 'firmado')) icon = '🚫';
+      if(r && r.status === 'firmado'){ icon = '✅'; sub = formatDateTimeUS(r.signed_at); }
+      else if(r && ch.status === 'en_curso' && (r.status === 'pendiente' || r.status === 'procesando')){ icon = r.first_viewed_at ? '👁' : '👉'; sub = r.first_viewed_at ? 'abrió el link' : 'su turno'; }
+      return '<div style="padding:2px 0;">' + icon + ' <strong>' + (i + 1) + '.</strong> ' + fmEsc(p.name) + (sub ? ' <span class="sub" style="margin:0; font-size:12px;">· ' + fmEsc(sub) + '</span>' : '') + (p.email ? '<div class="sub" style="margin:0 0 0 24px; font-size:12px;">' + fmEsc(p.email) + '</div>' : '') + '</div>';
+    }).join('');
+    let ui = { text: '⏳ En curso', cls: 'pending' }, sub = '';
+    if(ch.status === 'completada'){ ui = { text: '✓ Firmado por todos', cls: 'active' }; sub = formatDateTimeUS(ch.completed_at); }
+    else if(ch.status === 'cancelada'){ ui = { text: 'Cancelado', cls: 'gray' }; sub = ch.cancelled_at ? formatDateTimeUS(ch.cancelled_at) : ''; }
+    else if(stalled){ ui = { text: '⚠ Falta pasar a ' + fmEsc((sg[lastSigned.chain_pos] || {}).name || 'la siguiente persona'), cls: 'gray' }; sub = 'No se pudo preparar su link: toca «Continuar».'; }
+    else if(cur){
+      const nm = fmEsc((sg[cur.chain_pos - 1] || {}).name || 'la persona'); const exp = new Date(cur.expires_at).getTime() < now;
+      ui = exp ? { text: '⌛ Link vencido de ' + nm, cls: 'gray' } : cur.first_viewed_at ? { text: '👁 ' + nm + ' lo abrió, falta que firme', cls: 'pending' } : { text: '⏳ Esperando a ' + nm + ' (' + cur.chain_pos + ' de ' + sg.length + ')', cls: 'pending' };
+      if(cur.emailed_to) sub = 'Link mandado a ' + fmEsc(cur.emailed_to); else sub = 'Link sin enviar por correo (cópialo)';
+    }
+    let acts = '';
+    if(ch.status === 'en_curso' && cur){
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainCopy('${cur.id}')">📋 Link nuevo</button> `;
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainEmail('${ch.id}', '${cur.id}')">✉️ Enviar por correo</button> `;
+    }
+    if(stalled) acts += `<button class="btn-primary" style="width:auto; padding:6px 12px; margin:0;" onclick="fmChainResume('${ch.id}')">▶ Continuar</button> `;
+    if(ch.status === 'en_curso') acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px; color:#B23A3A;" onclick="fmChainCancel('${ch.id}')">Cancelar</button> `;
+    if(lastSigned) acts += `<button class="btn-primary" style="width:auto; padding:6px 12px; margin:0;" onclick="fmChainDownload('${lastSigned.id}')" title="${ch.status === 'completada' ? 'El PDF final con las firmas de todos' : 'El PDF con las firmas que van hasta ahora'}">⬇ ${ch.status === 'completada' ? 'Descargar firmado' : 'Descargar (hasta ahora)'}</button> `;
+    const first = mine.find(r => r.chain_pos === 1); if(first) acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainDownload('${first.id}', 'original')" title="El PDF tal cual se mandó, sin firmar">⬇ Original</button> `;
+    acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainEvents('${ch.id}')">Historial</button>`;
+    return `<tr data-chain="${ch.id}">
+      <td data-label="Fecha"><div>${formatDateTimeUS(ch.created_at)}${ch.created_by_name && isAdm ? '<div class="sub" style="margin:0;">por ' + fmEsc(ch.created_by_name) + '</div>' : ''}</div></td>
+      <td data-label="Documento"><div><strong>${fmEsc(ch.title)}</strong><div class="sub" style="margin:2px 0 0;">${sg.length === 1 ? '1 persona firma' : '👥 ' + sg.length + ' personas firman, una tras otra'}</div></div></td>
+      <td data-label="Personas"><div style="text-align:left;">${people}</div></td>
+      <td data-label="Estado"><div><span class="badge ${ui.cls}">${ui.text}</span>${sub ? '<div class="sub" style="margin:4px 0 0;">' + sub + '</div>' : ''}</div></td>
+      <td data-label="">${acts}</td></tr>`;
+  }).join('');
+}
+function fmChainLinkBox(r, note, isErr){
+  const el = document.getElementById('fm-chain-msg'); if(!el) return;
+  el.className = 'msg ' + (isErr ? 'error' : 'success');
+  el.innerHTML = (isErr ? '' : '✓ ') + fmEsc(note) + '<br><input type="text" id="fm-chain-link" readonly style="width:100%; margin-top:6px; padding:8px; border:1.5px solid var(--line); border-radius:8px; font-size:13px;" onclick="this.select()">';
+  document.getElementById('fm-chain-link').value = r.link;
+}
+async function fmChainCopy(reqId){
+  if(!confirm('Esto crea un link NUEVO para la persona a la que le toca firmar. Si ya se lo mandaste, ese deja de servir. ¿Continuar?')) return;
+  fmChainMsg('success', 'Generando link…');
+  try{
+    const r = await fmCall({ action: 'issue_link', requestId: reqId, linkBase: fmLinkBase() });
+    fmChainLinkBox(r, 'Link nuevo copiado — mándaselo a la persona por donde quieras (mensaje de texto, WhatsApp, etc.):');
+    fmCopyText(r.link).catch(() => {}); fmLoadChains().catch(() => {});
+  }catch(e){ fmChainMsg('error', e.message); }
+}
+async function fmChainEmail(chainId, reqId){
+  const ch = FM.chains.find(c => c.id === chainId), rq = FM.chainReqs.find(r => r.id === reqId); if(!ch || !rq) return;
+  const sg = (ch.signers || [])[rq.chain_pos - 1] || {};
+  const to = (prompt('¿A qué correo le mando el link de firma a ' + (sg.name || 'esta persona') + '?\n(Esto crea un link nuevo; el anterior deja de servir.)', sg.email || '') || '').trim();
+  if(!to) return;
+  if(!fmIsEmail(to)){ fmChainMsg('error', 'Ese correo no es válido.'); return; }
+  fmChainMsg('success', 'Enviando el link de firma…');
+  try{
+    if(to.toLowerCase() !== String(sg.email || '').toLowerCase()) await fmCall({ action: 'chain_update_signer', chainId, pos: rq.chain_pos, email: to });
+    const r = await fmCall({ action: 'issue_link', requestId: reqId, linkBase: fmLinkBase(), emailTo: true });
+    if(r.emailed) fmChainLinkBox(r, 'Se le mandó el link de firma a ' + to + '. (Aquí abajo también lo tienes por si lo quieres copiar.)');
+    else fmChainLinkBox(r, 'El link se generó, pero el correo NO se pudo mandar (' + (r.emailError || 'error') + '). Cópialo y mándaselo tú:', true);
+    fmLoadChains().catch(() => {});
+  }catch(e){ fmChainMsg('error', e.message); }
+}
+async function fmChainCancel(chainId){
+  if(!confirm('¿Cancelar este documento completo? Los links de las personas que faltan por firmar dejan de funcionar. Lo que ya firmaron se conserva.')) return;
+  try{ await fmCall({ action: 'chain_cancel', chainId }); fmChainMsg('success', 'Documento cancelado.'); await fmLoadChains(); }
+  catch(e){ fmChainMsg('error', e.message); }
+}
+async function fmChainResume(chainId){
+  if(!confirm('Se va a preparar el documento para la siguiente persona y mandarle su link por correo. ¿Continuar?')) return;
+  fmChainMsg('success', 'Pasando a la siguiente persona…');
+  try{
+    const r = await fmCall({ action: 'chain_resume', chainId, linkBase: fmLinkBase() });
+    if(r.completed) fmChainMsg('success', 'Ya habían firmado todos: el documento quedó como completado.');
+    else if(r.emailed) fmChainMsg('success', '✓ Listo: se le mandó el link a ' + r.name + '.');
+    else fmChainLinkBox(r, 'Se preparó el documento para ' + r.name + ', pero el correo NO se pudo mandar (' + (r.emailError || 'sin correo') + '). Copia su link y mándaselo tú:', true);
+    await fmLoadChains();
+  }catch(e){ fmChainMsg('error', e.message); }
+}
+async function fmChainDownload(id, kind){
+  let win = null; try{ win = window.open('', '_blank'); }catch(e){}   // se abre ANTES de pedir el link (Safari/iPhone)
+  try{
+    const r = await fmCall({ action: 'signed_url', requestId: id, kind: kind === 'original' ? 'original' : 'signed' });
+    if(win){ win.location.href = r.url; } else { window.location.href = r.url; }
+  }catch(e){ if(win){ try{ win.close(); }catch(_){} } fmChainMsg('error', e.message); }
+}
+async function fmChainEvents(chainId){
+  const panel = document.getElementById('fm-chain-events'); if(!panel) return;
+  if(panel.dataset.id === chainId && panel.style.display === 'block'){ panel.style.display = 'none'; return; }
+  panel.dataset.id = chainId; panel.style.display = 'block'; panel.innerHTML = '<p class="sub">Cargando…</p>';
+  try{
+    const ch = FM.chains.find(c => c.id === chainId); const reqs = FM.chainReqs.filter(r => r.chain_id === chainId);
+    const who = {}; reqs.forEach(r => { const p = ((ch && ch.signers) || [])[r.chain_pos - 1]; who[r.id] = (r.chain_pos) + '. ' + ((p && p.name) || ''); });
+    const r = await sb.from('sign_events').select('request_id,event,at,ip,detail').in('request_id', reqs.map(x => x.id)).order('at', { ascending: true });
+    if(r.error) throw r.error;
+    const isAdm = typeof isAdminUser === 'function' && isAdminUser();
+    panel.innerHTML = '<h5 style="margin:0 0 8px;">Historial de «' + fmEsc(ch ? ch.title : '') + '»</h5>' + ((r.data || []).map(e =>
+      `<div style="display:flex; gap:10px; padding:5px 0; border-bottom:1px solid var(--line); font-size:13.5px; flex-wrap:wrap;"><span style="min-width:150px; color:var(--slate-light);">${formatDateTimeUS(e.at)}</span><b>${fmEsc(who[e.request_id] || '')}</b><span>${fmEsc(fmEventLabel(e).replace(/El cliente/g, 'La persona'))}</span>${isAdm && e.ip ? '<span style="color:var(--slate-light);">· IP ' + fmEsc(e.ip) + '</span>' : ''}</div>`).join('') || '<p class="sub">Sin movimientos.</p>')
+      + '<p class="sub" style="margin:8px 0 0; font-size:12.5px;">Cada persona deja su propio certificado de firma electrónica (Certificate of Electronic Signature) en una página al final del PDF.</p>';
+  }catch(e){ panel.innerHTML = '<p class="sub" style="color:#B23A3A;">No se pudo cargar el historial: ' + fmEsc(e.message || e) + '</p>'; }
+}
+// Documentos que se mandaron desde el perfil de un cliente (solo para ver / descargar)
+async function fmLoadClientDocs(){
+  const tb = document.getElementById('fm-clientdocs-list'); if(!tb) return;
+  let rows = [];
+  try{
+    const r = await sb.from('sign_requests').select('id,title,status,created_at,signed_at,signer_name,client_id,client:client_id(full_name)').not('client_id', 'is', null).order('created_at', { ascending: false }).limit(40);
+    if(r.error) throw r.error; rows = (r.data || []).filter(x => x.client_id);
+  }catch(e){ tb.innerHTML = '<tr><td colspan="5">—</td></tr>'; return; }
+  if(rows.length === 0){ tb.innerHTML = '<tr><td colspan="5">Todavía no hay documentos mandados a clientes.</td></tr>'; return; }
+  tb.innerHTML = rows.map(r => {
+    const ui = FM_STATUS_UI[r.status] || { text: r.status, cls: 'gray' };
+    return `<tr><td data-label="Fecha">${formatDateTimeUS(r.created_at)}</td>
+      <td data-label="Cliente">${fmEsc(r.client ? r.client.full_name : '—')}</td><td data-label="Documento"><strong>${fmEsc(r.title)}</strong></td>
+      <td data-label="Estado"><div><span class="badge ${ui.cls}">${ui.text}</span>${r.status === 'firmado' ? '<div class="sub" style="margin:4px 0 0;">' + fmEsc(r.signer_name || '') + ' · ' + formatDateTimeUS(r.signed_at) + '</div>' : ''}</div></td>
+      <td data-label="">${r.status === 'firmado' ? `<button class="btn-primary" style="width:auto; padding:6px 12px; margin:0;" onclick="fmChainDownload('${r.id}')">⬇ Descargar</button> ` : ''}<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${r.client_id}')">Ver cliente</button></td></tr>`;
+  }).join('');
+}
+
 // =============== AVISO EN EL DASHBOARD: «ya se firmó» ===============
 function fmSeenIds(){ try{ return JSON.parse(localStorage.getItem('fm_seen_ids') || '[]'); }catch(e){ return []; } }
 function fmSaveSeen(ids){ try{ localStorage.setItem('fm_seen_ids', JSON.stringify(ids.slice(-300))); }catch(e){} }
@@ -18987,10 +19338,10 @@ async function fmLoadNotifications(){
   card.style.display = 'block';
   document.getElementById('fmNotifList').innerHTML = list.map(r => `
     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #A9DFC4; flex-wrap:wrap;">
-      <div><strong>${fmEsc(r.client ? r.client.full_name : 'Cliente')}</strong> firmó — ${fmEsc(r.title)}
+      <div><strong>${fmEsc(r.client_id ? (r.client ? r.client.full_name : 'Cliente') : (r.signer_name || 'Una persona'))}</strong> firmó — ${fmEsc(r.title)}
         <div class="sub" style="margin:2px 0 0;">${formatDateTimeUS(r.signed_at)}</div></div>
       <div style="white-space:nowrap; display:flex; gap:6px;">
-        <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="goToClientFromUnderwriting('${r.client_id}')">Ver</button>
+        <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="${r.client_id ? "goToClientFromUnderwriting('" + r.client_id + "')" : "switchTab('firmas')"}">Ver</button>
         <button type="button" class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12.5px;" onclick="fmDismiss('${r.id}')">Marcar vista</button>
       </div></div>`).join('');
 }
@@ -19005,6 +19356,7 @@ function fmDismissAll(){ const s = fmSeenIds().concat(fmLastNotifIds); fmSaveSee
     switchTab = function(tab){
       const out = origTab.apply(this, arguments);
       if(tab === 'inicio'){ try{ if(typeof loadSignatureNotifications === 'function') loadSignatureNotifications(); }catch(e){} }
+      if(tab === 'firmas'){ try{ fmLoadFirmasTab(); }catch(e){} }
       return out;
     };
   }
