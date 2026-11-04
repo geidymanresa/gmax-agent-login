@@ -14925,7 +14925,7 @@ function trBuildExceptions(s){
     if(b.classification === 'unclassified'){
       if(b.amount_cents < 0) add('unassigned_debit', 'critical', 'Retiro sin asignar', `${b.posted_at}: ${trFmt(b.amount_cents)} — ${b.description}`, 'bank_txn', b.id, -b.amount_cents, false);
       else add('unclassified_credit', 'critical', 'Depósito sin clasificar', `${b.posted_at}: ${trFmt(b.amount_cents)} — ${b.description}. No cuenta como ganancia: queda bloqueado como "sin identificar".`, 'bank_txn', b.id, b.amount_cents, false);
-    } else if(b.classification === 'carrier_debit'){
+    } else if(b.classification === 'carrier_debit' && !(s.settings && s.settings.cutoff_date && b.posted_at <= s.settings.cutoff_date)){   // retiros anteriores al corte: ya los cubre la apertura
       const allocated = (s.allocations || []).filter(a => a.bank_txn_id === b.id).reduce((x, a) => x + a.allocated_cents, 0);
       const remainder = -b.amount_cents - allocated;
       if(remainder > 0 && !res.has('debit_partial:' + b.id))
@@ -15380,6 +15380,51 @@ function trOpenClassic(){
 }
 
 // ---------- RESUMEN ----------
+function trCutoff(){ return (TR.d && TR.d.settings && TR.d.settings.cutoff_date) || null; }
+function trIsPreCutoff(iso){ const c = trCutoff(); return !!(c && iso && iso <= c); }
+// Lista corta, en orden y en palabras simples, de lo que falta para desbloquear. Se arma sola con los datos.
+function trPlan(){
+  const P = TR.pos, d = TR.d, s = d.settings || {}; const steps = [];
+  const add = (text, label, js) => steps.push({ text, label, js });
+  const cutoff = trCutoff();
+  P.blockers.forEach(b => {
+    if(b.code === 'no_opening') add('Falta aprobar el saldo inicial (apertura) de Tesorería.', 'Ir a Configuración', "trSetView('config')");
+    if(b.code === 'no_balance' || b.code === 'stale_balance') add('Registra el saldo que ves hoy en Bluevine (Agency Sweep). Sin un saldo reciente no se puede calcular nada.', 'Registrar saldo', 'trOpenBalance()');
+    if(b.code === 'no_import' || b.code === 'stale_import') add('Importa el CSV de movimientos más reciente de Bluevine.', 'Importar CSV', "trOpenImport('sweep')");
+  });
+  const sugAll = trSuggestPayoutMatches(d.payouts || [], d.bankTxns || []);
+  const auto = trAutoMatchList();
+  if(auto.length) add(`${auto.length} payout(s) de Stripe (${trFmt(auto.reduce((x, r) => x + r.payout.amount_cents, 0))}) ya aparecen en el banco por el importe exacto. Concílialos de una vez.`, 'Conciliar ahora', 'trOpenAutoMatch()');
+  const autoIds = new Set(auto.map(r => r.payout.payout_id));
+  const ambiguous = sugAll.filter(r => r.kind === 'ambiguous');
+  if(ambiguous.length) add(`${ambiguous.length} payout(s) tienen más de un depósito posible en el banco. Elige tú el correcto.`, 'Ir a Depósitos Stripe', "trSetView('stripe')");
+  const waiting = sugAll.filter(r => r.kind === 'none' && !(cutoff && r.payout.arrival_date && r.payout.arrival_date <= cutoff)).map(r => r.payout);
+  if(waiting.length) add(`${waiting.length} payout(s) de Stripe (${trFmt(waiting.reduce((x, p) => x + p.amount_cents, 0))}) ya fueron pagados pero todavía no aparecen en el CSV de Bluevine. Es normal: el banco tarda de 1 a 3 días en mostrarlos. Cuando los veas en Bluevine, importa un CSV nuevo y se concilian solos. No hay nada que arreglar aquí.`, 'Importar CSV', "trOpenImport('sweep')");
+  const candIds = new Set(); sugAll.forEach(r => r.candidates.forEach(b => candIds.add(b.id)));
+  const credits = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents > 0 && b.classification === 'unclassified' && !trIsPreCutoff(b.posted_at) && !candIds.has(b.id));
+  if(credits.length) add(`${credits.length} depósito(s) del banco (${trFmt(credits.reduce((x, b) => x + b.amount_cents, 0))}) que NO son de Stripe no están clasificados. Dime de dónde vienen (por ejemplo, una transferencia desde otra cuenta tuya = «Otro ingreso»).`, 'Clasificar', "trSetView('stripe')");
+  const debits = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents < 0 && b.classification === 'unclassified' && !trIsPreCutoff(b.posted_at));
+  if(debits.length) add(`${debits.length} retiro(s) del banco (${trFmt(-debits.reduce((x, b) => x + b.amount_cents, 0))}) sin clasificar: ¿es un pago a una aseguradora, una transferencia a Checking u otro gasto?`, 'Clasificar', "trSetView('retiros')");
+  const partial = P.exceptions.filter(e => e.type === 'debit_partial');
+  if(partial.length) add(`${partial.length} pago(s) a aseguradoras (${trFmt(partial.reduce((x, e) => x + e.amount_cents, 0))}) ya salieron del banco pero no están asignados a una póliza, así que el sistema todavía los cuenta como deuda. Asígnalos a su aseguradora; si no tienen póliza en el sistema, resuélvelos con una justificación.`, 'Ir a Retiros', "trSetView('retiros')");
+  const handled = new Set(['payout_unmatched', 'unclassified_credit', 'unassigned_debit', 'debit_partial']);
+  const others = P.exceptions.filter(e => e.severity === 'critical' && !handled.has(e.type));
+  if(others.length) add(`${others.length} excepción(es) crítica(s) que necesitan tu revisión (cobros sin póliza, cobros de Stripe sin registro, disputas…).`, 'Ver excepciones', "trSetView('excepciones')");
+  if(P.blockers.some(b => b.code === 'not_activated')) add('Falta activar el cálculo: se hacen cierres diarios de prueba comparados contra Bluevine y Stripe, y luego se activa en Configuración.', 'Cierre diario', 'trOpenClose()');
+  if(P.capacityRaw !== null && P.capacityRaw < 0){
+    const sb_ = s.stripe_balance || null;
+    const inTransit = (d.payouts || []).filter(p => p.status === 'pending' || p.status === 'in_transit').reduce((x, p) => x + p.amount_cents, 0);
+    const coming = (sb_ ? (sb_.available_cents || 0) + (sb_.pending_cents || 0) : 0) + inTransit;
+    add(`Por qué dice que faltan ${trFmt(-P.capacityRaw)}: el banco tiene ${trFmt(P.B)}, pero las aseguradoras todavía van a debitar ${trFmt(P.O)}${P.U ? `, hay ${trFmt(P.U)} sin identificar` : ''} y se deja un colchón de ${trFmt(P.C)}. Se corrige solo a medida que (1) asignas los pagos ya hechos a aseguradoras, (2) concilias los depósitos sin identificar y (3) llegan los ${trFmt(coming)} que Stripe todavía tiene por pagarte. Mientras tanto no pases nada a Checking.`, null, null);
+  }
+  return steps;
+}
+function trPlanHtml(){
+  const steps = trPlan();
+  return `<div class="dash-card" style="margin-top:12px; border:2px solid #C9D8F0;"><h4 style="margin-top:0;">Qué hacer ahora (en este orden)</h4>
+    ${steps.length ? `<ol style="margin:0; padding-left:22px;">${steps.map(st => `<li style="margin:0 0 10px;">${trE(st.text)}${st.js ? `<div style="margin-top:6px;"><button class="btn-ghost" style="width:auto; padding:5px 12px; font-size:13px;" onclick="${st.js.replace(/"/g, '&quot;')}">${trE(st.label)}</button></div>` : ''}</li>`).join('')}</ol>` : '<p style="margin:0;">✓ No hay nada pendiente. Todo está conciliado.</p>'}
+    <p class="sub" style="margin:8px 0 0;">Esta lista se arma sola con lo que el sistema ve hoy. Cuando resuelves un paso, desaparece.</p></div>`;
+}
 function trLinks(){ return trAttachPayouts(TR.d.payments || [], TR.d.stripeTxns || [], TR.d.payouts || []); }
 function trToggleBreak(k){ TR.openBreak = TR.openBreak === k ? null : k; trRender(); }
 function trViewResumen(){
@@ -15440,6 +15485,7 @@ function trViewResumen(){
       <button class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="trOpenBalance()">🏦 Registrar saldo verificado</button>
       <button class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="trOpenClose()">🗓 Cierre diario</button>
     </div>
+    ${trPlanHtml()}
     <div class="dash-stats tr-figs" style="margin-top:14px;">${figHtml}</div>
     ${breakHtml}
     <div class="tr-cols">
@@ -15539,11 +15585,19 @@ function trViewStripe(){
   const payouts = (d.payouts || []).slice().sort((a, b) => String(b.arrival_date || '').localeCompare(String(a.arrival_date || '')));
   const sug = {}; trSuggestPayoutMatches(d.payouts || [], d.bankTxns || []).forEach(r => { sug[r.payout.payout_id] = r; });
   const bankById = {}; (d.bankTxns || []).forEach(b => { bankById[b.id] = b; });
-  const unlinked = (d.stripeTxns || []).filter(t => (t.type === 'charge' || t.type === 'payment') && !t.payment_id && !(TR.pos.exceptions.length === 0 && false));
-  const credits = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents > 0 && b.classification === 'unclassified');
+  const cutoff = trCutoff(); const cutoffMs = cutoff ? Date.parse(cutoff + 'T00:00:00Z') : null;
+  const resSet = new Set((d.resolutions || []).map(r => r.exception_key));
+  const unlinkedAll = (d.stripeTxns || []).filter(t => (t.type === 'charge' || t.type === 'payment') && !t.payment_id);
+  const isOldCharge = t => cutoffMs !== null && t.created_at_stripe && Date.parse(t.created_at_stripe) < cutoffMs;
+  const unlinked = unlinkedAll.filter(t => !isOldCharge(t) && !resSet.has('stripe_charge_unlinked:' + t.stripe_id));   // mismo criterio que «Excepciones»
+  const unlinkedOld = unlinkedAll.filter(isOldCharge);
+  const creditsAll = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents > 0 && b.classification === 'unclassified');
+  const credits = creditsAll.filter(b => !trIsPreCutoff(b.posted_at));
+  const creditsOld = creditsAll.filter(b => trIsPreCutoff(b.posted_at));
+  const autoN = trAutoMatchList().length;
   const statusLab = { pending: 'Pendiente', in_transit: 'En camino', paid: 'Pagado', failed: 'Fallido', canceled: 'Cancelado' };
   return `<div class="dash-card"><div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;"><h4 style="margin:0;">Payouts de Stripe → Agency Sweep</h4>
-      <button class="btn-primary" style="width:auto; padding:7px 14px;" onclick="trSyncAll()">🔄 Sincronizar</button></div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">${autoN ? `<button class="btn-primary" style="width:auto; padding:7px 14px;" onclick="trOpenAutoMatch()">✅ Conciliar los ${autoN} que coinciden exacto</button>` : ''}<button class="${autoN ? 'btn-ghost' : 'btn-primary'}" style="width:auto; padding:7px 14px;" onclick="trSyncAll()">🔄 Sincronizar</button></div></div>
     <p class="sub">Un payout cuenta como dinero real solo cuando (1) sus cobros suman <strong>exactamente</strong> su monto y (2) el depósito aparece en Bluevine por el mismo importe. Si hay duda, no se asigna solo: tú eliges.</p>
     <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Payout</th><th>Llegada</th><th style="text-align:right;">Monto</th><th>Estado</th><th>Cobros que contiene</th><th>Depósito en Bluevine</th><th></th></tr></thead><tbody>
       ${payouts.length ? payouts.slice(0, 200).map(po => {
@@ -15557,9 +15611,11 @@ function trViewStripe(){
       }).join('') : '<tr><td colspan="7">Todavía no hay payouts. Usa “Sincronizar”.</td></tr>'}
     </tbody></table></div></div>
     <div class="dash-card"><h4 style="margin-top:0;">Depósitos en Agency Sweep sin clasificar (${credits.length})</h4>
-      ${credits.length ? `<table class="dash-table"><tbody>${credits.map(b => `<tr><td>${formatDateUS(b.posted_at)}</td><td>${trE(b.description)}</td><td style="text-align:right;"><strong>${trFmt(b.amount_cents)}</strong></td><td><button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenClassify('${trE(b.id)}')">Clasificar</button></td></tr>`).join('')}</tbody></table>` : '<p class="sub">No hay depósitos pendientes de clasificar.</p>'}
+      ${credits.length ? `<p class="sub" style="margin-top:0;">Si es un depósito de Stripe, no lo clasifiques aquí: concílialo con su payout (arriba). «Clasificar» es para dinero que NO viene de Stripe (por ejemplo, una transferencia de otra cuenta tuya).</p><table class="dash-table"><tbody>${credits.map(b => `<tr><td>${formatDateUS(b.posted_at)}</td><td>${trE(b.description)}</td><td style="text-align:right;"><strong>${trFmt(b.amount_cents)}</strong></td><td><button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenClassify('${trE(b.id)}')">Clasificar</button></td></tr>`).join('')}</tbody></table>` : '<p class="sub">✓ No hay depósitos pendientes de clasificar.</p>'}
+      ${creditsOld.length ? `<details style="margin-top:10px;"><summary class="sub">${creditsOld.length} depósito(s) anterior(es) a la fecha de corte (${formatDateUS(cutoff)}) — no necesitas hacer nada</summary><table class="dash-table"><tbody>${creditsOld.map(b => `<tr><td>${formatDateUS(b.posted_at)}</td><td>${trE(b.description)}</td><td style="text-align:right;">${trFmt(b.amount_cents)}</td></tr>`).join('')}</tbody></table><p class="sub">Ya están cubiertos por el saldo inicial (apertura); no cuentan como “sin identificar”.</p></details>` : ''}
     </div>
-    ${unlinked.length ? `<div class="dash-card" style="border-color:#E39C9C;"><h4 style="margin-top:0; color:#8a3030;">Cobros en Stripe sin registro en el CRM (${unlinked.length})</h4><table class="dash-table"><tbody>${unlinked.slice(0, 50).map(t => `<tr><td><code>${trE(t.stripe_id)}</code></td><td>${t.created_at_stripe ? formatDateUS(t.created_at_stripe.slice(0, 10)) : ''}</td><td style="text-align:right;">${trFmt(t.amount_cents)}</td></tr>`).join('')}</tbody></table><p class="sub">Aparecen también en “Excepciones”, donde se pueden resolver con justificación.</p></div>` : ''}`;
+    ${unlinked.length ? `<div class="dash-card" style="border-color:#E39C9C;"><h4 style="margin-top:0; color:#8a3030;">Cobros en Stripe sin registro en el CRM (${unlinked.length})</h4><table class="dash-table"><tbody>${unlinked.slice(0, 50).map(t => `<tr><td><code>${trE(t.stripe_id)}</code></td><td>${t.created_at_stripe ? formatDateUS(t.created_at_stripe.slice(0, 10)) : ''}</td><td style="text-align:right;">${trFmt(t.amount_cents)}</td></tr>`).join('')}</tbody></table><p class="sub">Aparecen también en “Excepciones”, donde se pueden resolver con justificación.</p></div>` : ''}
+    ${unlinkedOld.length ? `<details class="dash-card"><summary class="sub">${unlinkedOld.length} cobro(s) de Stripe anteriores a la fecha de corte (${formatDateUS(cutoff)}) — no necesitas hacer nada</summary><table class="dash-table"><tbody>${unlinkedOld.slice(0, 50).map(t => `<tr><td><code>${trE(t.stripe_id)}</code></td><td>${t.created_at_stripe ? formatDateUS(t.created_at_stripe.slice(0, 10)) : ''}</td><td style="text-align:right;">${trFmt(t.amount_cents)}</td></tr>`).join('')}</tbody></table><p class="sub">Ya los cubre el saldo inicial; no generan excepciones ni bloquean nada.</p></details>` : ''}`;
 }
 function trOpenMatchPayout(payoutId){
   const po = (TR.d.payouts || []).find(p => p.payout_id === payoutId); if(!po) return;
@@ -15575,14 +15631,37 @@ function trOpenMatchPayout(payoutId){
     cands.length ? [{ label: 'Cancelar' }, { label: 'Vincular depósito', primary: true, onClick: async () => {
       const pick = document.querySelector('input[name="trmp"]:checked'); if(!pick) throw new Error('Elige un depósito.');
       const b = (TR.d.bankTxns || []).find(x => x.id === pick.value);
-      if(!b || b.amount_cents !== po.amount_cents) throw new Error('El depósito debe ser EXACTAMENTE por ' + trFmt(po.amount_cents) + '.');
-      const { error } = await sb.from('treasury_payouts').update({ bank_txn_id: b.id, matched_at: new Date().toISOString() }).eq('payout_id', po.payout_id).is('bank_txn_id', null);
-      if(error) throw new Error(error.message);
-      const { error: e2 } = await sb.from('treasury_bank_txns').update({ classification: 'stripe_payout', classification_note: 'Payout ' + po.payout_id }).eq('id', b.id);
-      if(e2) throw new Error('El payout quedó vinculado pero no se pudo clasificar el depósito: ' + e2.message);
-      await trAudit('payout_matched', 'payout', po.payout_id, { bank_txn_id: b.id, amount_cents: po.amount_cents, allocation_complete: al.complete });
+      await trLinkPayoutToBank(po, b);
       await trLoad(); trRender(); trToast('Payout conciliado con el depósito de Bluevine.');
     } }] : [{ label: 'Cerrar' }]);
+}
+
+// Vincula un payout de Stripe con su depósito en Bluevine (mismo código para el botón individual y para «conciliar todo»).
+async function trLinkPayoutToBank(po, b){
+  if(!b || b.amount_cents !== po.amount_cents) throw new Error('El depósito debe ser EXACTAMENTE por ' + trFmt(po.amount_cents) + '.');
+  const al = trPayoutAllocation(po, (TR.d.stripeTxns || []).filter(t => t.payout_id === po.payout_id));
+  const { error } = await sb.from('treasury_payouts').update({ bank_txn_id: b.id, matched_at: new Date().toISOString() }).eq('payout_id', po.payout_id).is('bank_txn_id', null);
+  if(error) throw new Error(error.message);
+  const { error: e2 } = await sb.from('treasury_bank_txns').update({ classification: 'stripe_payout', classification_note: 'Payout ' + po.payout_id }).eq('id', b.id);
+  if(e2) throw new Error('El payout quedó vinculado pero no se pudo clasificar el depósito: ' + e2.message);
+  await trAudit('payout_matched', 'payout', po.payout_id, { bank_txn_id: b.id, amount_cents: po.amount_cents, allocation_complete: al.complete });
+}
+// Payouts cuyo depósito en el banco es único y exacto (mismo importe, ventana de fechas, sin duda).
+function trAutoMatchList(){ return trSuggestPayoutMatches(TR.d.payouts || [], TR.d.bankTxns || []).filter(r => (r.kind === 'unique' || r.kind === 'reference') && r.pick); }
+function trOpenAutoMatch(){
+  const list = trAutoMatchList();
+  if(!list.length){ trModal('Conciliar payouts', '<p>No hay payouts con un depósito exacto y único para conciliar en este momento. Si Stripe ya pagó un payout y todavía no aparece en el banco, importa un CSV más reciente de Bluevine.</p>', [{ label: 'Cerrar' }]); return; }
+  trModal('Conciliar payouts con su depósito', `<p class="sub" style="margin-top:0;">Estos payouts de Stripe tienen un depósito en Bluevine por <strong>exactamente</strong> el mismo importe y fecha, y no hay otra opción posible. Se vinculan los dos y queda registrado en la bitácora.</p>
+    <table class="dash-table"><thead><tr><th>Payout</th><th>Llegada</th><th style="text-align:right;">Monto</th><th>Depósito en Bluevine</th></tr></thead><tbody>
+    ${list.map(r => `<tr><td><code>${trE(r.payout.payout_id)}</code></td><td>${r.payout.arrival_date ? formatDateUS(r.payout.arrival_date) : '—'}</td><td style="text-align:right;">${trFmt(r.payout.amount_cents)}</td><td>${formatDateUS(r.pick.posted_at)} — ${trE(r.pick.description)}</td></tr>`).join('')}
+    </tbody></table>`,
+    [{ label: 'Cancelar' }, { label: 'Conciliar ' + list.length, primary: true, onClick: async () => {
+      let ok = 0; const fails = [];
+      for(const r of list){ try { await trLinkPayoutToBank(r.payout, r.pick); ok++; } catch(e){ fails.push(r.payout.payout_id + ': ' + e.message); } }
+      await trLoad(); trRender();
+      if(fails.length){ trToast(`Se conciliaron ${ok}; ${fails.length} fallaron: ${fails[0]}`, 'error'); }
+      else trToast(ok + ' payout(s) conciliado(s) con su depósito.');
+    } }]);
 }
 
 // ---------- Clasificación de movimientos del banco ----------
@@ -15608,18 +15687,25 @@ function trAllocSum(bankId){ return (TR.d.allocations || []).filter(a => a.bank_
 function trViewRetiros(){
   const d = TR.d;
   const debits = (d.bankTxns || []).filter(b => b.account === 'sweep' && b.amount_cents < 0);
+  const resSet = new Set((d.resolutions || []).map(r => r.exception_key));
   const tag = b => {
     if(b.classification === 'unclassified') return trChip('Sin clasificar', 'red');
-    if(b.classification === 'carrier_debit'){ const a = trAllocSum(b.id), t = -b.amount_cents; return a === t ? trChip('Asignado completo ✓', 'green') : trChip(`Asignado ${trFmt(a)} de ${trFmt(t)}`, 'red'); }
+    if(b.classification === 'carrier_debit'){
+      const a = trAllocSum(b.id), t = -b.amount_cents;
+      if(a === t) return trChip('Asignado completo ✓', 'green');
+      if(trIsPreCutoff(b.posted_at)) return trChip('Anterior al corte: lo cubre el saldo inicial', 'gray');
+      if(resSet.has('debit_partial:' + b.id)) return trChip('Resuelto con justificación', 'gray');
+      return trChip(`Falta asignar ${trFmt(t - a)} de ${trFmt(t)}`, 'red');
+    }
     return trChip(TR_CLASS_LABELS[b.classification] || b.classification, 'gray');
   };
   return `<div class="dash-card"><div style="display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;"><h4 style="margin:0;">Retiros de Agency Sweep</h4>
     <button class="btn-ghost" style="width:auto; padding:7px 14px;" onclick="trOpenImport('sweep')">📥 Importar CSV de Bluevine</button></div>
-    <p class="sub">Cada retiro de una aseguradora se reparte entre las pólizas que cubre (puede ser uno solo, varios o parcial). Un retiro sin asignar por completo bloquea el monto transferible.</p>
+    <p class="sub">Cada retiro de una aseguradora se reparte entre las pólizas que cubre (puede ser uno solo, varios o parcial). <strong>Asignarlo baja lo que el sistema cree que todavía debes</strong>, porque ese dinero ya salió del banco. Si un pago no tiene póliza en el sistema (era de antes, o se cobró por fuera de Stripe), usa «Sin póliza: resolver» y escribe el motivo.</p>
     <div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Fecha</th><th>Descripción</th><th style="text-align:right;">Monto</th><th>Estado</th><th></th></tr></thead><tbody>
     ${debits.length ? debits.slice(0, 300).map(b => `<tr><td>${formatDateUS(b.posted_at)}</td><td>${trE(b.description)}${b.classification_note ? `<div class="sub">${trE(b.classification_note)}</div>` : ''}</td><td style="text-align:right;">${trFmt(b.amount_cents)}</td><td>${tag(b)}</td>
       <td style="white-space:nowrap;">${b.classification === 'unclassified' ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenClassify('${trE(b.id)}')">Clasificar</button>` : ''}
-      ${b.classification === 'carrier_debit' ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenAllocate('${trE(b.id)}')">${trAllocSum(b.id) === -b.amount_cents ? 'Ver' : 'Asignar'}</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5">No hay retiros importados. Importa el CSV de Bluevine.</td></tr>'}
+      ${b.classification === 'carrier_debit' ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenAllocate('${trE(b.id)}')">${trAllocSum(b.id) === -b.amount_cents ? 'Ver' : 'Asignar'}</button>${(TR.pos.exceptions || []).some(e => e.key === 'debit_partial:' + b.id) ? ` <button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenResolve('debit_partial:${trE(b.id)}')" title="Úsalo si este pago no tiene póliza en el sistema (por ejemplo, un pago de antes del sistema o cobrado por fuera de Stripe)">Sin póliza: resolver</button>` : ''}` : ''}</td></tr>`).join('') : '<tr><td colspan="5">No hay retiros importados. Importa el CSV de Bluevine.</td></tr>'}
     </tbody></table></div></div>`;
 }
 function trOutstanding(o){ return Math.max(0, o.payable_cents - o.paid_cents - o.refunded_cents); }
@@ -15826,7 +15912,7 @@ function trViewExcepciones(){
   const ex = TR.pos.exceptions; const d = TR.d;
   const sev = { critical: ['Crítica', 'red'], warning: ['Aviso', 'amber'] };
   return `<div class="dash-card"><h4 style="margin-top:0;">Excepciones abiertas (${ex.length})</h4>
-    ${ex.length ? `<div class="dash-table-wrap"><table class="dash-table"><tbody>${ex.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1)).map(e => `<tr><td>${trChip(sev[e.severity][0], sev[e.severity][1])}</td><td><strong>${trE(e.title)}</strong><div class="sub">${trE(e.detail)}</div></td><td style="text-align:right;">${e.amount_cents ? trFmt(e.amount_cents) : ''}</td><td>${e.resolvable ? `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="trOpenResolve('${trE(e.key)}')">Resolver con justificación</button>` : '<span class="sub">se resuelve con datos</span>'}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sub">✓ No hay excepciones abiertas.</p>'}
+    ${ex.length ? `<div class="dash-table-wrap"><table class="dash-table"><tbody>${ex.sort((a, b) => (a.severity === 'critical' ? 0 : 1) - (b.severity === 'critical' ? 0 : 1)).map(e => `<tr><td>${trChip(sev[e.severity][0], sev[e.severity][1])}</td><td><strong>${trE(e.title)}</strong><div class="sub">${trE(e.detail)}</div></td><td style="text-align:right;">${e.amount_cents ? trFmt(e.amount_cents) : ''}</td><td>${trExAction(e)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sub">✓ No hay excepciones abiertas.</p>'}
   </div>
   <div class="dash-card"><div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap;"><h4 style="margin:0;">Bitácora de auditoría</h4>
     <div style="display:flex; gap:8px;"><button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="trExportAudit()">⬇ Bitácora CSV</button><button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="trBackup()">⬇ Descargar respaldo completo</button></div></div>
@@ -15836,6 +15922,28 @@ function trViewExcepciones(){
     </tbody></table></div></div>
   <div class="dash-card"><h4 style="margin-top:0;">Excepciones ya resueltas (${(d.resolutions || []).length})</h4>
     ${(d.resolutions || []).length ? `<table class="dash-table"><tbody>${d.resolutions.slice(0, 50).map(r => `<tr><td><code>${trE(r.exception_key)}</code></td><td>${trE(r.justification)}</td><td class="sub">${new Date(r.resolved_at).toLocaleDateString('en-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric' })}</td></tr>`).join('')}</tbody></table>` : '<p class="sub">Ninguna todavía.</p>'}</div>`;
+}
+// Qué puede hacer la persona con cada excepción (botón directo o explicación en palabras simples).
+function trExAction(e){
+  const btn = (label, js) => `<button class="btn-ghost" style="width:auto; padding:5px 10px; font-size:12px;" onclick="${js}">${label}</button>`;
+  const hint = t => `<div class="sub" style="max-width:260px;">${trE(t)}</div>`;
+  const res = e.resolvable ? btn('Resolver con justificación', `trOpenResolve('${trE(e.key)}')`) : '';
+  switch(e.type){
+    case 'payout_unmatched': {
+      const sg = trSuggestPayoutMatches(TR.d.payouts || [], TR.d.bankTxns || []).find(r => r.payout.payout_id === e.entity_id);
+      if(sg && sg.candidates.length) return btn('Conciliar', `trOpenMatchPayout('${trE(e.entity_id)}')`) + hint('Ya aparece un depósito con ese importe en el banco.');
+      return btn('Importar CSV', "trOpenImport('sweep')") + hint('Todavía no aparece en el banco. Bluevine tarda 1 a 3 días en mostrarlo: importa un CSV más reciente después.');
+    }
+    case 'unclassified_credit': {
+      const asPayout = trSuggestPayoutMatches(TR.d.payouts || [], TR.d.bankTxns || []).some(r => r.candidates.some(b => b.id === e.entity_id));
+      return asPayout ? btn('Ir a Depósitos Stripe', "trSetView('stripe')") + hint('Parece el depósito de un payout de Stripe: se resuelve conciliándolo ahí.') : btn('Clasificar', `trOpenClassify('${trE(e.entity_id)}')`);
+    }
+    case 'unassigned_debit': return btn('Clasificar', `trOpenClassify('${trE(e.entity_id)}')`);
+    case 'payout_difference': return btn('Sincronizar', 'trSyncAll()') + hint('Vuelve a sincronizar con Stripe; si sigue igual, avísame.');
+    case 'stripe_fee_missing': return btn('Sincronizar', 'trSyncAll()');
+    case 'transfer_stale': return btn('Ver transferencias', "trSetView('transfer')");
+    default: return res || '<span class="sub">se resuelve con datos</span>';
+  }
 }
 function trOpenResolve(key){
   const e = TR.pos.exceptions.find(x => x.key === key); if(!e) return;
