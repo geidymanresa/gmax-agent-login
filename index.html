@@ -15630,7 +15630,15 @@ function trOpenAllocate(bankId){
   const obById = {}; (TR.d.obligations || []).forEach(o => { obById[o.id] = o; });
   const lockedCarrier = mine.length ? (obById[mine[0].obligation_id] || {}).carrier_name : null;
   const open = (TR.d.obligations || []).filter(o => o.status !== 'cancelled' && trOutstanding(o) > 0);
-  const carriers = Array.from(new Set(open.map(o => o.carrier_name))).sort();
+  // Todas las compañías guardadas en «Compañías» + cualquiera que ya tenga primas pendientes (aunque su nombre no esté en la lista)
+  const pendByCarrier = {};   // clave en minúsculas → { name, cents }
+  open.forEach(o => { const k = String(o.carrier_name || '').trim().toLowerCase(); if(!k) return; (pendByCarrier[k] = pendByCarrier[k] || { name: o.carrier_name, cents: 0 }).cents += trOutstanding(o); });
+  const nameByKey = {};
+  (typeof allCompanies !== 'undefined' ? allCompanies : []).forEach(c => { const k = String(c.name || '').trim().toLowerCase(); if(k) nameByKey[k] = c.name; });
+  Object.keys(pendByCarrier).forEach(k => { if(!nameByKey[k]) nameByKey[k] = pendByCarrier[k].name; });
+  const carrierList = Object.keys(nameByKey).map(k => ({ name: nameByKey[k], cents: (pendByCarrier[k] || {}).cents || 0 }))
+    .sort((a, b) => (b.cents > 0) - (a.cents > 0) || a.name.localeCompare(b.name));
+  const carrierOptions = carrierList.map(c => `<option value="${trE(c.name)}">${trE(c.name)} — ${c.cents > 0 ? 'pendiente ' + trFmt(c.cents) : 'sin pólizas pendientes'}</option>`).join('');
   const payById = {}; (TR.d.payments || []).forEach(p => { payById[p.id] = p; });
   const rev = {}; mine.filter(a => a.reverses_id).forEach(a => { rev[a.reverses_id] = (rev[a.reverses_id] || 0) + a.allocated_cents; });
   const history = mine.filter(a => a.allocated_cents > 0).map(a => {
@@ -15642,7 +15650,7 @@ function trOpenAllocate(bankId){
     <p class="sub" style="margin-top:0;">${formatDateUS(b.posted_at)} — ${trE(b.description)}<br>Retiro <strong>${trFmt(debit)}</strong> · ya asignado <strong>${trFmt(done)}</strong> · falta <strong>${trFmt(debit - done)}</strong></p>
     ${history ? `<table class="dash-table"><tbody>${history}</tbody></table>` : ''}
     ${debit - done > 0 ? `
-    <div class="form-row"><label>Aseguradora</label><select id="tra-carrier" ${lockedCarrier ? 'disabled' : ''} onchange="trAllocLines()">${lockedCarrier ? `<option>${trE(lockedCarrier)}</option>` : '<option value="">— elige —</option>' + carriers.map(c => `<option>${trE(c)}</option>`).join('')}</select></div>
+    <div class="form-row"><label>Aseguradora</label><select id="tra-carrier" ${lockedCarrier ? 'disabled' : ''} onchange="trAllocLines()">${lockedCarrier ? `<option>${trE(lockedCarrier)}</option>` : '<option value="">— elige —</option>' + carrierOptions}</select></div>
     <div id="tra-lines"></div>
     <div id="tra-sum" class="sub" style="margin-top:6px;"></div>` : '<p class="msg success" style="display:block;">Este retiro ya está asignado por completo.</p>'}`,
     debit - done > 0 ? [{ label: 'Cerrar' }, { label: 'Guardar asignación', primary: true, onClick: trSaveAllocation }] : [{ label: 'Cerrar' }]);
@@ -15654,6 +15662,7 @@ function trAllocLines(){
   const payById = {}; (TR.d.payments || []).forEach(p => { payById[p.id] = p; });
   const obs = (TR.d.obligations || []).filter(o => o.status !== 'cancelled' && o.carrier_name.toLowerCase() === c.toLowerCase() && trOutstanding(o) > 0).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
   A.obs = obs;
+  if(!obs.length){ el.innerHTML = `<p class="msg" style="display:block; background:#FFF8E6; border:1px solid #F0D58A; color:#7A5A00;"><strong>${trE(c)}</strong> no tiene pólizas pendientes en el sistema, así que no hay nada a qué asignar este retiro. Esto pasa cuando el cobro no pasó por Stripe/CRM, cuando la compañía figura con otro nombre (por ejemplo «SGA» = Southern General) o cuando esas pólizas ya se asignaron por completo. Prueba con otra aseguradora o cierra y avísame.</p>`; A.obs = []; trAllocSumUpdate(); return; }
   el.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;"><strong>Pólizas pendientes de ${trE(c)}</strong><button type="button" class="btn-ghost" style="width:auto; padding:4px 10px; font-size:12px;" onclick="trAllocAuto()">Repartir automático (más antiguas primero)</button></div>
     <table class="dash-table"><thead><tr><th>Cliente</th><th style="text-align:right;">Se debe</th><th style="text-align:right;">Asignar (USD)</th></tr></thead><tbody>
     ${obs.map((o, i) => { const p = payById[o.payment_id] || {}; return `<tr><td>${trE(p.client_name || (o.source === 'opening' ? 'Saldo inicial' : '—'))}<div class="sub">${p.created_at ? formatDateUS(p.created_at.slice(0, 10)) : ''}</div></td><td style="text-align:right;">${trFmt(trOutstanding(o))}</td><td style="text-align:right;"><input type="text" inputmode="decimal" class="tra-in" data-i="${i}" placeholder="0.00" style="width:110px; text-align:right;" oninput="trAllocSumUpdate()"></td></tr>`; }).join('')}
