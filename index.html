@@ -1001,6 +1001,7 @@
 
 
 
+
 <!-- ===== FIRMAS-HTML-START ===== -->
     <style>
       #fmOverlay{ display:none; position:fixed; inset:0; background:var(--canvas, #F4F6FB); z-index:1200; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -1109,7 +1110,7 @@
           <div class="fm-box" id="fm-queue-box" style="display:none; background:#EEF2FB; border-color:#B9C6E6;"></div>
           <div class="fm-box" id="fm-signers-box" style="display:none;">
             <div style="font-weight:700; margin-bottom:4px;">👥 ¿Quién firma? (en este orden)</div>
-            <p class="sub" style="margin:0 0 10px;">Firman <b>una tras otra</b>: cuando firma la primera persona, a la segunda le llega su link por correo automáticamente, y así sucesivamente. Cada una ve la firma de las anteriores y solo llena sus propios recuadros. El correo es obligatorio desde la persona 2 (la primera puede recibir el link por donde tú quieras).</p>
+            <p class="sub" style="margin:0 0 10px;">Firman <b>una tras otra</b>: cuando firma la primera persona, a la segunda le llega su link por correo automáticamente, y así sucesivamente. Cada una ve la firma de las anteriores y solo llena sus propios recuadros. Si le pones correo a una persona, su link le llega solo. Si NO le pones correo, cuando le toque te sale aquí su link para que lo copies y se lo mandes por WhatsApp o por donde quieras.</p>
             <div id="fm-signers-list"></div>
             <button type="button" class="btn-ghost" id="fm-signers-add" style="width:auto; padding:8px 14px; margin:2px 0 0;" onclick="fmAddSigner()">➕ Agregar otra persona</button>
             <div class="msg" id="fm-msg-signers" style="margin-top:8px;"></div>
@@ -1337,6 +1338,7 @@
           <div id="fmNotifList" style="margin-top:8px;"></div>
         </div>
 <!-- ===== FIRMAS-NOTIF-END ===== -->
+
 
 
 
@@ -2891,6 +2893,7 @@
 
 
 
+
           <!-- Edición -->
           <div class="dash-card" id="cd-editCard" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -3274,6 +3277,7 @@
 
 
 
+
         <div class="dash-card">
           <h4>🏢 Información de aseguradoras</h4>
           <p class="sub" style="margin-bottom:10px;">Teléfonos, códigos de agencia y notas por aseguradora.</p>
@@ -3287,6 +3291,7 @@
       </section>
 
       <!-- TAB: ASEGURADORAS (con las que el agente está activo/apuntado) -->
+
 
 
 <!-- ===== FIRMAS-TAB-START ===== -->
@@ -17905,6 +17910,7 @@ async function saSaveSettings(){
 
 
 
+
 // ===== FIRMAS-JS-START =====
 // Firma de formularios (tipo DocuSign): botón «Firmar documento» en el perfil del cliente.
 // Todo vive aquí dentro; usa las funciones del CRM (sb, showMsg, escapeHtml, formatDateTimeUS, isAdminUser...).
@@ -19108,7 +19114,7 @@ function fmRenderSigners(){
   const n = FM.signers.length;
   box.innerHTML = FM.signers.map((s, i) => `<div class="fm-signer-row" data-i="${i}"><span class="fm-sn" style="background:${fmSignerColor(i + 1)};">${i + 1}</span>
       <input type="text" class="fm-s-name" maxlength="60" placeholder="Nombre de la persona ${i + 1}" value="${fmEsc(s.name)}" oninput="fmSignerEdit(${i}, 'name', this.value)" aria-label="Nombre de la persona ${i + 1}">
-      <input type="email" class="fm-s-email" maxlength="200" placeholder="${i === 0 ? 'Correo (opcional)' : 'Correo (obligatorio)'}" value="${fmEsc(s.email)}" oninput="fmSignerEdit(${i}, 'email', this.value)" aria-label="Correo de la persona ${i + 1}">
+      <input type="email" class="fm-s-email" maxlength="200" placeholder="Correo (opcional)" value="${fmEsc(s.email)}" oninput="fmSignerEdit(${i}, 'email', this.value)" aria-label="Correo de la persona ${i + 1}">
       <button type="button" class="btn-ghost" ${i === 0 ? 'disabled' : ''} onclick="fmMoveSigner(${i}, -1)" title="Subir (que firme antes)" aria-label="Subir">↑</button>
       <button type="button" class="btn-ghost" ${i === n - 1 ? 'disabled' : ''} onclick="fmMoveSigner(${i}, 1)" title="Bajar (que firme después)" aria-label="Bajar">↓</button>
       <button type="button" class="btn-ghost" ${n <= 1 ? 'disabled' : ''} style="color:#B23A3A;" onclick="fmRemoveSigner(${i})" title="Quitar a esta persona" aria-label="Quitar">✕</button></div>`).join('');
@@ -19131,7 +19137,6 @@ function fmChainCheckSigners(){
     const s = FM.signers[i]; s.name = String(s.name || '').replace(/\s+/g, ' ').trim(); s.email = String(s.email || '').trim();
     if(!s.name) return 'Escribe el nombre de la persona ' + (i + 1) + '.';
     if(s.email && !fmIsEmail(s.email)) return 'El correo de ' + s.name + ' no es válido.';
-    if(!s.email && i > 0) return 'Falta el correo de ' + s.name + ': su link se le manda solo cuando le toque firmar.';
   }
   return '';
 }
@@ -19213,11 +19218,11 @@ async function fmLoadChains(){
     else if(cur){
       const nm = fmEsc((sg[cur.chain_pos - 1] || {}).name || 'la persona'); const exp = new Date(cur.expires_at).getTime() < now;
       ui = exp ? { text: '⌛ Link vencido de ' + nm, cls: 'gray' } : cur.first_viewed_at ? { text: '👁 ' + nm + ' lo abrió, falta que firme', cls: 'pending' } : { text: '⏳ Esperando a ' + nm + ' (' + cur.chain_pos + ' de ' + sg.length + ')', cls: 'pending' };
-      if(cur.emailed_to) sub = 'Link mandado a ' + fmEsc(cur.emailed_to); else sub = 'Link sin enviar por correo (cópialo)';
+      if(cur.emailed_to) sub = 'Link mandado a ' + fmEsc(cur.emailed_to); else sub = 'Le toca y su link no se ha mandado: toca «Copiar link» y mándaselo por WhatsApp.';
     }
     let acts = '';
     if(ch.status === 'en_curso' && cur){
-      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainCopy('${cur.id}')">📋 Link nuevo</button> `;
+      acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainCopy('${cur.id}')">📋 Copiar link</button> `;
       acts += `<button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="fmChainEmail('${ch.id}', '${cur.id}')">✉️ Enviar por correo</button> `;
     }
     if(stalled) acts += `<button class="btn-primary" style="width:auto; padding:6px 12px; margin:0;" onclick="fmChainResume('${ch.id}')">▶ Continuar</button> `;
