@@ -15289,6 +15289,8 @@ function trImportRenderPreview(){
   const existing = new Set((TR.d.bankTxns || []).map(b => b.fingerprint));
   I.fps = fps; I.split = trSplitDuplicates(fps, existing);
   I.fileDup = (TR.d.imports || []).some(x => x.account === account && x.file_hash === I.hash);
+  // Si el archivo ya tiene su registro pero faltan movimientos (una importación anterior se cortó a medias), se permite completarlo.
+  I.partial = I.fileDup && I.split.fresh.length > 0;
   const credits = built.rows.filter(r => r.amount_cents > 0).reduce((s, r) => s + r.amount_cents, 0);
   const debits = built.rows.filter(r => r.amount_cents < 0).reduce((s, r) => s + r.amount_cents, 0);
   const endBal = trEndingBalance(built.rows);
@@ -15310,7 +15312,8 @@ function trImportRenderPreview(){
       </div>
       <label style="display:flex; gap:8px; align-items:center; font-size:13px;"><input type="checkbox" id="trm-invert" ${I.invert ? 'checked' : ''}> El banco muestra los retiros como números positivos (invertir signo)</label>
     </div>
-    ${I.fileDup ? '<div class="msg error" style="display:block;">Este mismo archivo ya fue importado antes en esta cuenta. No se volverá a importar.</div>' : ''}
+    ${I.fileDup && !I.partial ? '<div class="msg error" style="display:block;">Este mismo archivo ya fue importado antes en esta cuenta. No se volverá a importar.</div>' : ''}
+    ${I.partial ? '<div class="msg" style="display:block; background:#FFF6E0; color:#7A5A00; border:1px solid #F0D58A;">Este archivo ya se había importado, pero la importación anterior quedó incompleta: faltan <strong>' + I.split.fresh.length + '</strong> movimiento(s). Toca «Importar» para completarlos (los repetidos se omiten).</div>' : ''}
     <p style="margin:10px 0 4px;"><strong>${built.rows.length}</strong> filas válidas · <strong>${I.split.fresh.length}</strong> nuevas · <strong>${I.split.dup.length}</strong> repetidas (se omiten) · <strong>${built.errors.length}</strong> con error. Entradas ${trFmt(credits)} · Salidas ${trFmt(debits)}.</p>
     ${built.errors.length ? `<details><summary class="sub">Ver filas con error</summary><div class="sub">${built.errors.slice(0, 15).map(e => `Línea ${e.line}: ${trE(e.msg)}`).join('<br>')}</div></details>` : ''}
     <div class="dash-table-wrap" style="max-height:220px; overflow:auto;"><table class="dash-table"><thead><tr><th>Fecha</th><th>Descripción</th><th>Importe</th><th></th></tr></thead><tbody>
@@ -15324,11 +15327,12 @@ function trImportRenderPreview(){
 }
 async function trDoImport(){
   const I = TR.imp; if(!I || !I.built) throw new Error('Primero elige un archivo.');
-  if(I.fileDup) throw new Error('Este archivo ya se importó antes.');
+  if(I.fileDup && !I.partial) throw new Error('Este archivo ya se importó antes.');
   if(!I.built.rows.length) throw new Error('No hay filas válidas para importar.');
   if(I.built.errors.length && !confirmImportErrors(I)) return false;
   const account = trVal('tri-account') || 'sweep';
-  const { data: imp, error } = await sb.from('treasury_bank_imports').insert({ account, file_name: I.name, file_hash: I.hash, row_count: I.built.rows.length, new_count: I.split.fresh.length, duplicate_count: I.split.dup.length, mapping: I.mapping }).select().single();
+  const prevImp = I.partial ? (TR.d.imports || []).find(x => x.account === account && x.file_hash === I.hash) : null;
+  const { data: imp, error } = prevImp ? { data: prevImp, error: null } : await sb.from('treasury_bank_imports').insert({ account, file_name: I.name, file_hash: I.hash, row_count: I.built.rows.length, new_count: I.split.fresh.length, duplicate_count: I.split.dup.length, mapping: I.mapping }).select().single();
   if(error) throw new Error(/duplicate key/i.test(error.message) ? 'Este archivo ya se importó antes.' : error.message);
   const rows = I.split.fresh.map(i => { const r = I.built.rows[i]; return { account, posted_at: r.posted_at, amount_cents: r.amount_cents, description: r.description, running_balance_cents: r.running_balance_cents, fingerprint: I.fps[i], import_id: imp.id }; });
   for(let i = 0; i < rows.length; i += 200){
