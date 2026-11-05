@@ -746,6 +746,7 @@
         <button class="dash-nav-btn active" data-tab="inicio" onclick="switchTab('inicio')">Inicio <span id="navInicioBadge" style="display:none; background:#C23B3B; color:#fff; font-size:11px; font-weight:800; padding:1px 7px; border-radius:20px; margin-left:4px;" title="Cobros por pagar en Venture"></span></button>
         <button class="dash-nav-btn" data-tab="clientes" onclick="switchTab('clientes')">Clientes</button>
         <button class="dash-nav-btn" data-tab="libro" onclick="switchTab('libro')">📖 Libro de negocio</button>
+        <button class="dash-nav-btn" data-tab="vidasalud" id="navVidaSalud" onclick="switchTab('vidasalud')" style="display:none;">❤️ Vida y Salud <span id="navVidaSaludBadge" title="Seguimientos de hoy o vencidos" style="display:none; background:#C23B3B; color:#fff; font-size:11px; font-weight:800; padding:1px 7px; border-radius:100px; margin-left:4px;"></span></button>
         <button class="dash-nav-btn" data-tab="aseguradoras" id="navAseguradoras" onclick="switchTab('aseguradoras')">🏢 Aseguradoras</button>
         <button class="dash-nav-btn" data-tab="recursos" onclick="switchTab('recursos')">📚 Recursos</button>
 <!-- ===== FIRMAS-NAV-START ===== -->
@@ -2601,6 +2602,17 @@
             </div>
           </div>
 <!-- ===== TRUCKING-CARD-END ===== -->
+                                        <!-- ===== VIDASALUD-CARD-START ===== -->
+          <!-- Casos de Vida y Salud de este cliente (solo si el usuario tiene licencia L&H / es administradora, o si el cliente ya tiene casos) -->
+          <div class="dash-card" id="cd-vidaSaludCard" style="display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <h4 style="margin:0;">❤️ Vida y Salud</h4>
+              <button type="button" class="btn-primary" style="width:auto; padding:9px 18px; margin:0;" id="cd-vidaSaludNewBtn" onclick="vsNewCaseForClient(currentClientId)">Nuevo caso</button>
+            </div>
+            <p class="sub">Salud del Mercado, Vida, Suplementarios y Medicare de este cliente. Toca un caso para ver su hogar, documentos y seguimiento.</p>
+            <div id="cd-vidaSaludList"></div>
+          </div>
+          <!-- ===== VIDASALUD-CARD-END ===== -->
 
           <!-- Editar cotización — visible solo para la administradora suprema por ahora -->
           <div class="dash-card" id="cd-editQuoteCard" style="display:none;">
@@ -3867,6 +3879,59 @@
         <div id="soc-body"></div>
       </section>
 <!-- ===== SOCIAL-HTML-END ===== -->
+<!-- ===== VIDASALUD-HTML-START ===== -->
+      <section class="dash-tab" id="tab-vidasalud" style="display:none;">
+        <style>
+          #tab-vidasalud .sub{margin-bottom:6px; font-size:13px; color:var(--slate-light);}
+          #tab-vidasalud .dash-card{margin:14px 0; padding:18px;}
+          #tab-vidasalud .vs-pills{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0;}
+          #tab-vidasalud .vs-pill{border:1.5px solid var(--line); background:#fff; border-radius:100px; padding:7px 14px; font-size:13px; font-weight:700; cursor:pointer; font-family:'Poppins',sans-serif; color:var(--slate);}
+          #tab-vidasalud .vs-pill.on{background:var(--navy); color:#fff; border-color:var(--navy);}
+          #tab-vidasalud .vs-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:12px 0;}
+          #tab-vidasalud .vs-kpi{border:1.5px solid var(--line); border-radius:14px; padding:12px 14px; background:#fff; cursor:pointer; text-align:left; font-family:inherit;}
+          #tab-vidasalud .vs-kpi:hover{border-color:var(--navy);}
+          #tab-vidasalud .vs-kpi.warn{border-color:#E39C9C; background:#FFF5F5;}
+          #tab-vidasalud .vs-kpi.good{border-color:#9FD3B5; background:#F2FBF5;}
+          #tab-vidasalud .vs-kpi .n{font-family:'Poppins',sans-serif; font-size:24px; font-weight:800; color:var(--navy); line-height:1.1;}
+          #tab-vidasalud .vs-kpi .l{font-size:12.5px; color:var(--slate-light); margin-top:4px;}
+          #tab-vidasalud .vs-filters{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+          #tab-vidasalud .vs-filters select, #tab-vidasalud .vs-filters input[type=search]{padding:8px 10px; border:1.5px solid var(--line); border-radius:9px; font-size:14px; background:#fff; width:auto;}
+          #tab-vidasalud .vs-filters input[type=search]{flex:1; min-width:200px;}
+          #tab-vidasalud .vs-chk{font-size:13px; display:flex; gap:6px; align-items:center; font-weight:500;}
+          #tab-vidasalud .vs-mini{width:auto; padding:6px 12px; margin:0; font-size:12.5px;}
+          #tab-vidasalud .vs-chip{display:inline-block; border:1px solid; border-radius:100px; padding:2px 10px; font-size:12px; font-weight:700; white-space:nowrap;}
+          #tab-vidasalud table.dash-table td, #tab-vidasalud table.dash-table th{padding:8px 10px; font-size:13px; vertical-align:top;}
+          #tab-vidasalud tr.vs-row{cursor:pointer;} #tab-vidasalud tr.vs-row:hover{background:#F3F6FC;} #tab-vidasalud tr.vs-row.sel{background:#EAF1FB;}
+          #tab-vidasalud .vs-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px;}
+          #tab-vidasalud label{display:block; font-size:13px; font-weight:600; margin-bottom:4px;}
+          #tab-vidasalud input[type=text], #tab-vidasalud input[type=tel], #tab-vidasalud input[type=email], #tab-vidasalud input[type=url], #tab-vidasalud input[type=number], #tab-vidasalud select, #tab-vidasalud textarea{width:100%; padding:8px 10px; border:1.5px solid var(--line); border-radius:9px; font-size:14px; font-family:inherit; background:#fff; box-sizing:border-box;}
+          #tab-vidasalud .vs-row-flex{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+          #tab-vidasalud .vs-alert{background:#FFF5F5; border:1px solid #E39C9C; color:#9B2222; border-radius:10px; padding:8px 12px; font-size:13px; margin:8px 0;}
+          #tab-vidasalud .vs-info{background:#F3F6FC; border:1px solid #C9D6EE; color:#1F3B6E; border-radius:10px; padding:8px 12px; font-size:13px; margin:8px 0;}
+          #tab-vidasalud .vs-ok{background:#F2FBF5; border:1px solid #9FD3B5; color:#13633F; border-radius:10px; padding:8px 12px; font-size:13px; margin:8px 0;}
+          #tab-vidasalud .vs-stages{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0;}
+          #tab-vidasalud .vs-stage{border:1.5px solid var(--line); background:#fff; border-radius:9px; padding:6px 10px; font-size:12.5px; font-weight:700; cursor:pointer; font-family:inherit; color:var(--slate);}
+          #tab-vidasalud .vs-stage.on{color:#fff;}
+          #tab-vidasalud .vs-sec{margin-top:18px; padding-top:14px; border-top:1px solid var(--line);}
+          #tab-vidasalud .vs-sec h5{margin:0 0 8px; font-size:14.5px; color:var(--navy);}
+          #tab-vidasalud .vs-ev{padding:6px 0; border-bottom:1px dashed var(--line); font-size:13.5px;} #tab-vidasalud .vs-ev .when{color:var(--slate-light); font-size:12px; margin-right:6px;}
+          #tab-vidasalud .vs-check{display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 10px;}
+          #tab-vidasalud .vs-check span{border-radius:100px; padding:3px 10px; font-size:12px; font-weight:700; border:1px solid;}
+          #tab-vidasalud .vs-results{border:1px solid var(--line); border-radius:9px; margin-top:6px; max-height:240px; overflow:auto; background:#fff;}
+          #tab-vidasalud .vs-results button{display:block; width:100%; text-align:left; padding:8px 10px; border:0; border-bottom:1px solid var(--line); background:#fff; cursor:pointer; font-family:inherit; font-size:13.5px;}
+          #tab-vidasalud .vs-results button:hover{background:#F3F6FC;}
+          #tab-vidasalud .vs-steps{padding-left:20px; font-size:13.5px; line-height:1.55;} #tab-vidasalud .vs-steps li{margin:6px 0;}
+          #tab-vidasalud .vs-map{display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:8px 12px; margin:10px 0;}
+          #tab-vidasalud .vs-map label{font-weight:500; font-size:12.5px;}
+          #tab-vidasalud details summary{cursor:pointer; font-weight:700; font-size:13.5px; color:var(--navy);}
+        </style>
+        <h2>❤️ Vida y Salud</h2>
+        <p class="sub">Casos de Salud del Mercado (Obamacare), Vida, Suplementarios y Medicare: en qué etapa va cada uno, su hogar, sus documentos, el seguimiento y la comisión. Se conecta con HealthSherpa por enlace y por el archivo CSV que descargas de allá.</p>
+        <div class="vs-pills" id="vs-views"></div>
+        <div id="vs-msg" class="msg"></div>
+        <div id="vs-body"></div>
+      </section>
+<!-- ===== VIDASALUD-HTML-END ===== -->
 
       <!-- TAB: UNDERWRITING (administradores) -->
       <section class="dash-tab" id="tab-underwriting" style="display:none;">
@@ -5035,6 +5100,7 @@
     if(tab === 'pagina' && typeof pwOpen === 'function') pwOpen();
     if(tab === 'sms' && typeof saOpen === 'function') saOpen();
     if(tab === 'social' && typeof socOpen === 'function') socOpen();
+    if(tab === 'vidasalud' && typeof vsOpen === 'function') vsOpen();
   }
 
   // Libro de negocio + Conversión viven en un solo bloque (#libroWrap) que se muestra en
@@ -5601,6 +5667,7 @@
     await safeLoad(loadPagina, 'Página');
     await safeLoad(loadSmsAdmin, 'SMS');
     await safeLoad(loadSocial, 'Redes sociales');
+    await safeLoad(loadVidaSalud, 'Vida y Salud');
     await safeLoad(loadAgencyHolidays, 'Días festivos');
     await safeLoad(loadDashboardPendingPolicies, 'Pólizas pendientes de número');
     await safeLoad(loadDashboardAgentAlerts, 'Tareas de la administradora');
@@ -7071,6 +7138,7 @@
     currentClientPolicies = policies || [];
     if(typeof smsRefreshCardSoon === 'function') smsRefreshCardSoon(clientId);
     if(typeof tkRefreshCardSoon === 'function') tkRefreshCardSoon(clientId);
+    if(typeof vsRefreshCardSoon === 'function') vsRefreshCardSoon(clientId);
     // Mantiene la lista de Clientes y la etiqueta Activo/Inactivo al día después
     // de cancelar, restaurar o agregar una póliza.
     try{
@@ -19786,6 +19854,977 @@ async function socSaveChannel(key){
   SOC.busy = false;
 }
 // ===== SOCIAL-END =====
+// ===== VIDASALUD-START =====
+// ===== VIDASALUD-CORE (funciones puras: sin pantalla ni base de datos; se prueban con node) =====
+const VS_LINES = {
+  aca: { label: 'Salud del Mercado (Obamacare)', short: 'Salud ACA', icon: '🩺' },
+  vida: { label: 'Vida', short: 'Vida', icon: '🛡️' },
+  suplementario: { label: 'Suplementario', short: 'Suplementario', icon: '🦷' },
+  medicare: { label: 'Medicare', short: 'Medicare', icon: '💙' }
+};
+const VS_TYPES = {
+  aca: ['Bronce', 'Plata', 'Oro', 'Platino', 'Catastrófico', 'Dental del Mercado', 'Otro'],
+  vida: ['Término (Term)', 'Vida entera (Whole life)', 'IUL / Universal', 'Gastos finales (Final expense)', 'Protección de hipoteca', 'Otro'],
+  suplementario: ['Dental', 'Visión', 'Accidente', 'Hospitalización', 'Cáncer / enfermedades graves', 'Discapacidad', 'Otro'],
+  medicare: ['Medicare Advantage (Parte C)', 'Suplemento (Medigap)', 'Parte D (medicinas)', 'D-SNP', 'Otro']
+};
+const VS_STAGES = [
+  ['lead', 'Lead', '#1F4E9E'], ['datos', 'Recolectando datos', '#7A5A00'], ['cotizado', 'Cotizado', '#5B3FA3'],
+  ['solicitud', 'Solicitud enviada', '#0E6E8C'], ['pendientes', 'Pendientes (documentos)', '#B4540A'],
+  ['activa', 'Activa', '#13633F'], ['cancelada', 'Cancelada', '#9B2222'], ['perdida', 'No compró', '#6B7280']
+];
+const VS_OPEN = ['lead', 'datos', 'cotizado', 'solicitud', 'pendientes'];
+const VS_DOCS = {
+  aca: ['Identificación (ID / licencia)', 'Prueba de ingresos', 'Prueba de estatus migratorio / ciudadanía', 'Carta / aviso del Mercado', 'Tarjeta del seguro', 'Otro'],
+  vida: ['Identificación (ID / licencia)', 'Solicitud firmada', 'Examen médico / underwriting', 'Designación de beneficiarios', 'Póliza emitida', 'Otro'],
+  suplementario: ['Identificación (ID / licencia)', 'Solicitud firmada', 'Tarjeta del seguro', 'Otro'],
+  medicare: ['Identificación (ID / licencia)', 'Tarjeta de Medicare', 'Formulario de alcance de cita (SOA)', 'Solicitud firmada', 'Tarjeta del plan', 'Otro']
+};
+// Documentos que normalmente hacen falta (se marcan ✓ cuando hay uno subido con esa categoría).
+const VS_REQUIRED = {
+  aca: ['Identificación (ID / licencia)', 'Prueba de ingresos', 'Prueba de estatus migratorio / ciudadanía'],
+  vida: ['Identificación (ID / licencia)', 'Solicitud firmada'],
+  suplementario: ['Solicitud firmada'],
+  medicare: ['Tarjeta de Medicare', 'Formulario de alcance de cita (SOA)', 'Solicitud firmada']
+};
+const VS_REL = { titular: 'Titular', conyuge: 'Cónyuge', hijo: 'Hijo/a', dependiente: 'Dependiente', otro: 'Otro' };
+
+function vsStageLabel(s){ const x = VS_STAGES.find(r => r[0] === s); return x ? x[1] : s; }
+function vsStageColor(s){ const x = VS_STAGES.find(r => r[0] === s); return x ? x[2] : '#444'; }
+
+// Fecha de hoy en Houston (YYYY-MM-DD)
+function vsToday(now){ return (now || new Date()).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' }); }
+function vsAddDays(iso, n){ const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+
+// Open Enrollment del Mercado: 1 nov – 15 ene. Devuelve el año del plan que se está renovando, o null fuera de la temporada.
+function vsRenewalYear(todayIso){
+  const [y, m, d] = todayIso.split('-').map(Number);
+  if(m >= 11) return y + 1;
+  if(m === 1 && d <= 15) return y;
+  return null;
+}
+// Medicare: periodo anual de inscripción 15 oct – 7 dic
+function vsMedicareAep(todayIso){
+  const [y, m, d] = todayIso.split('-').map(Number);
+  return (m === 10 && d >= 15) || m === 11 || (m === 12 && d <= 7) ? y + 1 : null;
+}
+
+function vsNeedsRenewal(c, todayIso){
+  const ry = vsRenewalYear(todayIso);
+  if(!ry || c.product_line !== 'aca' || c.stage !== 'activa') return false;
+  return !c.plan_year || Number(c.plan_year) < ry;
+}
+function vsIsDue(c, todayIso){ return !!c.next_followup_on && c.next_followup_on <= todayIso && VS_OPEN.concat(['activa']).includes(c.stage); }
+function vsDocsSoon(c, todayIso){ return !!c.docs_due_on && !['cancelada', 'perdida'].includes(c.stage) && c.docs_due_on <= vsAddDays(todayIso, 10); }
+function vsNet(c){
+  const p = Number(c.premium_monthly), s = Number(c.subsidy_monthly) || 0;
+  if(!(p >= 0) || c.premium_monthly === null || c.premium_monthly === undefined || c.premium_monthly === '') return null;
+  return Math.max(0, Math.round((p - s) * 100) / 100);
+}
+function vsCommissionPending(c){
+  const e = Number(c.commission_expected) || 0, r = Number(c.commission_received) || 0;
+  return Math.max(0, Math.round((e - r) * 100) / 100);
+}
+
+// ---------- Texto ----------
+function vsNorm(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function vsDigits(s){ const d = String(s || '').replace(/\D/g, ''); return d.length === 11 && d[0] === '1' ? d.slice(1) : d; }
+function vsFmtPhone(p){ const d = vsDigits(p); return d.length === 10 ? '(' + d.slice(0, 3) + ') ' + d.slice(3, 6) + '-' + d.slice(6) : (p || ''); }
+function vsMoney(n){ const v = Number(n); return isFinite(v) ? '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'; }
+
+// ---------- CSV ----------
+function vsParseCSV(text){
+  text = String(text || '').replace(/^﻿/, '');
+  // separador: coma, punto y coma o tabulador (el que más aparezca en la primera línea fuera de comillas)
+  const first = text.split(/\r?\n/, 1)[0] || '';
+  const count = ch => first.split(ch).length - 1;
+  const sep = [',', ';', '\t'].sort((a, b) => count(b) - count(a))[0];
+  const rows = []; let row = [], cell = '', q = false;
+  for(let i = 0; i < text.length; i++){
+    const ch = text[i];
+    if(q){
+      if(ch === '"'){ if(text[i + 1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += ch;
+    } else if(ch === '"' && cell === '') q = true;
+    else if(ch === sep){ row.push(cell); cell = ''; }
+    else if(ch === '\n' || ch === '\r'){
+      if(ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); cell = ''; if(row.some(c => c.trim() !== '')) rows.push(row); row = [];
+    } else cell += ch;
+  }
+  row.push(cell); if(row.some(c => c.trim() !== '')) rows.push(row);
+  if(!rows.length) return { headers: [], rows: [] };
+  const headers = rows[0].map(h => h.trim());
+  return { headers, rows: rows.slice(1).map(r => headers.map((_, i) => (r[i] === undefined ? '' : String(r[i]).trim()))) };
+}
+
+const VS_HS_FIELDS = [
+  ['hsid', 'HealthSherpa ID', ['healthsherpaid', 'hsid', 'healthsherpaapplicationid', 'healthsherpaclientid']],
+  ['ffm', 'FFM / Federal Exchange ID', ['ffmappid', 'ffmid', 'ffmapplicationid', 'federalexchangeid', 'exchangeid', 'ffmapplicationnumber', 'exchangeapplicationid', 'applicationid']],
+  ['first', 'Nombre', ['firstname', 'primaryfirstname', 'applicantfirstname', 'consumerfirstname', 'primaryapplicantfirstname', 'clientfirstname']],
+  ['last', 'Apellido', ['lastname', 'primarylastname', 'applicantlastname', 'consumerlastname', 'primaryapplicantlastname', 'clientlastname']],
+  ['name', 'Nombre completo', ['name', 'fullname', 'clientname', 'primaryapplicant', 'applicantname', 'consumername', 'primaryapplicantname', 'primaryname']],
+  ['dob', 'Fecha de nacimiento', ['dateofbirth', 'dob', 'birthdate', 'primarydob', 'primarydateofbirth', 'applicantdob']],
+  ['phone', 'Teléfono', ['phone', 'phonenumber', 'primaryphone', 'mobilephone', 'consumerphone', 'cellphone', 'primaryphonenumber']],
+  ['email', 'Correo', ['email', 'emailaddress', 'primaryemail', 'consumeremail']],
+  ['carrier', 'Compañía', ['carrier', 'issuer', 'issuername', 'carriername', 'insurancecompany', 'plancarrier']],
+  ['plan', 'Plan', ['planname', 'plan', 'marketingname', 'planmarketingname']],
+  ['metal', 'Nivel (metal)', ['metallevel', 'metal', 'planmetallevel']],
+  ['planyear', 'Año del plan', ['planyear', 'coverageyear', 'year', 'py']],
+  ['effective', 'Fecha efectiva', ['effectivedate', 'coverageeffectivedate', 'policyeffectivedate', 'coveragestartdate', 'startdate', 'planeffectivedate']],
+  ['end', 'Fecha de fin', ['enddate', 'coverageenddate', 'terminationdate', 'policyenddate', 'termdate']],
+  ['premium', 'Prima bruta mensual', ['grosspremium', 'premium', 'monthlypremium', 'totalpremium', 'grossmonthlypremium', 'planpremium']],
+  ['aptc', 'Subsidio (APTC)', ['aptc', 'subsidy', 'aptcamount', 'monthlysubsidy', 'appliedaptc', 'taxcredit', 'electedaptc', 'subsidyamount']],
+  ['net', 'Prima neta', ['netpremium', 'netmonthlypremium', 'premiumafteraptc', 'memberresponsibility']],
+  ['status', 'Estatus', ['policystatus', 'status', 'enrollmentstatus', 'applicationstatus', 'effectuationstatus', 'policystatusdescription']],
+  ['followup', 'Documentos pendientes', ['followupstatus', 'followups', 'documentstatus', 'dmistatus', 'outstandingdocuments', 'followupdocumentstatus', 'followupdocuments', 'outstandingfollowups']],
+  ['followupdue', 'Fecha límite de documentos', ['followupduedate', 'documentduedate', 'dmiduedate', 'followupdue', 'earliestfollowupduedate', 'duedate']],
+  ['members', 'Personas en la póliza', ['numberofapplicants', 'applicants', 'householdsize', 'numapplicants', 'membercount', 'memberscount', 'numberofmembers', 'coveredmembers']],
+  ['memberid', 'ID de miembro / póliza', ['memberid', 'policyid', 'carriermemberid', 'issuerpolicyid', 'subscriberid', 'issuerassignedpolicyid']],
+  ['url', 'Enlace del cliente', ['clientdetailspageurl', 'clientdetailsurl', 'clienturl', 'url', 'link', 'clientlink']]
+];
+function vsHeaderKey(h){ return String(h || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function vsDetectColumns(headers){
+  const keys = headers.map(vsHeaderKey); const map = {}; const used = new Set();
+  // 1) coincidencia exacta, en el orden de los alias (el primero gana)
+  VS_HS_FIELDS.forEach(([f, , aliases]) => {
+    for(const a of aliases){ const i = keys.indexOf(a); if(i >= 0 && !used.has(i)){ map[f] = i; used.add(i); break; } }
+  });
+  // 2) "contiene" para los que faltan (p. ej. "Primary Applicant First Name (Legal)")
+  VS_HS_FIELDS.forEach(([f, , aliases]) => {
+    if(map[f] !== undefined) return;
+    for(const a of aliases){
+      if(a.length < 5) continue;
+      const i = keys.findIndex((k, j) => !used.has(j) && k.includes(a));
+      if(i >= 0){ map[f] = i; used.add(i); break; }
+    }
+  });
+  return map;
+}
+
+function vsParseDate(s){
+  s = String(s || '').trim(); if(!s) return null;
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let y, mo, d;
+  if(m){ y = +m[1]; mo = +m[2]; d = +m[3]; }
+  else if((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/))){ mo = +m[1]; d = +m[2]; y = +m[3]; if(y < 100) y += y > 50 ? 1900 : 2000; }
+  else return null;
+  if(mo < 1 || mo > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return null;
+  const dt = new Date(Date.UTC(y, mo - 1, d)); if(dt.getUTCMonth() !== mo - 1) return null;
+  return dt.toISOString().slice(0, 10);
+}
+function vsParseMoney(s){
+  s = String(s === null || s === undefined ? '' : s).trim(); if(!s) return null;
+  const neg = /^\(.*\)$/.test(s) || /^-/.test(s);
+  const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+  if(!isFinite(n)) return null;
+  return Math.round((neg ? -n : n) * 100) / 100;
+}
+
+// Estatus de HealthSherpa → etapa del CRM (null = no cambiar)
+function vsStatusToStage(status, followup){
+  const s = vsNorm(status), f = vsNorm(followup);
+  if(!s) return null;
+  if(/\b(cancel|cancell?ed|terminat\w*|void\w*|inactive|lapsed|ended|expired)\b/.test(s)) return 'cancelada';
+  if(/\b(effectuated|active|in force|inforce|paid|enrolled and paid)\b/.test(s)) return 'activa';
+  if(/\b(pending|submitted|enrolled|awaiting|binder|unpaid|pending effectuation|in progress)\b/.test(s)){
+    const hasDocs = f && !/^(none|no|0|n a|na|resolved|complete|completed|cleared|no follow ups?)$/.test(f);
+    return hasDocs ? 'pendientes' : 'solicitud';
+  }
+  return null;
+}
+
+// Lee una fila del CSV con el mapeo de columnas
+function vsReadHsRow(row, map){
+  const g = f => (map[f] === undefined || map[f] === null || map[f] === '' ? '' : String(row[map[f]] || '').trim());
+  let first = g('first'), last = g('last'); const full = g('name');
+  if(!first && !last && full){
+    if(full.includes(',')){ const [l, f] = full.split(','); last = l.trim(); first = (f || '').trim(); }
+    else { const p = full.split(/\s+/); first = p[0]; last = p.slice(1).join(' '); }
+  }
+  const premium = vsParseMoney(g('premium')), aptc = vsParseMoney(g('aptc')), net = vsParseMoney(g('net'));
+  let subsidy = aptc;
+  if(subsidy === null && premium !== null && net !== null) subsidy = Math.max(0, Math.round((premium - net) * 100) / 100);
+  const effective = vsParseDate(g('effective'));
+  let planYear = parseInt(g('planyear'), 10); if(!(planYear >= 2014 && planYear <= 2100)) planYear = effective ? +effective.slice(0, 4) : null;
+  const members = parseInt(g('members'), 10);
+  const url = g('url');
+  return {
+    hsid: g('hsid') || null, ffm: g('ffm') || null,
+    first: first || '', last: last || '', name: (first + ' ' + last).trim() || full,
+    dob: vsParseDate(g('dob')), phone: vsDigits(g('phone')).length === 10 ? vsDigits(g('phone')) : null,
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g('email')) ? g('email').toLowerCase() : null,
+    carrier: g('carrier') || null, plan: g('plan') || null, metal: g('metal') || null, planYear,
+    effective, end: vsParseDate(g('end')), premium, subsidy,
+    status: g('status') || null, followup: g('followup') || null, followupDue: vsParseDate(g('followupdue')),
+    members: members >= 1 && members <= 20 ? members : null, memberId: g('memberid') || null,
+    url: /^https:\/\/[^\s]+$/i.test(url) ? url : null
+  };
+}
+
+// Busca el caso que corresponde a una fila. cases: [{id, healthsherpa_id, ffm_app_id, product_line, client:{full_name, date_of_birth, phone}}]
+function vsMatchCase(r, cases){
+  if(r.hsid){ const c = cases.find(x => x.healthsherpa_id && String(x.healthsherpa_id) === String(r.hsid)); if(c) return { c, by: 'HealthSherpa ID' }; }
+  if(r.ffm){ const c = cases.find(x => x.ffm_app_id && String(x.ffm_app_id) === String(r.ffm)); if(c) return { c, by: 'FFM ID' }; }
+  const aca = cases.filter(x => x.product_line === 'aca' && !x.healthsherpa_id && !x.ffm_app_id);
+  const nm = vsNorm(r.name);
+  if(nm && r.dob){
+    const c = aca.find(x => x.client && vsNorm(x.client.full_name) === nm && x.client.date_of_birth === r.dob);
+    if(c) return { c, by: 'nombre y fecha de nacimiento' };
+  }
+  if(r.phone && r.last){
+    const ln = vsNorm(r.last);
+    const c = aca.find(x => x.client && vsDigits(x.client.phone) === r.phone && vsNorm(x.client.full_name).includes(ln));
+    if(c) return { c, by: 'teléfono y apellido' };
+  }
+  if(nm){
+    const same = aca.filter(x => x.client && vsNorm(x.client.full_name) === nm);
+    if(same.length === 1 && !r.dob) return { c: same[0], by: 'nombre' };
+  }
+  return null;
+}
+
+// Cambios que una fila le haría a un caso existente (solo campos con valor en el CSV)
+function vsHsPatch(r, c){
+  const p = {};
+  const set = (k, v) => { if(v !== null && v !== undefined && v !== '' && String(c[k] === null || c[k] === undefined ? '' : c[k]) !== String(v)) p[k] = v; };
+  if(!c.healthsherpa_id) set('healthsherpa_id', r.hsid);
+  if(!c.ffm_app_id) set('ffm_app_id', r.ffm);
+  set('carrier', r.carrier); set('plan_name', r.plan); set('plan_year', r.planYear);
+  set('effective_date', r.effective); set('end_date', r.end);
+  if(r.premium !== null && r.premium >= 0) set('premium_monthly', r.premium);
+  if(r.subsidy !== null && r.subsidy >= 0) set('subsidy_monthly', r.subsidy);
+  set('hs_status', r.status ? r.status.slice(0, 120) : null); set('hs_followup_status', r.followup ? r.followup.slice(0, 200) : null);
+  set('docs_due_on', r.followupDue); set('household_size', r.members); set('policy_number', r.memberId);
+  if(!c.healthsherpa_url) set('healthsherpa_url', r.url);
+  if(r.metal && !c.product_type){ const t = vsMetalType(r.metal); if(t) p.product_type = t; }
+  const st = vsStatusToStage(r.status, r.followup);
+  // No regresar una póliza activa a "solicitud/pendientes" por un archivo viejo.
+  if(st && st !== c.stage && !(c.stage === 'activa' && (st === 'solicitud' || st === 'pendientes'))) p.stage = st;
+  return p;
+}
+
+function vsMetalType(metal){
+  const m = vsNorm(metal);
+  if(/bronze|bronce/.test(m)) return 'Bronce';
+  if(/silver|plata/.test(m)) return 'Plata';
+  if(/platinum|platino/.test(m)) return 'Platino';
+  if(/gold|oro/.test(m)) return 'Oro';
+  if(/catastroph|catastrof/.test(m)) return 'Catastrófico';
+  if(/dental/.test(m)) return 'Dental del Mercado';
+  return null;
+}
+
+const VS_FIELD_LABELS = { healthsherpa_id: 'HealthSherpa ID', ffm_app_id: 'FFM ID', carrier: 'compañía', plan_name: 'plan', plan_year: 'año', effective_date: 'fecha efectiva', end_date: 'fecha de fin', premium_monthly: 'prima', subsidy_monthly: 'subsidio', hs_status: 'estatus', hs_followup_status: 'documentos', docs_due_on: 'fecha límite de documentos', household_size: 'personas', policy_number: 'ID de miembro', healthsherpa_url: 'enlace', product_type: 'nivel', stage: 'etapa' };
+function vsDescribePatch(p){
+  return Object.keys(p).map(k => k === 'stage' ? 'etapa → ' + vsStageLabel(p.stage) : (VS_FIELD_LABELS[k] || k)).join(', ');
+}
+
+// Huella del archivo (para no importar dos veces el mismo). SHA-256 si hay; si no, una huella simple de 32 caracteres.
+async function vsFileHash(text){
+  try{
+    if(typeof crypto !== 'undefined' && crypto.subtle && typeof TextEncoder !== 'undefined'){
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+  }catch(e){}
+  let h1 = 0x811c9dc5, h2 = 0x01000193, h3 = 5381, h4 = 7;
+  for(let i = 0; i < text.length; i++){ const c = text.charCodeAt(i); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 + c, 2654435761) >>> 0; h3 = ((h3 << 5) + h3 + c) >>> 0; h4 = (h4 * 31 + c) >>> 0; }
+  return 'fb' + [h1, h2, h3, h4].map(n => n.toString(16).padStart(8, '0')).join('') + text.length.toString(16);
+}
+
+if(false){ // (solo para pruebas con node)
+  module.exports = { VS_LINES, VS_TYPES, VS_STAGES, VS_OPEN, VS_DOCS, VS_REQUIRED, vsToday, vsAddDays, vsRenewalYear, vsMedicareAep, vsNeedsRenewal, vsIsDue, vsDocsSoon, vsNet, vsCommissionPending,
+    vsNorm, vsDigits, vsFmtPhone, vsParseCSV, vsDetectColumns, vsParseDate, vsParseMoney, vsStatusToStage, vsReadHsRow, vsMatchCase, vsHsPatch, vsDescribePatch, vsFileHash, vsMetalType, VS_HS_FIELDS };
+}
+// ===== FIN VIDASALUD-CORE =====
+
+// ===== VIDASALUD-UI =====
+// Pestaña «Vida y Salud»: casos de Salud del Mercado, Vida, Suplementarios y Medicare.
+// Ven la pestaña: administradoras y agentes con licencia Life & Health (Usuarios → perfil → licencias).
+// Cada agente ve sus casos; las administradoras ven todos (lo asegura la base de datos con RLS).
+const VS = {
+  view: 'casos', cases: [], agents: [], loaded: false, missing: false,
+  f: { line: '', stage: '', agent: '', q: '', quick: 'abiertos' },
+  sel: null, members: [], docs: [], acts: [], busy: false,
+  adding: false, addClient: null, addLine: 'aca', addResults: [], newClientMode: false,
+  webLeads: null, myHsUrl: undefined, imp: null, imports: []
+};
+const VS_VIEWS = [['casos', 'Casos'], ['importar', 'Importar de HealthSherpa']];
+
+function vsEsc(s){ return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch])); }
+function vsIsAdmin(){ try{ return isAdminUser(); }catch(e){ return false; } }
+function vsHasLicense(){
+  try{
+    if(vsIsAdmin()) return true;
+    const l = currentProfile && currentProfile.license_lines;
+    return Array.isArray(l) && l.includes('life_health');
+  }catch(e){ return false; }
+}
+function vsMsg(type, text){ const el = document.getElementById('vs-msg'); if(!el) return; el.className = 'msg' + (type ? ' ' + type : ''); el.textContent = text || ''; if(text && type === 'error' && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+function vsFmtDate(iso){ try{ return iso ? formatDateUS(String(iso).slice(0, 10)) : ''; }catch(e){ return iso || ''; } }
+function vsToISO(us){ const s = String(us || '').trim(); if(!s) return null; try{ return mmddyyyyToISO(s) || null; }catch(e){ return null; } }
+function vsWhen(iso){ const t = Date.parse(iso); if(!t) return ''; return new Date(t).toLocaleString('es-US', { timeZone: 'America/Chicago', month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+function vsChip(text, color){ return '<span class="vs-chip" style="color:' + color + '; border-color:' + color + '55; background:' + color + '14;">' + vsEsc(text) + '</span>'; }
+function vsMissingErr(e){ return /does not exist|schema cache|42P01|PGRST205|PGRST200/i.test(String((e && (e.message || e.code)) || e)); }
+function vsAgentName(id){ const a = VS.agents.find(x => x.id === id); return a ? (a.full_name || 'Agente') + (a.producer_code ? ' — ' + a.producer_code : '') : '—'; }
+function vsUid(){ return currentProfile && currentProfile.id; }
+function vsNum(id){ const el = document.getElementById(id); if(!el) return undefined; const v = String(el.value || '').replace(/[$,\s]/g, ''); if(v === '') return null; const n = Number(v); return isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN; }
+function vsVal(id){ const el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; }
+
+// ---------- Arranque (desde loadDashboard) ----------
+async function loadVidaSalud(){
+  const b = document.getElementById('navVidaSalud');
+  const show = vsHasLicense();
+  if(b) b.style.display = show ? '' : 'none';
+  if(!show) return;
+  // Globito con los seguimientos vencidos (si la migración no está corrida, no pasa nada).
+  try{
+    const r = await sb.from('lh_cases').select('id,stage,next_followup_on').lte('next_followup_on', vsToday());
+    const n = r.error ? 0 : (r.data || []).filter(c => vsIsDue(c, vsToday())).length;
+    const badge = document.getElementById('navVidaSaludBadge');
+    if(badge){ badge.textContent = n; badge.style.display = n ? 'inline-block' : 'none'; }
+  }catch(e){}
+}
+
+async function vsOpen(){
+  if(!vsHasLicense()) return;
+  vsRenderViews(); vsMsg('', '');
+  await vsShow(VS.view);
+}
+function vsRenderViews(){
+  const el = document.getElementById('vs-views'); if(!el) return;
+  el.innerHTML = VS_VIEWS.map(v => '<button type="button" class="vs-pill' + (v[0] === VS.view ? ' on' : '') + '" onclick="vsShow(\'' + v[0] + '\')">' + vsEsc(v[1]) + '</button>').join('');
+}
+function vsShow(view){ VS.pending = vsShowInner(view); return VS.pending; }
+async function vsShowInner(view){
+  VS.view = view; vsRenderViews(); vsMsg('', '');
+  const body = document.getElementById('vs-body'); if(!body) return;
+  body.innerHTML = '<p class="sub">Cargando…</p>';
+  try{
+    await vsLoad();
+    if(view === 'importar') vsRenderImport(); else vsRenderCases();
+  }catch(e){
+    body.innerHTML = '';
+    VS.missing = vsMissingErr(e);
+    vsMsg('error', VS.missing ? 'Falta correr la migración migracion_vida_salud.sql en Supabase (SQL Editor). Después recarga la página.' : 'No se pudo cargar: ' + ((e && e.message) || e));
+  }
+}
+async function vsLoad(){
+  const r = await sb.from('lh_cases').select('*, client:client_id(id, full_name, phone, email, date_of_birth)').order('updated_at', { ascending: false }).limit(2000);
+  if(r.error) throw r.error;
+  VS.cases = r.data || []; VS.loaded = true;
+  if(vsIsAdmin() && !VS.agents.length){
+    const a = await sb.from('profiles').select('id, full_name, producer_code, role, license_lines').order('full_name', { ascending: true });
+    VS.agents = (a.data || []).filter(p => p.role === 'admin' || p.role === 'super_admin' || (Array.isArray(p.license_lines) && p.license_lines.includes('life_health')));
+  }
+  if(!vsIsAdmin() && !VS.agents.length && currentProfile) VS.agents = [{ id: currentProfile.id, full_name: currentProfile.full_name, producer_code: currentProfile.producer_code }];
+  loadVidaSalud();
+}
+
+// ---------- Lista de casos ----------
+function vsQuickMatch(c, quick, today){
+  if(quick === 'abiertos') return VS_OPEN.includes(c.stage);
+  if(quick === 'activas') return c.stage === 'activa';
+  if(quick === 'seguimiento') return vsIsDue(c, today);
+  if(quick === 'documentos') return vsDocsSoon(c, today);
+  if(quick === 'renovar') return vsNeedsRenewal(c, today);
+  if(quick === 'comision') return c.stage === 'activa' && vsCommissionPending(c) > 0;
+  return true;
+}
+function vsFiltered(){
+  const f = VS.f, q = vsNorm(f.q), qd = vsDigits(f.q), today = vsToday();
+  return VS.cases.filter(c => (!f.line || c.product_line === f.line) && (!f.stage || c.stage === f.stage) && (!f.agent || c.agent_id === f.agent)
+    && vsQuickMatch(c, f.quick, today)
+    && (!q || [c.client && c.client.full_name, c.carrier, c.plan_name, c.policy_number, c.ffm_app_id, c.healthsherpa_id, c.product_type, c.notes].some(x => vsNorm(x).includes(q))
+      || (qd.length >= 3 && c.client && vsDigits(c.client.phone).includes(qd))));
+}
+function vsRenderCases(){
+  const all = VS.cases, today = vsToday(), k = fn => all.filter(fn).length;
+  const ry = vsRenewalYear(today), aep = vsMedicareAep(today);
+  const pend = all.filter(c => c.stage === 'activa').reduce((s, c) => s + vsCommissionPending(c), 0);
+  const kpi = (quick, n, label, cls) => '<button type="button" class="vs-kpi' + (cls ? ' ' + cls : '') + '" onclick="vsQuick(\'' + quick + '\')" ' + (VS.f.quick === quick ? 'style="border-color:var(--navy); box-shadow:0 0 0 2px var(--navy) inset;"' : '') + '><div class="n">' + n + '</div><div class="l">' + label + '</div></button>';
+  let h = '<div class="vs-kpis">'
+    + kpi('abiertos', k(c => VS_OPEN.includes(c.stage)), 'En proceso')
+    + kpi('activas', k(c => c.stage === 'activa'), 'Pólizas activas', 'good')
+    + kpi('seguimiento', k(c => vsIsDue(c, today)), 'Seguimientos de hoy o vencidos', k(c => vsIsDue(c, today)) ? 'warn' : '')
+    + kpi('documentos', k(c => vsDocsSoon(c, today)), 'Documentos por vencer (10 días)', k(c => vsDocsSoon(c, today)) ? 'warn' : '')
+    + (ry ? kpi('renovar', k(c => vsNeedsRenewal(c, today)), 'Salud ACA por renovar para ' + ry + ' (Open Enrollment)', k(c => vsNeedsRenewal(c, today)) ? 'warn' : '') : '')
+    + kpi('comision', vsMoney(pend), 'Comisión pendiente de cobrar')
+    + kpi('todos', all.length, 'Todos los casos')
+    + '</div>';
+  if(ry) h += '<div class="vs-info">📅 Open Enrollment del Mercado: del 1 de noviembre al 15 de enero. Los casos de Salud ACA activos con año de plan menor a ' + ry + ' salen en «por renovar».' + (aep ? ' Medicare: periodo anual de inscripción hasta el 7 de diciembre.' : '') + '</div>';
+  else if(aep) h += '<div class="vs-info">📅 Medicare: periodo anual de inscripción del 15 de octubre al 7 de diciembre.</div>';
+  const opt = (arr, cur) => arr.map(([v, l]) => '<option value="' + vsEsc(v) + '"' + (cur === v ? ' selected' : '') + '>' + vsEsc(l) + '</option>').join('');
+  h += '<div class="dash-card"><div class="vs-filters">'
+    + '<select id="vs-f-line" onchange="vsFilter()"><option value="">Todas las líneas</option>' + opt(Object.keys(VS_LINES).map(x => [x, VS_LINES[x].icon + ' ' + VS_LINES[x].short]), VS.f.line) + '</select>'
+    + '<select id="vs-f-stage" onchange="vsFilter()"><option value="">Todas las etapas</option>' + opt(VS_STAGES.map(s => [s[0], s[1]]), VS.f.stage) + '</select>'
+    + (vsIsAdmin() ? '<select id="vs-f-agent" onchange="vsFilter()"><option value="">Todos los agentes</option>' + opt(VS.agents.map(a => [a.id, a.full_name || 'Agente']), VS.f.agent) + '</select>' : '')
+    + '<input type="search" id="vs-f-q" placeholder="Buscar cliente, teléfono, compañía, FFM ID…" value="' + vsEsc(VS.f.q) + '" oninput="vsFilter()">'
+    + '<button type="button" class="btn-primary vs-mini" onclick="vsToggleAdd()">+ Nuevo caso</button></div>'
+    + '<div id="vs-add"></div></div>';
+  h += '<div id="vs-detail"></div>';
+  h += '<div class="dash-card"><div class="sub" id="vs-count" style="margin:0 0 6px;"></div><div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cliente</th><th>Producto</th><th>Compañía / plan</th><th>Etapa</th><th>Prima neta / mes</th><th>Seguimiento</th>' + (vsIsAdmin() ? '<th>Agente</th>' : '') + '</tr></thead><tbody id="vs-rows"></tbody></table></div></div>';
+  h += '<div class="dash-card" id="vs-webleads"><details id="vs-webleads-d" ontoggle="if(this.open) vsLoadWebLeads()"><summary>🌐 Leads de salud y vida sin caso (cotizaciones de los últimos 60 días)</summary><div id="vs-webleads-body" class="sub" style="margin-top:8px;">Cargando…</div></details></div>';
+  document.getElementById('vs-body').innerHTML = h;
+  vsPaintRows(); vsPaintAdd(); if(VS.sel) vsPaintDetail();
+}
+function vsQuick(q){ VS.f.quick = VS.f.quick === q && q !== 'todos' ? 'todos' : q; vsRenderCases(); }
+function vsFilter(){
+  VS.f.line = vsVal('vs-f-line'); VS.f.stage = vsVal('vs-f-stage'); VS.f.agent = vsIsAdmin() ? vsVal('vs-f-agent') : ''; VS.f.q = (document.getElementById('vs-f-q') || {}).value || '';
+  if(VS.f.stage && VS.f.quick !== 'todos') VS.f.quick = 'todos';
+  vsPaintRows();
+}
+function vsPaintRows(){
+  const rows = vsFiltered(), tb = document.getElementById('vs-rows'); if(!tb) return;
+  const today = vsToday(), cols = vsIsAdmin() ? 7 : 6;
+  const quickTxt = { abiertos: 'en proceso', activas: 'activos', seguimiento: 'con seguimiento de hoy o vencido', documentos: 'con documentos por vencer', renovar: 'por renovar', comision: 'con comisión pendiente', todos: '' }[VS.f.quick] || '';
+  document.getElementById('vs-count').textContent = rows.length + ' caso' + (rows.length === 1 ? '' : 's') + (quickTxt ? ' ' + quickTxt : '') + ' · ' + VS.cases.length + ' en total';
+  tb.innerHTML = rows.length ? rows.slice(0, 300).map(c => {
+    const L = VS_LINES[c.product_line] || { icon: '', short: c.product_line }; const net = vsNet(c);
+    const due = vsIsDue(c, today), docs = vsDocsSoon(c, today), ren = vsNeedsRenewal(c, today);
+    return '<tr class="vs-row' + (VS.sel === c.id ? ' sel' : '') + '" onclick="vsSelect(\'' + vsEsc(c.id) + '\')">'
+      + '<td><b>' + vsEsc((c.client && c.client.full_name) || 'Cliente') + '</b>' + (c.client && c.client.phone ? '<div class="sub" style="margin:0;">' + vsEsc(vsFmtPhone(c.client.phone)) + '</div>' : '') + '</td>'
+      + '<td>' + vsEsc(L.icon + ' ' + L.short) + (c.product_type ? '<div class="sub" style="margin:0;">' + vsEsc(c.product_type) + '</div>' : '') + '</td>'
+      + '<td>' + vsEsc(c.carrier || '—') + (c.plan_name ? '<div class="sub" style="margin:0;">' + vsEsc(c.plan_name) + (c.plan_year ? ' · ' + vsEsc(c.plan_year) : '') + '</div>' : '') + '</td>'
+      + '<td>' + vsChip(vsStageLabel(c.stage), vsStageColor(c.stage)) + (docs ? '<div style="margin-top:4px;">' + vsChip('📄 docs ' + vsFmtDate(c.docs_due_on), '#B4540A') + '</div>' : '') + (ren ? '<div style="margin-top:4px;">' + vsChip('🔁 renovar', '#9B2222') + '</div>' : '') + '</td>'
+      + '<td>' + (net === null ? '—' : vsMoney(net)) + (c.subsidy_monthly > 0 ? '<div class="sub" style="margin:0;">subsidio ' + vsMoney(c.subsidy_monthly) + '</div>' : '') + '</td>'
+      + '<td>' + (c.next_followup_on ? (due ? '<b style="color:#9B2222;">' : '<span>') + vsEsc(vsFmtDate(c.next_followup_on)) + (due ? '</b>' : '</span>') : '—') + '</td>'
+      + (vsIsAdmin() ? '<td>' + vsEsc(vsAgentName(c.agent_id)) + '</td>' : '') + '</tr>';
+  }).join('') : '<tr><td colspan="' + cols + '">' + (VS.cases.length ? 'Ningún caso con esos filtros. Toca «Todos los casos» arriba para ver todo.' : 'Todavía no hay casos. Toca «+ Nuevo caso», o importa tu archivo de HealthSherpa.') + '</td></tr>';
+}
+
+// ---------- Leads de la web / cotizaciones sin caso ----------
+const VS_LEAD_RE = /salud|m[eé]dic|vida|life|health|medicare|dental|obamacare|\baca\b|suplement/i;
+async function vsLoadWebLeads(){
+  const box = document.getElementById('vs-webleads-body'); if(!box) return;
+  try{
+    const since = new Date(Date.now() - 60 * 864e5).toISOString();
+    const r = await sb.from('client_quotes').select('id, client_id, product, created_at, client:client_id(full_name, phone)').gte('created_at', since).order('created_at', { ascending: false }).limit(1000);
+    if(r.error) throw r.error;
+    const withCase = new Set(VS.cases.map(c => c.client_id)); const seen = new Set();
+    VS.webLeads = (r.data || []).filter(q => q.client_id && VS_LEAD_RE.test(q.product || '') && !withCase.has(q.client_id) && !seen.has(q.client_id) && seen.add(q.client_id));
+    box.innerHTML = VS.webLeads.length ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Cliente</th><th>Producto cotizado</th><th>Fecha</th><th></th></tr></thead><tbody>'
+      + VS.webLeads.slice(0, 100).map(q => '<tr><td><b>' + vsEsc((q.client && q.client.full_name) || 'Cliente') + '</b>' + (q.client && q.client.phone ? '<div class="sub" style="margin:0;">' + vsEsc(vsFmtPhone(q.client.phone)) + '</div>' : '') + '</td><td>' + vsEsc(q.product) + '</td><td>' + vsEsc(vsFmtDate(q.created_at)) + '</td><td><button type="button" class="btn-ghost vs-mini" onclick="vsNewCaseFromLead(\'' + vsEsc(q.client_id) + '\', \'' + vsEsc(vsGuessLine(q.product)) + '\')">Crear caso</button></td></tr>').join('')
+      + '</tbody></table></div>' : 'No hay cotizaciones de salud o vida sin caso en los últimos 60 días.';
+  }catch(e){ box.textContent = 'No se pudieron cargar: ' + ((e && e.message) || e); }
+}
+function vsGuessLine(product){ const p = vsNorm(product); if(/medicare/.test(p)) return 'medicare'; if(/vida|life/.test(p)) return 'vida'; if(/dental|vision|accident|suplement|cancer|hospital/.test(p)) return 'suplementario'; return 'aca'; }
+async function vsNewCaseFromLead(clientId, line){
+  const r = await sb.from('clients').select('id, full_name, phone, email, date_of_birth').eq('id', clientId).maybeSingle();
+  if(r.error || !r.data){ vsMsg('error', 'No se pudo abrir ese cliente.'); return; }
+  VS.adding = true; VS.newClientMode = false; VS.addClient = r.data; VS.addLine = line || 'aca'; vsPaintAdd();
+  const el = document.getElementById('vs-add'); if(el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// ---------- Nuevo caso ----------
+function vsToggleAdd(){ VS.adding = !VS.adding; if(!VS.adding){ VS.addClient = null; VS.newClientMode = false; } vsPaintAdd(); }
+function vsTypeOptions(line, cur){ return '<option value="">—</option>' + (VS_TYPES[line] || []).map(t => '<option' + (cur === t ? ' selected' : '') + '>' + vsEsc(t) + '</option>').join(''); }
+function vsPaintAdd(){
+  const el = document.getElementById('vs-add'); if(!el) return;
+  if(!VS.adding){ el.innerHTML = ''; return; }
+  const lineOpts = Object.keys(VS_LINES).map(x => '<option value="' + x + '"' + (VS.addLine === x ? ' selected' : '') + '>' + vsEsc(VS_LINES[x].icon + ' ' + VS_LINES[x].label) + '</option>').join('');
+  let h = '<div style="margin-top:14px;"><h4 style="margin:0 0 8px;">Nuevo caso</h4>';
+  if(VS.addClient){
+    h += '<div class="vs-ok">Cliente: <b>' + vsEsc(VS.addClient.full_name) + '</b>' + (VS.addClient.phone ? ' · ' + vsEsc(vsFmtPhone(VS.addClient.phone)) : '') + ' <button type="button" class="btn-ghost vs-mini" onclick="VS.addClient=null; vsPaintAdd()">Cambiar</button></div>';
+  } else if(VS.newClientMode){
+    h += '<div class="vs-info">Cliente nuevo (se guarda también en Clientes como lead). <button type="button" class="btn-ghost vs-mini" onclick="VS.newClientMode=false; vsPaintAdd()">Mejor buscar uno que ya existe</button></div>'
+      + '<div class="vs-grid"><div><label>Nombre</label><input type="text" id="vs-n-first" maxlength="60"></div><div><label>Apellido</label><input type="text" id="vs-n-last" maxlength="60"></div>'
+      + '<div><label>Teléfono</label><input type="tel" id="vs-n-phone" maxlength="20" placeholder="(713) 555-0101"></div><div><label>Correo (opcional)</label><input type="email" id="vs-n-email" maxlength="160"></div>'
+      + '<div><label>Fecha de nacimiento (MM/DD/AAAA)</label><input type="text" id="vs-n-dob" maxlength="10" inputmode="numeric" placeholder="MM/DD/AAAA" oninput="maskDateInput(this)"></div></div>';
+  } else {
+    h += '<label>Busca el cliente (nombre, teléfono o correo)</label><input type="text" id="vs-a-q" placeholder="Escribe al menos 2 letras…" oninput="vsSearchClients(this.value)" autocomplete="off">'
+      + '<div id="vs-a-results"></div><p class="sub" style="margin-top:6px;">¿No existe todavía? <a href="#" onclick="VS.newClientMode=true; vsPaintAdd(); return false;">Crear cliente nuevo</a></p>';
+  }
+  h += '<div class="vs-grid" style="margin-top:10px;"><div><label>Línea</label><select id="vs-a-line" onchange="VS.addLine=this.value; document.getElementById(\'vs-a-type\').innerHTML=vsTypeOptions(this.value,\'\')">' + lineOpts + '</select></div>'
+    + '<div><label>Tipo</label><select id="vs-a-type">' + vsTypeOptions(VS.addLine, '') + '</select></div>'
+    + '<div><label>Etapa</label><select id="vs-a-stage">' + VS_STAGES.map(s => '<option value="' + s[0] + '">' + vsEsc(s[1]) + '</option>').join('') + '</select></div>'
+    + (vsIsAdmin() ? '<div><label>Agente</label><select id="vs-a-agent">' + VS.agents.map(a => '<option value="' + vsEsc(a.id) + '"' + (a.id === vsUid() ? ' selected' : '') + '>' + vsEsc(a.full_name || 'Agente') + '</option>').join('') + '</select></div>' : '')
+    + '</div><div class="vs-row-flex" style="margin-top:12px;"><button type="button" class="btn-primary vs-mini" onclick="vsCreateCase()">Crear caso</button><button type="button" class="btn-ghost vs-mini" onclick="vsToggleAdd()">Cancelar</button></div></div>';
+  el.innerHTML = h;
+}
+let vsSearchTimer = null;
+function vsSearchClients(q){
+  clearTimeout(vsSearchTimer);
+  vsSearchTimer = setTimeout(async () => {
+    const box = document.getElementById('vs-a-results'); if(!box) return;
+    q = String(q || '').trim(); if(q.length < 2){ box.innerHTML = ''; return; }
+    const safe = q.replace(/[%,()*]/g, ' ').trim(); const digits = vsDigits(q);
+    const ors = ['full_name.ilike.%' + safe + '%', 'email.ilike.%' + safe + '%'];
+    if(digits.length >= 3) ors.push('phone.ilike.%' + digits.slice(-4) + '%');
+    const r = await sb.from('clients').select('id, full_name, phone, email, date_of_birth').or(ors.join(',')).limit(25);
+    if(r.error){ box.innerHTML = '<div class="vs-alert">No se pudo buscar: ' + vsEsc(r.error.message) + '</div>'; return; }
+    let list = r.data || [];
+    if(digits.length >= 3) list = list.filter(c => vsNorm(c.full_name).includes(vsNorm(q)) || (c.email || '').toLowerCase().includes(q.toLowerCase()) || vsDigits(c.phone).includes(digits));
+    VS.addResults = list.slice(0, 10);
+    box.innerHTML = VS.addResults.length ? '<div class="vs-results">' + VS.addResults.map((c, i) => '<button type="button" onclick="vsPickClient(' + i + ')"><b>' + vsEsc(c.full_name) + '</b> <span class="sub">' + vsEsc([vsFmtPhone(c.phone), c.email].filter(Boolean).join(' · ')) + '</span></button>').join('') + '</div>' : '<p class="sub">Nadie con ese dato. Puedes crear el cliente nuevo.</p>';
+  }, 250);
+}
+function vsPickClient(i){ VS.addClient = VS.addResults[i] || null; vsPaintAdd(); }
+async function vsCreateCase(){
+  if(VS.busy) return; vsMsg('', '');
+  const line = vsVal('vs-a-line') || 'aca', type = vsVal('vs-a-type') || null, stage = vsVal('vs-a-stage') || 'lead';
+  const agentId = vsIsAdmin() ? (vsVal('vs-a-agent') || vsUid()) : vsUid();
+  let client = VS.addClient;
+  if(!client && !VS.newClientMode){ vsMsg('error', 'Elige el cliente de la lista, o crea uno nuevo.'); return; }
+  VS.busy = true;
+  try{
+    if(!client){
+      const first = vsVal('vs-n-first'), last = vsVal('vs-n-last'), phoneRaw = vsVal('vs-n-phone'), email = vsVal('vs-n-email'), dobTxt = vsVal('vs-n-dob');
+      const phone = vsDigits(phoneRaw), dob = dobTxt ? vsToISO(dobTxt) : null;
+      if(first.length < 1 || last.length < 1) throw new Error('Escribe nombre y apellido.');
+      if(phoneRaw && phone.length !== 10) throw new Error('El teléfono debe tener 10 dígitos.');
+      if(!phoneRaw && !email) throw new Error('Pon al menos el teléfono o el correo.');
+      if(dobTxt && !dob) throw new Error('La fecha de nacimiento no es válida (MM/DD/AAAA).');
+      const full = first + ' ' + last, phoneFmt = phone ? vsFmtPhone(phone) : null;
+      const dup = await sb.rpc('find_possible_duplicate_clients', { p_name: full, p_phone: phoneFmt, p_email: email || null });
+      const dupes = (dup && dup.data) || [];
+      if(dupes.length){
+        const d0 = dupes[0]; const list = dupes.slice(0, 3).map(d => '• ' + d.full_name + ' — ' + (d.phone || d.email || 'sin contacto')).join('\n');
+        if(d0.id && window.confirm('Ya existe en el CRM:\n' + list + '\n\n¿Usar a «' + d0.full_name + '» en vez de crear otro cliente?')){
+          const g = await sb.from('clients').select('id, full_name, phone, email, date_of_birth').eq('id', d0.id).maybeSingle();
+          if(g.error || !g.data) throw new Error('Ese cliente es de otro agente y no lo puedes ver. Pídele a la administradora que te lo asigne.');
+          client = g.data;
+        } else if(!window.confirm('¿Crear un cliente NUEVO de todos modos?')){ VS.busy = false; return; }
+      }
+      if(!client){
+        const ins = await sb.from('clients').insert({ client_type: 'individual', first_name: first, last_name: last, full_name: full, phone: phoneFmt, email: email || null, date_of_birth: dob, preferred_language: 'es', lead_source: 'manual', created_by: vsUid(), assigned_agent_id: agentId, client_status: 'lead_nuevo' }).select('id, full_name, phone, email, date_of_birth').single();
+        if(ins.error) throw ins.error; client = ins.data;
+      }
+    }
+    const ins = await sb.from('lh_cases').insert({ client_id: client.id, agent_id: agentId, product_line: line, product_type: type, stage, created_by: vsUid() }).select('id').single();
+    if(ins.error) throw ins.error;
+    // Titular del hogar con los datos del cliente
+    const parts = String(client.full_name || '').trim().split(/\s+/);
+    await sb.from('lh_members').insert({ case_id: ins.data.id, relationship: 'titular', first_name: parts[0] || 'Titular', last_name: parts.slice(1).join(' ') || null, date_of_birth: client.date_of_birth || null });
+    VS.adding = false; VS.addClient = null; VS.newClientMode = false; VS.f.quick = 'todos';
+    await vsLoad(); vsRenderCases(); await vsSelect(ins.data.id);
+    vsMsg('success', 'Caso creado. Llena los datos, el hogar y sube los documentos.');
+  }catch(e){ vsMsg('error', 'No se pudo crear el caso: ' + ((e && e.message) || e)); }
+  VS.busy = false;
+}
+
+// Desde el perfil del cliente
+async function vsNewCaseForClient(clientId){
+  if(!clientId) return;
+  VS.view = 'casos'; VS.sel = null;
+  switchTab('vidasalud');           // abre la pestaña (vsOpen carga los casos)
+  try{ await VS.pending; }catch(e){}
+  await vsNewCaseFromLead(clientId, 'aca');
+}
+async function vsOpenCase(caseId){
+  VS.view = 'casos'; VS.f = { line: '', stage: '', agent: '', q: '', quick: 'todos' }; VS.sel = caseId;
+  switchTab('vidasalud');
+  try{ await VS.pending; }catch(e){}
+  await vsSelect(caseId);
+}
+
+// ---------- Ficha del caso ----------
+function vsCur(){ return VS.cases.find(c => c.id === VS.sel) || null; }
+async function vsSelect(id){
+  VS.sel = id; VS.members = []; VS.docs = []; VS.acts = []; vsPaintRows(); vsPaintDetail();
+  vsMyHsUrl();   // se precarga para que «Mandar mi enlace» abra WhatsApp sin que el navegador lo bloquee
+  const [m, d, a] = await Promise.all([
+    sb.from('lh_members').select('*').eq('case_id', id).order('created_at', { ascending: true }),
+    sb.from('lh_documents').select('*').eq('case_id', id).order('uploaded_at', { ascending: false }),
+    sb.from('lh_activity').select('*').eq('case_id', id).order('created_at', { ascending: false }).limit(200)
+  ]);
+  if(VS.sel !== id) return;
+  VS.members = m.data || []; VS.docs = d.data || []; VS.acts = a.data || [];
+  vsPaintDetail();
+  const el = document.getElementById('vs-detail'); if(el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function vsCloseDetail(){ VS.sel = null; vsPaintDetail(); vsPaintRows(); }
+
+async function vsMyHsUrl(){
+  if(VS.myHsUrl !== undefined) return VS.myHsUrl;
+  try{ const r = await sb.from('agent_pages').select('healthsherpa_url').eq('agent_id', vsUid()).maybeSingle(); VS.myHsUrl = (r.data && r.data.healthsherpa_url) || null; }catch(e){ VS.myHsUrl = null; }
+  return VS.myHsUrl;
+}
+
+function vsPaintDetail(){
+  const c = vsCur(), box = document.getElementById('vs-detail'); if(!box) return;
+  if(!c){ box.innerHTML = ''; return; }
+  const L = VS_LINES[c.product_line] || { icon: '', label: c.product_line };
+  const isAca = c.product_line === 'aca', isVida = c.product_line === 'vida', isMed = c.product_line === 'medicare', hsLine = isAca || isMed;
+  const today = vsToday(), net = vsNet(c);
+  const inp = (id, label, val, extra) => '<div><label for="' + id + '">' + label + '</label><input type="text" id="' + id + '" value="' + vsEsc(val === null || val === undefined ? '' : val) + '" ' + (extra || '') + '></div>';
+  const dateInp = (id, label, iso) => inp(id, label + ' (MM/DD/AAAA)', iso ? vsFmtDate(iso) : '', 'maxlength="10" inputmode="numeric" placeholder="MM/DD/AAAA" oninput="maskDateInput(this)"');
+  const money = (id, label, v) => inp(id, label, v === null || v === undefined ? '' : Number(v).toFixed(2), 'inputmode="decimal" placeholder="0.00"');
+  let h = '<div class="dash-card"><div class="vs-row-flex" style="justify-content:space-between;"><div><h4 style="margin:0;">' + vsEsc((c.client && c.client.full_name) || 'Cliente') + ' — ' + vsEsc(L.icon + ' ' + L.label) + '</h4>'
+    + '<div class="sub" style="margin:2px 0 0;">' + vsEsc([c.client && vsFmtPhone(c.client.phone), c.client && c.client.email, c.client && c.client.date_of_birth ? 'nac. ' + vsFmtDate(c.client.date_of_birth) : ''].filter(Boolean).join(' · ')) + (vsIsAdmin() ? ' · Agente: ' + vsEsc(vsAgentName(c.agent_id)) : '') + '</div></div>'
+    + '<div class="vs-row-flex"><button type="button" class="btn-ghost vs-mini" onclick="vsOpenClient()">Abrir ficha del cliente</button>'
+    + (hsLine ? '<button type="button" class="btn-ghost vs-mini" onclick="vsOpenHealthSherpa()">↗ Abrir en HealthSherpa</button><button type="button" class="btn-ghost vs-mini" onclick="vsShareMyLink()">Mandar mi enlace de HealthSherpa</button>' : '')
+    + '<button type="button" class="btn-ghost vs-mini" onclick="vsCloseDetail()">Cerrar</button></div></div>';
+  if(vsIsDue(c, today)) h += '<div class="vs-alert">⏰ Seguimiento pendiente desde el ' + vsEsc(vsFmtDate(c.next_followup_on)) + '.</div>';
+  if(vsDocsSoon(c, today)) h += '<div class="vs-alert">📄 Fecha límite de documentos: ' + vsEsc(vsFmtDate(c.docs_due_on)) + (c.docs_due_on < today ? ' (ya pasó)' : '') + '.</div>';
+  if(vsNeedsRenewal(c, today)) h += '<div class="vs-alert">🔁 Esta póliza de salud es del ' + vsEsc(c.plan_year || 'año pasado') + ': hay que renovarla para ' + vsRenewalYear(today) + ' antes del 15 de enero.</div>';
+  if(c.hs_status || c.hs_followup_status) h += '<div class="vs-info">HealthSherpa' + (c.hs_synced_at ? ' (importado ' + vsEsc(vsWhen(c.hs_synced_at)) + ')' : '') + ': ' + vsEsc([c.hs_status && 'estatus «' + c.hs_status + '»', c.hs_followup_status && 'documentos «' + c.hs_followup_status + '»'].filter(Boolean).join(' · ')) + '</div>';
+  // Etapas
+  h += '<div class="vs-stages">' + VS_STAGES.map(s => '<button type="button" class="vs-stage' + (c.stage === s[0] ? ' on' : '') + '" style="' + (c.stage === s[0] ? 'background:' + s[2] + '; border-color:' + s[2] + ';' : '') + '" onclick="vsSetStage(\'' + s[0] + '\')">' + vsEsc(s[1]) + '</button>').join('') + '</div>';
+  // Datos
+  h += '<div class="vs-grid">'
+    + '<div><label>Línea</label><select id="vs-d-line" onchange="document.getElementById(\'vs-d-type\').innerHTML=vsTypeOptions(this.value,\'\')">' + Object.keys(VS_LINES).map(x => '<option value="' + x + '"' + (c.product_line === x ? ' selected' : '') + '>' + vsEsc(VS_LINES[x].label) + '</option>').join('') + '</select></div>'
+    + '<div><label>Tipo</label><select id="vs-d-type">' + vsTypeOptions(c.product_line, c.product_type) + (c.product_type && !(VS_TYPES[c.product_line] || []).includes(c.product_type) ? '<option selected>' + vsEsc(c.product_type) + '</option>' : '') + '</select></div>'
+    + inp('vs-d-carrier', 'Compañía', c.carrier, 'maxlength="120" list="vs-carriers"')
+    + inp('vs-d-plan', 'Plan', c.plan_name, 'maxlength="200"')
+    + inp('vs-d-policy', isMed ? 'ID de miembro / póliza' : 'Número de póliza / miembro', c.policy_number, 'maxlength="80"')
+    + (isAca ? inp('vs-d-year', 'Año del plan', c.plan_year, 'inputmode="numeric" maxlength="4"') : '')
+    + dateInp('vs-d-eff', 'Fecha efectiva', c.effective_date)
+    + dateInp('vs-d-end', isVida ? 'Fin del término' : 'Fecha de fin / renovación', c.end_date)
+    + money('vs-d-prem', 'Prima mensual ($)', c.premium_monthly)
+    + (isAca ? money('vs-d-sub', 'Subsidio mensual / APTC ($)', c.subsidy_monthly) : '')
+    + (isVida ? money('vs-d-face', 'Suma asegurada ($)', c.face_amount) : '')
+    + (isAca ? inp('vs-d-hh', 'Personas en el hogar (impuestos)', c.household_size, 'inputmode="numeric" maxlength="2"') + money('vs-d-inc', 'Ingreso anual del hogar ($)', c.annual_income) : '')
+    + (hsLine ? inp('vs-d-hsid', 'HealthSherpa ID', c.healthsherpa_id, 'maxlength="64"') : '')
+    + (isAca ? inp('vs-d-ffm', 'FFM / Federal Exchange ID', c.ffm_app_id, 'maxlength="64"') : '')
+    + (hsLine ? '<div style="grid-column:1/-1;"><label for="vs-d-hsurl">Enlace del cliente en HealthSherpa (https://…)</label><input type="url" id="vs-d-hsurl" maxlength="500" placeholder="Pega aquí el enlace de la página del cliente en HealthSherpa" value="' + vsEsc(c.healthsherpa_url) + '"></div>' : '')
+    + dateInp('vs-d-docsdue', 'Fecha límite de documentos', c.docs_due_on)
+    + dateInp('vs-d-follow', 'Próximo seguimiento', c.next_followup_on)
+    + money('vs-d-cexp', 'Comisión esperada ($)', c.commission_expected)
+    + money('vs-d-crec', 'Comisión recibida ($)', c.commission_received)
+    + (['perdida', 'cancelada'].includes(c.stage) ? inp('vs-d-lost', 'Motivo', c.lost_reason, 'maxlength="300"') : '')
+    + (vsIsAdmin() ? '<div><label>Agente</label><select id="vs-d-agent">' + VS.agents.map(a => '<option value="' + vsEsc(a.id) + '"' + (a.id === c.agent_id ? ' selected' : '') + '>' + vsEsc(a.full_name || 'Agente') + '</option>').join('') + (VS.agents.some(a => a.id === c.agent_id) ? '' : '<option value="' + vsEsc(c.agent_id) + '" selected>Agente actual</option>') + '</select></div>' : '')
+    + '</div>'
+    + '<datalist id="vs-carriers">' + Array.from(new Set(VS.cases.map(x => x.carrier).filter(Boolean))).sort().map(x => '<option value="' + vsEsc(x) + '">').join('') + '</datalist>'
+    + (net !== null && isAca ? '<p class="sub" style="margin-top:8px;">Prima neta que paga el cliente: <b>' + vsMoney(net) + '</b> al mes.</p>' : '')
+    + '<label for="vs-d-notes" style="margin-top:10px;">Notas</label><textarea id="vs-d-notes" rows="3" maxlength="8000">' + vsEsc(c.notes) + '</textarea>'
+    + '<div class="vs-row-flex" style="margin-top:10px;"><button type="button" class="btn-primary vs-mini" onclick="vsSaveCase()">Guardar cambios</button>'
+    + (vsIsAdmin() ? '<button type="button" class="btn-ghost vs-mini" style="color:#9B2222;" onclick="vsDeleteCase()">Eliminar caso</button>' : '') + '</div>';
+  // Hogar
+  h += '<div class="vs-sec"><h5>👨‍👩‍👧 Hogar / personas en la póliza</h5>' + vsMembersHtml(c) + '</div>';
+  // Documentos
+  h += '<div class="vs-sec"><h5>📄 Documentos</h5>' + vsDocsHtml(c) + '</div>';
+  // Seguimiento
+  h += '<div class="vs-sec"><h5>📞 Seguimiento</h5>'
+    + '<div class="vs-row-flex"><select id="vs-l-kind" style="width:auto;"><option value="llamada">Llamada</option><option value="mensaje">Mensaje</option><option value="nota">Nota</option></select>'
+    + '<input type="text" id="vs-l-body" maxlength="1000" placeholder="¿Qué se habló o qué hiciste?" style="flex:1; min-width:200px;">'
+    + '<input type="text" id="vs-l-next" maxlength="10" placeholder="Próximo: MM/DD/AAAA" inputmode="numeric" oninput="maskDateInput(this)" style="width:170px;">'
+    + '<button type="button" class="btn-primary vs-mini" onclick="vsAddLog()">Agregar</button></div>'
+    + '<div class="vs-row-flex" style="margin-top:6px;">' + [1, 3, 7, 14].map(n => '<button type="button" class="btn-ghost vs-mini" onclick="document.getElementById(\'vs-l-next\').value=vsFmtDate(vsAddDays(vsToday(),' + n + '))">en ' + n + ' día' + (n > 1 ? 's' : '') + '</button>').join('') + '</div>'
+    + '<div id="vs-acts" style="margin-top:10px;">' + vsActsHtml() + '</div></div>';
+  h += '</div>';
+  box.innerHTML = h;
+}
+function vsActsHtml(){
+  if(!VS.acts.length) return '<p class="sub">Sin movimientos todavía.</p>';
+  const icon = { nota: '📝', llamada: '📞', mensaje: '💬', documento: '📄', etapa: '🔀', importacion: '⬇️', sistema: '⚙️' };
+  return VS.acts.map(a => '<div class="vs-ev"><span class="when">' + vsEsc(vsWhen(a.created_at)) + '</span>' + (icon[a.kind] || '') + ' ' + vsEsc(a.body) + (a.created_by_name ? ' <span class="sub">— ' + vsEsc(a.created_by_name) + '</span>' : '') + '</div>').join('');
+}
+function vsMembersHtml(c){
+  const rows = VS.members.map(m => '<tr><td>' + vsEsc(VS_REL[m.relationship] || m.relationship) + '</td><td><b>' + vsEsc([m.first_name, m.last_name].filter(Boolean).join(' ')) + '</b></td><td>' + vsEsc(vsFmtDate(m.date_of_birth) || '—') + '</td><td>' + (m.applying ? 'Sí' : 'No') + '</td><td>' + (m.tobacco ? 'Sí' : 'No') + '</td><td>' + (m.ssn_last4 ? '••• ' + vsEsc(m.ssn_last4) : '—') + '</td><td>' + vsEsc(m.immigration_status || '—') + '</td><td><button type="button" class="btn-ghost vs-mini" onclick="vsDelMember(\'' + vsEsc(m.id) + '\')">Quitar</button></td></tr>').join('');
+  return '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Parentesco</th><th>Nombre</th><th>Nacimiento</th><th>Aplica</th><th>Tabaco</th><th>SSN</th><th>Estatus migratorio</th><th></th></tr></thead><tbody>'
+    + (rows || '<tr><td colspan="8">Nadie todavía.</td></tr>') + '</tbody></table></div>'
+    + '<div class="vs-grid" style="margin-top:10px;"><div><label>Parentesco</label><select id="vs-m-rel">' + Object.keys(VS_REL).map(k => '<option value="' + k + '"' + (k === (VS.members.length ? 'conyuge' : 'titular') ? ' selected' : '') + '>' + VS_REL[k] + '</option>').join('') + '</select></div>'
+    + '<div><label>Nombre</label><input type="text" id="vs-m-first" maxlength="80"></div><div><label>Apellido</label><input type="text" id="vs-m-last" maxlength="80"></div>'
+    + '<div><label>Nacimiento (MM/DD/AAAA)</label><input type="text" id="vs-m-dob" maxlength="10" inputmode="numeric" placeholder="MM/DD/AAAA" oninput="maskDateInput(this)"></div>'
+    + '<div><label>Últimos 4 del SSN (opcional)</label><input type="text" id="vs-m-ssn" maxlength="4" inputmode="numeric" placeholder="1234"></div>'
+    + '<div><label>Estatus migratorio (opcional)</label><input type="text" id="vs-m-imm" maxlength="120" placeholder="Ciudadano, residente, permiso…"></div></div>'
+    + '<div class="vs-row-flex" style="margin-top:8px;"><label class="vs-chk"><input type="checkbox" id="vs-m-apply" checked> Aplica para el seguro</label><label class="vs-chk"><input type="checkbox" id="vs-m-tob"> Usa tabaco</label><button type="button" class="btn-ghost vs-mini" onclick="vsAddMember()">+ Agregar persona</button></div>'
+    + '<p class="sub" style="margin-top:6px;">Por seguridad el CRM no guarda el Seguro Social completo, solo los últimos 4 dígitos.</p>';
+}
+function vsDocsHtml(c){
+  const req = VS_REQUIRED[c.product_line] || [], have = new Set(VS.docs.map(d => d.category));
+  let h = req.length ? '<div class="vs-check">' + req.map(r => have.has(r) ? '<span style="color:#13633F; border-color:#9FD3B5; background:#F2FBF5;">✓ ' + vsEsc(r) + '</span>' : '<span style="color:#9B2222; border-color:#E39C9C; background:#FFF5F5;">Falta: ' + vsEsc(r) + '</span>').join('') + '</div>' : '';
+  h += VS.docs.length ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Tipo</th><th>Archivo</th><th>Subido</th><th></th></tr></thead><tbody>' + VS.docs.map(d => '<tr><td>' + vsEsc(d.category) + '</td><td>' + vsEsc(d.file_name) + '</td><td>' + vsEsc(vsWhen(d.uploaded_at)) + '</td><td class="vs-row-flex"><button type="button" class="btn-ghost vs-mini" onclick="vsViewDoc(\'' + vsEsc(d.id) + '\')">Ver</button><button type="button" class="btn-ghost vs-mini" onclick="vsDelDoc(\'' + vsEsc(d.id) + '\')">Borrar</button></td></tr>').join('') + '</tbody></table></div>' : '<p class="sub">No hay documentos todavía.</p>';
+  h += '<div class="vs-row-flex" style="margin-top:10px;"><select id="vs-doc-cat" style="width:auto;">' + (VS_DOCS[c.product_line] || ['Otro']).map(x => '<option>' + vsEsc(x) + '</option>').join('') + '</select>'
+    + '<input type="file" id="vs-doc-file" accept=".pdf,.jpg,.jpeg,.png,.heic,.webp,.doc,.docx" multiple style="flex:1; min-width:200px;"><button type="button" class="btn-primary vs-mini" onclick="vsUploadDocs()">Subir</button></div>'
+    + '<p class="sub" style="margin-top:6px;">PDF o fotos, hasta 15 MB cada uno. Se guardan privados (solo el CRM los puede abrir).</p>';
+  return h;
+}
+
+function vsOpenClient(){ const c = vsCur(); if(c && typeof goToClientFromUnderwriting === 'function') goToClientFromUnderwriting(c.client_id); }
+async function vsOpenHealthSherpa(){
+  const c = vsCur(); if(!c) return;
+  if(c.healthsherpa_url){ window.open(c.healthsherpa_url, '_blank', 'noopener'); return; }
+  const id = c.ffm_app_id || c.healthsherpa_id || (c.client && c.client.full_name) || '';
+  window.open('https://www.healthsherpa.com/', '_blank', 'noopener');
+  try{ if(id && navigator.clipboard) await navigator.clipboard.writeText(id); }catch(e){}
+  vsMsg('success', 'Abrí HealthSherpa. ' + (id ? 'Copié «' + id + '» para que lo pegues en el buscador de clientes. ' : '') + 'Cuando estés en la página del cliente, copia el enlace y pégalo en «Enlace del cliente en HealthSherpa» para que la próxima vez abra directo.');
+}
+async function vsShareMyLink(){
+  const c = vsCur(); if(!c) return;
+  const url = VS.myHsUrl !== undefined ? VS.myHsUrl : await vsMyHsUrl();
+  if(!url){ vsMsg('error', 'No tienes tu enlace de HealthSherpa guardado. Ponlo en Mi cuenta → Mi página («Tu link de HealthSherpa»).'); return; }
+  const first = String((c.client && c.client.full_name) || '').split(' ')[0];
+  const text = 'Hola ' + first + ', soy ' + ((currentProfile && currentProfile.full_name) || 'tu agente') + ' de GMAX All Insurance. Aquí puedes revisar tus opciones y aplicar a tu seguro de salud: ' + url;
+  const phone = c.client && vsDigits(c.client.phone);
+  if(phone && phone.length === 10) window.open('https://wa.me/1' + phone + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
+  try{ if(navigator.clipboard) await navigator.clipboard.writeText(text); }catch(e){}
+  await vsLog('mensaje', 'Le mandé mi enlace de HealthSherpa para aplicar.');
+  vsMsg('success', phone && phone.length === 10 ? 'Abrí WhatsApp con el mensaje listo (también quedó copiado).' : 'Mensaje copiado; pégalo donde le escribas al cliente.');
+}
+
+async function vsSetStage(stage){
+  const c = vsCur(); if(!c || c.stage === stage || VS.busy) return;
+  const patch = { stage };
+  if(stage === 'perdida' || stage === 'cancelada'){
+    const why = window.prompt(stage === 'perdida' ? '¿Por qué no compró? (ej.: precio, ya tiene seguro, no contestó)' : '¿Por qué se canceló? (ej.: falta de pago, la canceló el cliente)', c.lost_reason || '');
+    if(why === null) return;
+    if(why.trim().length < 3){ vsMsg('error', 'Escribe el motivo (al menos 3 letras).'); return; }
+    patch.lost_reason = why.trim().slice(0, 300);
+  }
+  await vsUpdate(patch, 'Etapa cambiada a «' + vsStageLabel(stage) + '».');
+}
+async function vsUpdate(patch, okText){
+  const c = vsCur(); if(!c) return false;
+  VS.busy = true; vsMsg('', '');
+  try{
+    const r = await sb.from('lh_cases').update(patch).eq('id', c.id).select('*, client:client_id(id, full_name, phone, email, date_of_birth)').single();
+    if(r.error) throw r.error;
+    const i = VS.cases.findIndex(x => x.id === c.id); if(i >= 0) VS.cases[i] = r.data;
+    const a = await sb.from('lh_activity').select('*').eq('case_id', c.id).order('created_at', { ascending: false }).limit(200); if(!a.error) VS.acts = a.data || [];
+    VS.busy = false; vsPaintDetail(); vsPaintRows(); loadVidaSalud(); if(okText) vsMsg('success', okText);
+    return true;
+  }catch(e){
+    VS.busy = false; const m = String((e && e.message) || e);
+    vsMsg('error', /lh_cases_hsid_uq|duplicate key/i.test(m) ? 'Ese HealthSherpa ID ya está en otro caso. Revisa que no sea el mismo cliente repetido.' : 'No se pudo guardar: ' + m);
+    return false;
+  }
+}
+async function vsSaveCase(){
+  const c = vsCur(); if(!c) return;
+  const errs = []; const p = {};
+  const dates = [['vs-d-eff', 'effective_date', 'fecha efectiva'], ['vs-d-end', 'end_date', 'fecha de fin'], ['vs-d-docsdue', 'docs_due_on', 'fecha límite de documentos'], ['vs-d-follow', 'next_followup_on', 'próximo seguimiento']];
+  dates.forEach(([id, k, l]) => { const el = document.getElementById(id); if(!el) return; const t = el.value.trim(); if(!t){ p[k] = null; return; } const iso = vsToISO(t); if(!iso) errs.push('La ' + l + ' no es válida (MM/DD/AAAA).'); else p[k] = iso; });
+  const moneys = [['vs-d-prem', 'premium_monthly', 'prima'], ['vs-d-sub', 'subsidy_monthly', 'subsidio'], ['vs-d-face', 'face_amount', 'suma asegurada'], ['vs-d-inc', 'annual_income', 'ingreso'], ['vs-d-cexp', 'commission_expected', 'comisión esperada'], ['vs-d-crec', 'commission_received', 'comisión recibida']];
+  moneys.forEach(([id, k, l]) => { const v = vsNum(id); if(v === undefined) return; if(Number.isNaN(v)) errs.push('La ' + l + ' debe ser un número (sin letras).'); else p[k] = v; });
+  const yearEl = document.getElementById('vs-d-year'); if(yearEl){ const y = yearEl.value.trim(); if(!y) p.plan_year = null; else if(!/^\d{4}$/.test(y) || +y < 2014 || +y > 2100) errs.push('El año del plan debe ser de 4 números (ej. 2027).'); else p.plan_year = +y; }
+  const hhEl = document.getElementById('vs-d-hh'); if(hhEl){ const n = hhEl.value.trim(); if(!n) p.household_size = null; else if(!/^\d{1,2}$/.test(n) || +n < 1 || +n > 20) errs.push('Personas en el hogar: un número del 1 al 20.'); else p.household_size = +n; }
+  const urlEl = document.getElementById('vs-d-hsurl'); if(urlEl){ const u = urlEl.value.trim(); if(!u) p.healthsherpa_url = null; else if(!/^https:\/\/\S+$/i.test(u)) errs.push('El enlace de HealthSherpa debe empezar con https://'); else p.healthsherpa_url = u; }
+  const txt = (id, k) => { const el = document.getElementById(id); if(el) p[k] = el.value.trim() || null; };
+  txt('vs-d-carrier', 'carrier'); txt('vs-d-plan', 'plan_name'); txt('vs-d-policy', 'policy_number'); txt('vs-d-hsid', 'healthsherpa_id'); txt('vs-d-ffm', 'ffm_app_id'); txt('vs-d-lost', 'lost_reason'); txt('vs-d-notes', 'notes');
+  p.product_line = vsVal('vs-d-line') || c.product_line; p.product_type = vsVal('vs-d-type') || null;
+  if(vsIsAdmin() && document.getElementById('vs-d-agent')) p.agent_id = vsVal('vs-d-agent') || c.agent_id;
+  if(p.effective_date && p.end_date && p.end_date < p.effective_date) errs.push('La fecha de fin no puede ser antes de la fecha efectiva.');
+  if(p.subsidy_monthly && p.premium_monthly !== undefined && p.premium_monthly !== null && p.subsidy_monthly > p.premium_monthly) errs.push('El subsidio no puede ser mayor que la prima.');
+  if(errs.length){ vsMsg('error', errs.join(' ')); return; }
+  await vsUpdate(p, 'Cambios guardados.');
+}
+async function vsDeleteCase(){
+  const c = vsCur(); if(!c || !vsIsAdmin()) return;
+  if(!window.confirm('¿Eliminar este caso de ' + ((c.client && c.client.full_name) || 'este cliente') + '? Se borran su hogar, documentos y bitácora. El cliente sigue en Clientes.')) return;
+  try{
+    const paths = VS.docs.map(d => d.storage_path).filter(Boolean);
+    if(paths.length) await sb.storage.from('client-documents').remove(paths);
+    const r = await sb.from('lh_cases').delete().eq('id', c.id); if(r.error) throw r.error;
+    VS.sel = null; await vsLoad(); vsRenderCases(); vsMsg('success', 'Caso eliminado.');
+  }catch(e){ vsMsg('error', 'No se pudo eliminar: ' + ((e && e.message) || e)); }
+}
+
+// ---------- Hogar ----------
+async function vsAddMember(){
+  const c = vsCur(); if(!c || VS.busy) return;
+  const first = vsVal('vs-m-first'), last = vsVal('vs-m-last'), dobT = vsVal('vs-m-dob'), ssn = vsVal('vs-m-ssn'), imm = vsVal('vs-m-imm');
+  if(!first){ vsMsg('error', 'Escribe el nombre de la persona.'); return; }
+  const dob = dobT ? vsToISO(dobT) : null; if(dobT && !dob){ vsMsg('error', 'La fecha de nacimiento no es válida (MM/DD/AAAA).'); return; }
+  if(ssn && !/^\d{4}$/.test(ssn)){ vsMsg('error', 'Del Seguro Social solo van los últimos 4 números.'); return; }
+  VS.busy = true;
+  const r = await sb.from('lh_members').insert({ case_id: c.id, relationship: vsVal('vs-m-rel') || 'otro', first_name: first, last_name: last || null, date_of_birth: dob, ssn_last4: ssn || null, immigration_status: imm || null, applying: document.getElementById('vs-m-apply').checked, tobacco: document.getElementById('vs-m-tob').checked }).select('*').single();
+  VS.busy = false;
+  if(r.error){ vsMsg('error', 'No se pudo agregar: ' + r.error.message); return; }
+  VS.members.push(r.data); vsPaintDetail(); vsMsg('success', 'Persona agregada.');
+}
+async function vsDelMember(id){
+  if(!window.confirm('¿Quitar a esta persona del hogar?')) return;
+  const r = await sb.from('lh_members').delete().eq('id', id);
+  if(r.error){ vsMsg('error', 'No se pudo quitar: ' + r.error.message); return; }
+  VS.members = VS.members.filter(m => m.id !== id); vsPaintDetail();
+}
+
+// ---------- Documentos ----------
+async function vsUploadDocs(){
+  const c = vsCur(); if(!c || VS.busy) return;
+  const input = document.getElementById('vs-doc-file'); const files = Array.from((input && input.files) || []);
+  if(!files.length){ vsMsg('error', 'Elige uno o más archivos primero.'); return; }
+  const big = files.find(f => f.size > 15 * 1024 * 1024); if(big){ vsMsg('error', '«' + big.name + '» pesa más de 15 MB.'); return; }
+  const cat = vsVal('vs-doc-cat') || 'Otro'; VS.busy = true; vsMsg('', 'Subiendo…');
+  let ok = 0; const fails = [];
+  for(const f of files){
+    const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-120);
+    const path = c.client_id + '/vida-salud/' + c.id + '/' + Date.now() + '_' + safe;
+    const up = await sb.storage.from('client-documents').upload(path, f);
+    if(up.error){ fails.push(f.name + ': ' + up.error.message); continue; }
+    const ins = await sb.from('lh_documents').insert({ case_id: c.id, client_id: c.client_id, category: cat, file_name: f.name.slice(0, 255), storage_path: path, size_bytes: f.size, uploaded_by: vsUid() }).select('*').single();
+    if(ins.error){ try{ await sb.storage.from('client-documents').remove([path]); }catch(e){} fails.push(f.name + ': ' + ins.error.message); continue; }
+    VS.docs.unshift(ins.data); ok++;
+  }
+  if(ok) await vsLog('documento', 'Subió ' + ok + ' documento' + (ok > 1 ? 's' : '') + ': ' + cat);
+  VS.busy = false; vsPaintDetail();
+  if(fails.length) vsMsg('error', 'No se subieron: ' + fails.join(' · ')); else vsMsg('success', ok === 1 ? 'Documento subido.' : ok + ' documentos subidos.');
+}
+async function vsViewDoc(id){
+  const d = VS.docs.find(x => x.id === id); if(!d) return;
+  const w = window.open('', '_blank');
+  const r = await sb.storage.from('client-documents').createSignedUrl(d.storage_path, 300);
+  if(r.error || !r.data){ if(w) w.close(); vsMsg('error', 'No se pudo abrir: ' + ((r.error && r.error.message) || 'sin acceso')); return; }
+  if(w) w.location = r.data.signedUrl; else window.open(r.data.signedUrl, '_blank', 'noopener');
+}
+async function vsDelDoc(id){
+  const d = VS.docs.find(x => x.id === id); if(!d) return;
+  if(!window.confirm('¿Borrar «' + d.file_name + '»?')) return;
+  const r = await sb.from('lh_documents').delete().eq('id', id).select('id');
+  if(r.error || !(r.data || []).length){ vsMsg('error', r.error ? 'No se pudo borrar: ' + r.error.message : 'Solo quien lo subió o una administradora puede borrarlo.'); return; }
+  try{ await sb.storage.from('client-documents').remove([d.storage_path]); }catch(e){}
+  VS.docs = VS.docs.filter(x => x.id !== id); vsPaintDetail(); vsMsg('success', 'Documento borrado.');
+}
+
+// ---------- Bitácora ----------
+async function vsLog(kind, body){
+  const c = vsCur(); if(!c) return false;
+  const r = await sb.from('lh_activity').insert({ case_id: c.id, kind, body: String(body).slice(0, 4000), created_by: vsUid(), created_by_name: (currentProfile && currentProfile.full_name) || null }).select('*').single();
+  if(!r.error){ VS.acts.unshift(r.data); const el = document.getElementById('vs-acts'); if(el) el.innerHTML = vsActsHtml(); }
+  return !r.error;
+}
+async function vsAddLog(){
+  const c = vsCur(); if(!c || VS.busy) return;
+  const body = vsVal('vs-l-body'), nextT = vsVal('vs-l-next');
+  if(body.length < 3){ vsMsg('error', 'Escribe qué se habló o qué hiciste.'); return; }
+  const next = nextT ? vsToISO(nextT) : null; if(nextT && !next){ vsMsg('error', 'La fecha del próximo seguimiento no es válida (MM/DD/AAAA).'); return; }
+  const kind = vsVal('vs-l-kind') || 'nota';
+  const ok = await vsLog(kind, body + (next ? ' · Próximo seguimiento: ' + vsFmtDate(next) : ''));
+  if(!ok){ vsMsg('error', 'No se pudo guardar en la bitácora.'); return; }
+  if(next || c.next_followup_on) await vsUpdate({ next_followup_on: next }, next ? 'Guardado. Próximo seguimiento: ' + vsFmtDate(next) + '.' : 'Guardado (sin próximo seguimiento).');
+  else { vsPaintDetail(); vsMsg('success', 'Guardado en la bitácora.'); }
+}
+
+// ---------- Tarjeta en el perfil del cliente ----------
+let vsCardTimer = null;
+function vsRefreshCardSoon(clientId){ clearTimeout(vsCardTimer); vsCardTimer = setTimeout(() => { vsLoadClientCard(clientId).catch(() => {}); }, 300); }
+async function vsLoadClientCard(clientId){
+  const card = document.getElementById('cd-vidaSaludCard'); if(!card || !clientId) return;
+  const r = await sb.from('lh_cases').select('id, product_line, product_type, stage, carrier, plan_name, plan_year, next_followup_on').eq('client_id', clientId).order('updated_at', { ascending: false });
+  if(r.error){ card.style.display = 'none'; return; }
+  const list = r.data || [];
+  if(!list.length && !vsHasLicense()){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const btn = document.getElementById('cd-vidaSaludNewBtn'); if(btn) btn.style.display = vsHasLicense() ? '' : 'none';
+  document.getElementById('cd-vidaSaludList').innerHTML = list.length ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Producto</th><th>Compañía / plan</th><th>Etapa</th><th>Seguimiento</th><th></th></tr></thead><tbody>'
+    + list.map(c => { const L = VS_LINES[c.product_line] || { icon: '', short: c.product_line }; return '<tr><td>' + vsEsc(L.icon + ' ' + L.short) + (c.product_type ? ' · ' + vsEsc(c.product_type) : '') + '</td><td>' + vsEsc(c.carrier || '—') + (c.plan_name ? ' · ' + vsEsc(c.plan_name) : '') + (c.plan_year ? ' (' + vsEsc(c.plan_year) + ')' : '') + '</td><td>' + vsChip(vsStageLabel(c.stage), vsStageColor(c.stage)) + '</td><td>' + vsEsc(c.next_followup_on ? vsFmtDate(c.next_followup_on) : '—') + '</td><td><button type="button" class="btn-ghost vs-mini" style="width:auto; padding:6px 12px; margin:0;" onclick="vsOpenCase(\'' + vsEsc(c.id) + '\')">Abrir</button></td></tr>'; }).join('')
+    + '</tbody></table></div>' : '<p class="sub">Este cliente todavía no tiene casos de Vida y Salud.</p>';
+}
+
+// ---------- Importar CSV de HealthSherpa ----------
+function vsRenderImport(){
+  const steps = '<ol class="vs-steps"><li>Entra a tu cuenta de agente en HealthSherpa.</li><li>En el menú de la izquierda abre <b>Exports</b> (o en <b>Clients</b>, el botón <b>Export</b>) y genera el export de tus clientes del año del plan.</li><li>Cuando esté listo (llega a tu correo o queda en la página de Exports), descarga el archivo <b>.csv</b>.</li><li>Súbelo aquí. Antes de cambiar nada te enseño qué casos se actualizan y cuáles serían nuevos.</li></ol>';
+  let h = '<div class="dash-card"><h4 style="margin:0 0 6px;">Traer tus clientes de HealthSherpa</h4>' + steps
+    + '<div class="vs-row-flex" style="margin-top:10px;"><input type="file" id="vs-imp-file" accept=".csv,text/csv" onchange="vsImpRead(this)" style="flex:1; min-width:220px;"></div>'
+    + '<p class="sub" style="margin-top:6px;">Se emparejan por HealthSherpa ID, FFM ID, nombre + fecha de nacimiento, o teléfono + apellido. Solo se actualizan los casos que tú puedes ver. Los nombres de columnas pueden cambiar en HealthSherpa: si algo no se reconoce, lo eliges a mano abajo.</p>'
+    + '<div id="vs-imp-preview"></div></div>';
+  h += '<div class="dash-card"><h4 style="margin:0 0 6px;">Archivos importados</h4><div id="vs-imp-hist" class="sub">Cargando…</div></div>';
+  document.getElementById('vs-body').innerHTML = h;
+  vsImpHistory(); if(VS.imp) vsImpPaint();
+}
+async function vsImpHistory(){
+  const el = document.getElementById('vs-imp-hist'); if(!el) return;
+  const r = await sb.from('lh_hs_imports').select('*').order('imported_at', { ascending: false }).limit(30);
+  if(r.error){ el.textContent = 'No se pudo cargar: ' + r.error.message; return; }
+  VS.imports = r.data || [];
+  el.innerHTML = VS.imports.length ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Fecha</th><th>Archivo</th><th>Filas</th><th>Actualizados</th><th>Nuevos</th><th>Sin cambios / omitidos</th>' + (vsIsAdmin() ? '<th>Quién</th>' : '') + '</tr></thead><tbody>'
+    + VS.imports.map(i => '<tr><td>' + vsEsc(vsWhen(i.imported_at)) + '</td><td>' + vsEsc(i.file_name) + '</td><td>' + i.row_count + '</td><td>' + i.updated + '</td><td>' + i.created + '</td><td>' + i.skipped + '</td>' + (vsIsAdmin() ? '<td>' + vsEsc(vsAgentName(i.imported_by)) + '</td>' : '') + '</tr>').join('') + '</tbody></table></div>' : 'Todavía no has importado ningún archivo.';
+}
+function vsImpRead(input){
+  const f = input.files && input.files[0]; if(!f) return;
+  if(f.size > 10 * 1024 * 1024){ vsMsg('error', 'El archivo pesa más de 10 MB.'); return; }
+  const rd = new FileReader();
+  rd.onload = async () => {
+    const text = String(rd.result || ''); const parsed = vsParseCSV(text);
+    if(!parsed.headers.length || !parsed.rows.length){ vsMsg('error', 'El archivo está vacío o no es un CSV.'); return; }
+    if(parsed.rows.length > 5000){ vsMsg('error', 'El archivo tiene más de 5,000 filas; divídelo en partes.'); return; }
+    VS.imp = { fileName: f.name, text, hash: await vsFileHash(text), headers: parsed.headers, rows: parsed.rows, map: vsDetectColumns(parsed.headers), create: {} };
+    vsMsg('', ''); vsImpCompute(); vsImpPaint();
+  };
+  rd.onerror = () => vsMsg('error', 'No se pudo leer el archivo.');
+  rd.readAsText(f);
+}
+function vsImpCompute(){
+  const imp = VS.imp; if(!imp) return;
+  const seenCase = new Set();
+  imp.items = imp.rows.map((row, i) => {
+    const r = vsReadHsRow(row, imp.map);
+    if(!r.name && !r.hsid && !r.ffm) return { i, r, action: 'skip', why: 'Sin nombre ni ID' };
+    const m = vsMatchCase(r, VS.cases);
+    if(m){
+      if(seenCase.has(m.c.id)) return { i, r, action: 'skip', why: 'Repetido en el archivo (ya se usa otra fila para este caso)' };
+      seenCase.add(m.c.id);
+      const patch = vsHsPatch(r, m.c);
+      return Object.keys(patch).length ? { i, r, action: 'update', c: m.c, by: m.by, patch } : { i, r, action: 'same', c: m.c, by: m.by };
+    }
+    if(!r.first || !r.last) return { i, r, action: 'skip', why: 'Falta nombre o apellido' };
+    if(!r.phone && !r.email) return { i, r, action: 'skip', why: 'Falta teléfono y correo' };
+    if(imp.create[i] === undefined) imp.create[i] = true;
+    return { i, r, action: 'new' };
+  });
+}
+function vsImpPaint(){
+  const el = document.getElementById('vs-imp-preview'), imp = VS.imp; if(!el || !imp) return;
+  const dupe = VS.imports.find(x => x.file_hash === imp.hash);
+  const colOpts = cur => '<option value="">— no usar —</option>' + imp.headers.map((hd, i) => '<option value="' + i + '"' + (String(cur) === String(i) ? ' selected' : '') + '>' + vsEsc(hd || '(columna ' + (i + 1) + ')') + '</option>').join('');
+  const n = a => imp.items.filter(x => x.action === a).length;
+  const willCreate = imp.items.filter(x => x.action === 'new' && imp.create[x.i]).length;
+  let h = '<div class="vs-info" style="margin-top:12px;">Archivo <b>' + vsEsc(imp.fileName) + '</b>: ' + imp.rows.length + ' filas · <b>' + n('update') + '</b> casos para actualizar · <b>' + n('new') + '</b> sin caso (' + willCreate + ' marcados para crear) · ' + n('same') + ' sin cambios · ' + n('skip') + ' omitidos.</div>';
+  if(dupe) h += '<div class="vs-alert">Este mismo archivo ya se importó el ' + vsEsc(vsWhen(dupe.imported_at)) + '. Si lo vuelves a aplicar no pasa nada malo, pero normalmente no hace falta.</div>';
+  if(imp.map.first === undefined && imp.map.name === undefined) h += '<div class="vs-alert">No encontré la columna del nombre. Elígela abajo.</div>';
+  h += '<details' + (imp.mapOpen || (imp.map.first === undefined && imp.map.name === undefined) ? ' open' : '') + ' ontoggle="if(VS.imp) VS.imp.mapOpen=this.open"><summary>Columnas reconocidas (cámbialas si algo no cuadra)</summary><div class="vs-map">'
+    + VS_HS_FIELDS.map(([f, label]) => '<div><label>' + vsEsc(label) + '</label><select onchange="vsImpMap(\'' + f + '\', this.value)">' + colOpts(imp.map[f]) + '</select></div>').join('') + '</div></details>';
+  const rowsHtml = imp.items.slice(0, 400).map(x => {
+    const nm = vsEsc(x.r.name || '—') + (x.r.dob ? '<div class="sub" style="margin:0;">nac. ' + vsEsc(vsFmtDate(x.r.dob)) + '</div>' : '');
+    const plan = vsEsc([x.r.carrier, x.r.plan].filter(Boolean).join(' · ') || '—') + (x.r.status ? '<div class="sub" style="margin:0;">' + vsEsc(x.r.status) + '</div>' : '');
+    let act;
+    if(x.action === 'update') act = vsChip('Actualizar', '#0E6E8C') + '<div class="sub" style="margin:2px 0 0;">' + vsEsc((x.c.client && x.c.client.full_name) || '') + ' (por ' + vsEsc(x.by) + '): ' + vsEsc(vsDescribePatch(x.patch)) + '</div>';
+    else if(x.action === 'same') act = vsChip('Sin cambios', '#6B7280');
+    else if(x.action === 'new') act = '<label class="vs-chk"><input type="checkbox"' + (imp.create[x.i] ? ' checked' : '') + ' onchange="VS.imp.create[' + x.i + ']=this.checked; vsImpPaint()"> Crear cliente (si no existe) y caso de Salud ACA</label>';
+    else act = vsChip('Omitir', '#9B2222') + '<div class="sub" style="margin:2px 0 0;">' + vsEsc(x.why) + '</div>';
+    return '<tr><td>' + (x.i + 2) + '</td><td>' + nm + '</td><td>' + plan + '</td><td>' + act + '</td></tr>';
+  }).join('');
+  h += '<div class="dash-table-wrap" style="margin-top:10px;"><table class="dash-table"><thead><tr><th>Fila</th><th>Cliente</th><th>Plan / estatus</th><th>Qué va a pasar</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>'
+    + (imp.items.length > 400 ? '<p class="sub">Se muestran las primeras 400 filas; se aplican todas.</p>' : '')
+    + '<div class="vs-row-flex" style="margin-top:12px;"><button type="button" class="btn-primary vs-mini" id="vs-imp-apply" onclick="vsImpApply()"' + (n('update') + willCreate ? '' : ' disabled') + '>Aplicar: actualizar ' + n('update') + ' y crear ' + willCreate + '</button><button type="button" class="btn-ghost vs-mini" onclick="VS.imp=null; vsRenderImport()">Cancelar</button></div>';
+  el.innerHTML = h;
+}
+function vsImpMap(field, val){ VS.imp.map[field] = val === '' ? undefined : +val; VS.imp.mapOpen = true; vsImpCompute(); vsImpPaint(); }
+async function vsImpApply(){
+  const imp = VS.imp; if(!imp || VS.busy) return;
+  VS.busy = true; const btn = document.getElementById('vs-imp-apply'); if(btn){ btn.disabled = true; btn.textContent = 'Aplicando…'; }
+  let updated = 0, created = 0, skipped = 0; const errors = []; const now = new Date().toISOString(); const who = (currentProfile && currentProfile.full_name) || null;
+  for(const x of imp.items){
+    try{
+      if(x.action === 'update'){
+        const patch = Object.assign({}, x.patch, { hs_synced_at: now });
+        const r = await sb.from('lh_cases').update(patch).eq('id', x.c.id).select('id'); if(r.error) throw r.error;
+        if(!(r.data || []).length) throw new Error('sin permiso para este caso');
+        await sb.from('lh_activity').insert({ case_id: x.c.id, kind: 'importacion', body: ('Actualizado desde HealthSherpa (' + imp.fileName + '): ' + vsDescribePatch(x.patch)).slice(0, 4000), created_by: vsUid(), created_by_name: who });
+        updated++;
+      } else if(x.action === 'new' && imp.create[x.i]){
+        const r = x.r, full = (r.first + ' ' + r.last).trim(), phoneFmt = r.phone ? vsFmtPhone(r.phone) : null;
+        let clientId = null;
+        const dup = await sb.rpc('find_possible_duplicate_clients', { p_name: full, p_phone: phoneFmt, p_email: r.email });
+        const d0 = ((dup && dup.data) || [])[0];
+        if(d0 && d0.id){
+          const g = await sb.from('clients').select('id').eq('id', d0.id).maybeSingle();
+          if(!g.data) throw new Error('ya existe como cliente de otro agente (' + d0.full_name + ')');
+          clientId = g.data.id;
+        } else {
+          const ins = await sb.from('clients').insert({ client_type: 'individual', first_name: r.first, last_name: r.last, full_name: full, phone: phoneFmt, email: r.email, date_of_birth: r.dob, preferred_language: 'es', lead_source: 'importacion', created_by: vsUid(), assigned_agent_id: vsUid(), client_status: 'lead_nuevo' }).select('id').single();
+          if(ins.error) throw ins.error; clientId = ins.data.id;
+        }
+        const base = { client_id: clientId, agent_id: vsUid(), product_line: 'aca', stage: 'lead', created_by: vsUid() };
+        const patch = vsHsPatch(r, base); delete patch.client_id;
+        const cIns = await sb.from('lh_cases').insert(Object.assign(base, patch, { hs_synced_at: now })).select('id').single();
+        if(cIns.error) throw cIns.error;
+        await sb.from('lh_members').insert({ case_id: cIns.data.id, relationship: 'titular', first_name: r.first, last_name: r.last, date_of_birth: r.dob });
+        await sb.from('lh_activity').insert({ case_id: cIns.data.id, kind: 'importacion', body: ('Creado desde HealthSherpa (' + imp.fileName + ')').slice(0, 4000), created_by: vsUid(), created_by_name: who });
+        created++;
+      } else skipped++;
+    }catch(e){ skipped++; errors.push('Fila ' + (x.i + 2) + ' (' + (x.r.name || '—') + '): ' + ((e && e.message) || e)); }
+  }
+  try{ await sb.from('lh_hs_imports').insert({ file_name: imp.fileName.slice(0, 255), file_hash: imp.hash, row_count: imp.rows.length, updated, created, skipped, summary: { errors: errors.slice(0, 50), map: imp.map }, imported_by: vsUid() }); }catch(e){}
+  VS.busy = false; VS.imp = null;
+  await vsLoad(); vsRenderImport();
+  vsMsg(errors.length ? 'error' : 'success', 'Listo: ' + updated + ' actualizados, ' + created + ' nuevos.' + (errors.length ? ' Con problema: ' + errors.slice(0, 5).join(' · ') + (errors.length > 5 ? ' (y ' + (errors.length - 5) + ' más)' : '') : ''));
+}
+// ===== FIN VIDASALUD-UI =====
+// ===== VIDASALUD-END =====
 
 // ===== PAGINA-UI-START =====
 // Pestaña «Página»: visitas a la página pública + editor del contenido (aviso festivo, aseguradoras, equipo).
