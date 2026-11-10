@@ -2392,7 +2392,7 @@
               <div class="profile-field profile-field-compact"><div class="label">Licencia de conducir</div><div class="num" id="cd-view-licencia">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Fecha de nacimiento</div><div class="num" id="cd-view-nacimiento">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Sexo / Estado civil</div><div class="num" id="cd-view-sexocivil">—</div></div>
-              <div class="profile-field profile-field-compact"><div class="label">Idioma preferido</div><div class="num" id="cd-view-idioma">—</div></div>
+              <div class="profile-field profile-field-compact"><div class="label">Idioma preferido (idioma de sus correos)</div><div class="num" id="cd-view-idioma">—</div><div id="cd-idioma-toggle" style="display:flex; gap:6px; margin-top:6px;"><button type="button" class="tr-pill" data-l="es" onclick="cdSetIdioma('es')">Español</button><button type="button" class="tr-pill" data-l="en" onclick="cdSetIdioma('en')">English</button></div><div class="sub" id="cd-idioma-hint" style="margin:4px 0 0; font-size:12px;">Los correos le llegan en este idioma.</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Dirección residencial</div><div class="num" id="cd-view-direccion">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Dirección postal</div><div class="num" id="cd-view-direccionpostal">—</div></div>
               <div class="profile-field profile-field-compact"><div class="label">Ciudad / Estado / ZIP</div><div class="num" id="cd-view-ciudad">—</div></div>
@@ -6601,7 +6601,7 @@
             ? ` <span class="badge" style="background:#EDEFF5; color:#3A3F55;" title="Agente asignado">👤 ${c.agente.full_name}${c.agente.producer_code ? ' — ' + c.agente.producer_code : ''}</span>`
             : ` <span class="badge" style="background:#F5E9E9; color:#7A3030;" title="Sin agente asignado">👤 Sin agente asignado</span>`)
         : '';
-      const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${webBadge}${agentBadge}`;
+      const nameCell = `${c.full_name}${c.client_type === 'business' ? ' <span class="badge purple">Negocio</span>' : ''}${typeof ldLangBadge === 'function' ? ldLangBadge(c) : ''}${webBadge}${agentBadge}`;
       const policies = allClientPoliciesByClient[c.id] || [];
       const lastTxDate = allLastTransactionByClient[c.id];
       const lastTxCell = lastTxDate ? formatDateUS(lastTxDate.slice(0, 10)) : '—';
@@ -7617,7 +7617,8 @@
     document.getElementById('cd-view-licencia').textContent = c.drivers_license_number ? (c.drivers_license_number + (c.drivers_license_state ? ' (' + c.drivers_license_state + ')' : '')) : '—';
     document.getElementById('cd-view-nacimiento').textContent = formatDateUS(c.date_of_birth) || '—';
     document.getElementById('cd-view-sexocivil').textContent = [c.sex, c.marital_status].filter(Boolean).join(' / ') || '—';
-    document.getElementById('cd-view-idioma').textContent = (c.preferred_language === 'en' ? 'Inglés' : 'Español') + (c.email_opt_out ? ' · baja de correos de festividades' : '');
+    document.getElementById('cd-view-idioma').textContent = (c.preferred_language === 'en' ? 'Inglés' : 'Español') + (c.email_opt_out ? ' · baja de correos' : '');
+    if(typeof cdIdiomaPaint === 'function') cdIdiomaPaint(c);
     document.getElementById('cd-view-direccion').textContent = c.address || '—';
     document.getElementById('cd-view-direccionpostal').textContent = c.mailing_address || '—';
     document.getElementById('cd-view-ciudad').textContent = [c.city, c.state, c.zip].filter(Boolean).join(', ') || '—';
@@ -13811,7 +13812,7 @@
         : '';
       return `
       <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${webBadge}${agentLine}</div>
+        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${typeof ldLangBadge === 'function' ? ldLangBadge(c) : ''}${webBadge}${agentLine}</div>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:6px 10px; color:#8a3030; border-color:#E3B8B8;" onclick="markLeadNoContactar('${c.id}', event)">🚫 No contactar</button>
           <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
@@ -19634,6 +19635,7 @@ function fmDismissAll(){ const s = fmSeenIds().concat(fmLastNotifIds); fmSaveSee
 })();
 // ===== FIRMAS-JS-END =====
 
+
 // ===== HM-SHARED-START =====
 // Código COMPARTIDO (idéntico en el CRM y en la función send-holiday-emails; una prueba comprueba que sean iguales):
 // la plantilla del correo y la regla de a quién se le manda. Así la vista previa del CRM es exactamente lo que llega.
@@ -19673,7 +19675,7 @@ function hmClassify(clients, sentIds){
   });
   return out;
 }
-// Construye el correo. o = { lang, name, subject, message, closing, imageUrl, campaignName, settings:{agency_name,address,phone,website}, unsubUrl }
+// Construye el correo. o = { lang, name, subject, message, closing, imageUrl, campaignName, settings:{agency_name,address,phone,website}, unsubUrl, cta?:{label,href} }
 function hmBuildEmail(o){
   const en = o.lang === 'en';
   const name = String(o.name || '').trim();
@@ -19699,16 +19701,16 @@ function hmBuildEmail(o){
 (o.imageUrl ? '<tr><td style="padding:0;line-height:0;font-size:0;"><img src="' + hmEsc(o.imageUrl) + '" alt="' + hmEsc(o.campaignName || subject) + '" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;"></td></tr>' : '') +
 '<tr><td style="padding:28px 32px 6px;font-size:21px;font-weight:700;color:#14305F;">' + hmEsc(greeting) + '</td></tr>' +
 '<tr><td style="padding:8px 32px 0;">' + msgP.map(function(p){ return '<p style="' + pStyle + '">' + hmEsc(p).replace(/\n/g, '<br>') + '</p>'; }).join('') + closingP.map(function(p){ return '<p style="' + pStyle + '">' + hmEsc(p).replace(/\n/g, '<br>') + '</p>'; }).join('') + '</td></tr>' +
+(o.cta && o.cta.label && o.cta.href ? '<tr><td align="center" style="padding:4px 32px 22px;"><a href="' + hmEsc(o.cta.href) + '" style="display:inline-block;background:#14305F;color:#FFFFFF;text-decoration:none;font-size:17px;font-weight:700;padding:14px 28px;border-radius:8px;">' + hmEsc(o.cta.label) + '</a></td></tr>' : '') +
 '<tr><td style="padding:4px 32px 28px;font-size:16px;line-height:1.5;color:#14305F;">' + hmEsc(sign1) + '<br><strong>' + hmEsc(sign2) + '</strong>' + (contact ? '<br><span style="font-size:14px;color:#555555;">' + hmEsc(contact) + '</span>' : '') + '</td></tr>' +
 '<tr><td style="padding:18px 32px;background:#F6F7FA;border-top:1px solid #E3E6EE;font-size:12px;line-height:1.6;color:#777777;">' +
 (s.address ? hmEsc(agency) + ' · ' + hmEsc(s.address) + '<br>' : '') +
 hmEsc(unsubIntro) + '<a href="' + hmEsc(o.unsubUrl || '#') + '" style="color:#555555;text-decoration:underline;">' + hmEsc(unsubLabel) + '</a>.' +
 '</td></tr></table></td></tr></table></body></html>';
-  const text = [greeting, ''].concat(msgP.length ? [msgP.join('\n\n'), ''] : [], closingP.length ? [closingP.join('\n\n'), ''] : [], [sign1, sign2], contact ? [contact] : [], ['', (s.address ? agency + ' · ' + s.address + '\n' : '') + unsubIntro + unsubLabel + ': ' + (o.unsubUrl || '')]).join('\n');
+  const text = [greeting, ''].concat(msgP.length ? [msgP.join('\n\n'), ''] : [], closingP.length ? [closingP.join('\n\n'), ''] : [], o.cta && o.cta.label ? [o.cta.label, ''] : [], [sign1, sign2], contact ? [contact] : [], ['', (s.address ? agency + ' · ' + s.address + '\n' : '') + unsubIntro + unsubLabel + ': ' + (o.unsubUrl || '')]).join('\n');
   return { subject: subject, html: html, text: text };
 }
 // ===== HM-SHARED-END =====
-
 // ===== HM-UI-START =====
 // ✉️ Bandeja de correos — correos de festividades a clientes y leads, en su idioma. Solo admin / super_admin.
 // Requiere migracion_correos_festivos.sql y las funciones send-holiday-emails y email-unsubscribe.
@@ -19780,6 +19782,7 @@ async function hmOpen(){
   hmRender();
   await hmLoad();
   hmRender();
+  if(HM.view === 'leads' && typeof ldOpen === 'function') ldOpen();
 }
 async function hmLoad(){
   if(HM.loading) return; HM.loading = true;
@@ -19796,16 +19799,16 @@ async function hmLoad(){
     HM.error = /relation|does not exist|schema cache|column/i.test(ex.message) ? 'Falta correr la migración SQL de la Bandeja de correos (migracion_correos_festivos.sql) en Supabase.' : ex.message;
   } finally { HM.loading = false; }
 }
-function hmSetView(v){ HM.view = v; hmRender(); }
+function hmSetView(v){ HM.view = v; hmRender(); if(v === 'leads' && typeof ldOpen === 'function') ldOpen(); }
 function hmChip(t, k){ return '<span class="tr-chip tr-chip-' + (k || 'gray') + '">' + hmEsc(t) + '</span>'; }
 function hmToast(msg, kind){ const el = document.getElementById('hm-msg'); if(!el) return; el.className = 'msg ' + (kind || 'success'); el.textContent = msg; el.style.display = 'block'; el.scrollIntoView({ block: 'nearest' }); clearTimeout(hmToast.t); hmToast.t = setTimeout(() => { el.style.display = 'none'; }, 9000); }
 function hmRender(){
   const body = document.getElementById('hm-body'); if(!body) return;
   if(HM.error){ body.innerHTML = '<div class="dash-card"><div class="msg error" style="display:block;">' + hmEsc(HM.error) + '</div><button class="btn-ghost" style="width:auto; padding:8px 16px; margin-top:10px;" onclick="HM.error=null; HM.loaded=false; hmOpen()">Reintentar</button></div>'; return; }
   if(!HM.loaded){ body.innerHTML = '<div class="dash-card">Cargando…</div>'; return; }
-  const tabs = [['fest', 'Festividades'], ['hist', 'Historial de envíos'], ['conf', 'Configuración']];
+  const tabs = [['fest', 'Festividades'], ['leads', 'Leads (automático)'], ['hist', 'Historial de envíos'], ['conf', 'Configuración']];
   const nav = '<div class="tr-pills">' + tabs.map(t => '<button type="button" class="tr-pill ' + (HM.view === t[0] ? 'active' : '') + '" onclick="hmSetView(\'' + t[0] + '\')">' + t[1] + '</button>').join('') + '</div><div class="msg" id="hm-msg" style="display:none;"></div>';
-  body.innerHTML = nav + (HM.view === 'hist' ? hmViewHist() : HM.view === 'conf' ? hmViewConf() : hmViewFest());
+  body.innerHTML = nav + (HM.view === 'hist' ? hmViewHist() : HM.view === 'conf' ? hmViewConf() : HM.view === 'leads' && typeof ldViewHtml === 'function' ? ldViewHtml() : hmViewFest());
 }
 function hmSentCount(id, year){ return HM.sends.filter(s => s.campaign_id === id && s.send_year === year && s.status === 'sent').length; }
 function hmViewFest(){
@@ -20034,6 +20037,474 @@ async function hmDoSend(id, btn){
   hmToast(parts.join(' '), r.failed ? 'error' : 'success');
 }
 // ===== HM-UI-END =====
+// ===== LD-SHARED-START =====
+// Código COMPARTIDO (idéntico en el CRM y en la función send-lead-emails; una prueba comprueba que sean iguales):
+// los mensajes por tipo de seguro (español / inglés), la regla de a quién le toca correo hoy y cómo se arma el correo.
+// Necesita el bloque HM-SHARED (hmBuildEmail, hmNiceName, hmLang, HM_EMAIL_RE).
+const LD_MAX_STEPS = 6;
+// Seguro que cotizó (client_quotes.product) → grupo de mensajes.
+const LD_GROUP_OF = {
+  auto_personal: 'auto', auto: 'auto', motocicleta: 'moto', home: 'home', vida: 'vida', medico: 'medico', renters: 'renters',
+  auto_comercial: 'auto_comercial', workers_comp: 'workers_comp',
+  general_liability: 'negocios', professional_liability: 'negocios', errores_omisiones: 'negocios', commercial_property: 'negocios', bop: 'negocios', comercial_negocios: 'negocios',
+  otro: 'general'
+};
+function ldGroup(product){ return LD_GROUP_OF[String(product || '').toLowerCase()] || 'general'; }
+// Datos de cada grupo. noun = «su ___»; why = por qué no dejarlo para después; need = qué hace falta para cotizar; q/a = una pregunta frecuente.
+const LD_GROUPS = {
+  auto: {
+    label: 'Auto personal',
+    es: { noun: 'seguro de auto', benefit: 'Trabajamos con varias compañías para buscarle una buena tarifa con la cobertura que usted realmente necesita para manejar tranquilo.',
+      why: 'En Texas el seguro de auto es obligatorio, y una cobertura que se queda corta puede salir muy cara si ocurre un accidente.',
+      need: 'su licencia de conducir, los datos del vehículo (VIN o placa) y su fecha de nacimiento',
+      q: '¿Puedo cotizar aunque todavía no tenga el seguro vigente?', a: 'Sí. Cuéntenos su situación y le explicamos cuáles son sus opciones.' },
+    en: { noun: 'auto insurance', benefit: 'We work with several companies to look for a good rate with the coverage you actually need to drive with peace of mind.',
+      why: 'Auto insurance is required in Texas, and coverage that falls short can get very expensive if an accident happens.',
+      need: 'your driver license, the vehicle information (VIN or plate) and your date of birth',
+      q: 'Can I get a quote even if I do not have current coverage?', a: 'Yes. Tell us your situation and we will walk you through your options.' }
+  },
+  moto: {
+    label: 'Motocicleta',
+    es: { noun: 'seguro de motocicleta', benefit: 'Le buscamos opciones para proteger su moto y a usted en cada recorrido.',
+      why: 'En Texas la moto también necesita seguro, y estar protegido le da tranquilidad cada vez que sale a la carretera.',
+      need: 'su licencia, los datos de la moto (año, marca, modelo y VIN) y su fecha de nacimiento',
+      q: '¿Cotizan motos de cualquier tipo?', a: 'Dígannos qué moto tiene y le decimos qué opciones hay disponibles.' },
+    en: { noun: 'motorcycle insurance', benefit: 'We look for options to protect your bike and you on every ride.',
+      why: 'Motorcycles also need insurance in Texas, and being protected gives you peace of mind every time you hit the road.',
+      need: 'your license, the motorcycle information (year, make, model and VIN) and your date of birth',
+      q: 'Do you quote any type of motorcycle?', a: 'Tell us which bike you have and we will tell you what options are available.' }
+  },
+  home: {
+    label: 'Casa (Home)',
+    es: { noun: 'seguro de casa', benefit: 'Le ayudamos a comparar opciones para proteger lo que más le ha costado: su hogar y sus pertenencias.',
+      why: 'Una tormenta, un incendio o un robo pueden llegar sin avisar, y tener la cobertura correcta hace la diferencia.',
+      need: 'la dirección de la propiedad, el año de construcción y la edad del techo',
+      q: '¿Qué cubre normalmente un seguro de casa?', a: 'Depende de la póliza; con gusto le explicamos qué cubre cada opción antes de que decida.' },
+    en: { noun: 'home insurance', benefit: 'We help you compare options to protect what matters most: your home and your belongings.',
+      why: 'A storm, a fire or a theft can show up without warning, and having the right coverage makes all the difference.',
+      need: 'the property address, the year it was built and the age of the roof',
+      q: 'What does home insurance usually cover?', a: 'It depends on the policy; we are happy to explain what each option covers before you decide.' }
+  },
+  vida: {
+    label: 'Vida',
+    es: { noun: 'seguro de vida', benefit: 'Un seguro de vida deja protegida económicamente a su familia. Le explicamos las opciones, como el seguro a término y el IUL, sin presión.',
+      why: 'Mientras más joven y saludable es usted al empezar, más accesible suele ser, y su familia queda protegida desde el primer día.',
+      need: 'su fecha de nacimiento, estatura y peso aproximados, y el monto de protección que le gustaría',
+      q: '¿Cuál es la diferencia entre un seguro a término y un IUL?', a: 'El seguro a término cubre por un tiempo fijo; el IUL es permanente y además acumula valor en efectivo. Le ayudamos a ver cuál le conviene.' },
+    en: { noun: 'life insurance', benefit: 'Life insurance financially protects your family. We explain the options, like term life and IUL, with no pressure.',
+      why: 'The younger and healthier you are when you start, the more affordable it usually is, and your family is protected from day one.',
+      need: 'your date of birth, approximate height and weight, and the amount of protection you would like',
+      q: 'What is the difference between term life and IUL?', a: 'Term life covers you for a fixed period; IUL is permanent and also builds cash value. We help you see which one fits you.' }
+  },
+  medico: {
+    label: 'Salud / Médico',
+    es: { noun: 'seguro médico', benefit: 'Le ayudamos a revisar las opciones de seguro de salud disponibles para usted y su familia.',
+      why: 'Una visita al hospital sin seguro puede costar mucho más de lo que se imagina; tener cobertura le da tranquilidad.',
+      need: 'la fecha de nacimiento de cada persona que quiere cubrir y el ingreso aproximado del hogar',
+      q: '¿Pueden ayudarme a revisar qué plan me conviene?', a: 'Sí. Revisamos las opciones disponibles para su situación y se las explicamos en palabras sencillas.' },
+    en: { noun: 'health insurance', benefit: 'We help you review the health insurance options available for you and your family.',
+      why: 'A hospital visit without insurance can cost far more than you imagine; having coverage gives you peace of mind.',
+      need: 'the date of birth of each person you want to cover and the approximate household income',
+      q: 'Can you help me figure out which plan fits me?', a: 'Yes. We review the options available for your situation and explain them in plain words.' }
+  },
+  renters: {
+    label: 'Inquilinos (Renters)',
+    es: { noun: 'seguro de inquilino', benefit: 'Protege sus pertenencias y le da responsabilidad civil dentro de la casa o apartamento que renta, normalmente a un costo muy accesible.',
+      why: 'El seguro del dueño del edificio no cubre sus cosas: ropa, muebles y aparatos electrónicos quedan por su cuenta.',
+      need: 'la dirección donde vive y un estimado del valor de sus pertenencias',
+      q: '¿Mi arrendador ya tiene seguro, entonces yo no lo necesito?', a: 'El seguro del arrendador protege el edificio, no sus pertenencias. Con gusto se lo explicamos.' },
+    en: { noun: 'renters insurance', benefit: 'It protects your belongings and gives you liability coverage in the home or apartment you rent, usually at a very affordable cost.',
+      why: 'The landlord\'s insurance does not cover your things: clothing, furniture and electronics are on you.',
+      need: 'the address where you live and an estimate of the value of your belongings',
+      q: 'My landlord already has insurance, so do I still need it?', a: 'The landlord\'s policy protects the building, not your belongings. We are happy to explain.' }
+  },
+  auto_comercial: {
+    label: 'Auto comercial / Trucking',
+    es: { noun: 'seguro de auto comercial', benefit: 'Protegemos su vehículo de trabajo y su negocio sobre ruedas, para que un imprevisto no detenga sus operaciones.',
+      why: 'Cada día parado por un accidente es dinero que no entra; la cobertura correcta le ayuda a seguir trabajando.',
+      need: 'los datos de su negocio (y número DOT/MC si aplica), los vehículos y el tipo de trabajo o carga',
+      q: '¿Cotizan para negocios con varios vehículos?', a: 'Sí. Cuéntenos cuántos vehículos tiene y qué hace con ellos y le armamos opciones.' },
+    en: { noun: 'commercial auto insurance', benefit: 'We protect your work vehicle and your business on wheels, so an unexpected event does not stop your operations.',
+      why: 'Every day your vehicle is out of service after an accident is money not coming in; the right coverage helps you keep working.',
+      need: 'your business information (and DOT/MC number if applicable), the vehicles and the type of work or cargo',
+      q: 'Do you quote businesses with several vehicles?', a: 'Yes. Tell us how many vehicles you have and what you use them for and we will put options together.' }
+  },
+  negocios: {
+    label: 'Seguro para negocios',
+    es: { noun: 'seguro para su negocio', benefit: 'Le ayudamos a proteger su negocio con la cobertura que su actividad realmente necesita.',
+      why: 'Una demanda o un daño a la propiedad puede afectar años de trabajo; estar protegido le permite concentrarse en su negocio.',
+      need: 'el nombre y tipo de su negocio, la dirección, los ingresos aproximados y el número de empleados',
+      q: '¿Qué tipo de negocios pueden asegurar?', a: 'Trabajamos con muchos tipos de negocios. Cuéntenos el suyo y le decimos qué opciones hay.' },
+    en: { noun: 'business insurance', benefit: 'We help you protect your business with the coverage your activity really needs.',
+      why: 'A lawsuit or property damage can affect years of hard work; being protected lets you focus on your business.',
+      need: 'your business name and type, the address, the approximate revenue and the number of employees',
+      q: 'What types of businesses can you insure?', a: 'We work with many types of businesses. Tell us about yours and we will tell you what options are available.' }
+  },
+  workers_comp: {
+    label: 'Workers Compensation',
+    es: { noun: 'seguro de compensación para trabajadores (Workers\' Comp)', benefit: 'Le ayudamos a conseguir la cobertura de compensación para sus trabajadores, para que usted y su equipo estén protegidos si ocurre un accidente en el trabajo.',
+      why: 'Muchos contratos y clientes lo exigen, y un accidente de trabajo sin cobertura puede costarle mucho a su negocio.',
+      need: 'el tipo de negocio, el trabajo principal que realizan, la nómina anual aproximada y el número de empleados',
+      q: '¿Pueden cotizar si tengo pocos empleados?', a: 'Sí. Cuéntenos cuántas personas trabajan con usted y qué hacen, y revisamos opciones.' },
+    en: { noun: 'workers\' compensation insurance', benefit: 'We help you get workers\' compensation coverage so you and your team are protected if an accident happens at work.',
+      why: 'Many contracts and customers require it, and a work accident without coverage can be very costly for your business.',
+      need: 'the type of business, the main work you do, the approximate annual payroll and the number of employees',
+      q: 'Can you quote if I only have a few employees?', a: 'Yes. Tell us how many people work with you and what they do, and we will review options.' }
+  },
+  general: {
+    label: 'General (otro / sin cotización)',
+    es: { noun: 'seguro', benefit: 'Tenemos opciones de seguro de auto, casa, vida, salud, inquilino, negocios y más, y le ayudamos a escoger lo que más le conviene.',
+      why: 'Mientras antes tenga la protección correcta, más tranquilo puede estar usted y su familia.',
+      need: 'su nombre, su teléfono y qué tipo de seguro está buscando',
+      q: '¿Qué tipos de seguro ofrecen?', a: 'Auto, casa, vida, salud, inquilino, motocicleta, negocios y más. Si no lo ve en la lista, pregúntenos.' },
+    en: { noun: 'insurance', benefit: 'We have auto, home, life, health, renters, business insurance and more, and we help you choose what fits you best.',
+      why: 'The sooner you have the right protection, the more at ease you and your family can be.',
+      need: 'your name, your phone number and what type of insurance you are looking for',
+      q: 'What types of insurance do you offer?', a: 'Auto, home, life, health, renters, motorcycle, business and more. If you do not see it on the list, just ask us.' }
+  }
+};
+const LD_GROUP_KEYS = ['auto', 'moto', 'home', 'vida', 'medico', 'renters', 'auto_comercial', 'negocios', 'workers_comp', 'general'];
+// Texto original de cada correo (paso 1..6). Se pueden cambiar desde el CRM; lo cambiado se guarda en lead_email_templates.
+// En el texto: {{nombre}}/{{name}} = nombre del cliente, {{phone}} = teléfono de la agencia, {{agency}} = nombre de la agencia.
+function ldDefault(group, step, lang){
+  const g = (LD_GROUPS[group] || LD_GROUPS.general)[lang === 'en' ? 'en' : 'es'];
+  const en = lang === 'en';
+  const n = Math.min(LD_MAX_STEPS, Math.max(1, step | 0));
+  if(!en){
+    const subj = [
+      '{{nombre}}, ¿le ayudamos con su ' + g.noun + '?',
+      'Su ' + g.noun + ': no lo deje para después',
+      'Cotizar su ' + g.noun + ' toma solo un minuto',
+      'Lo que muchos se preguntan sobre el ' + g.noun,
+      'Su agencia de seguros de confianza en Houston',
+      '{{nombre}}, un último mensaje de {{agency}}'
+    ];
+    const msg = [
+      'Gracias por darnos la oportunidad de ayudarle con su ' + g.noun + '. En {{agency}} somos su agencia de seguros de confianza y nos encantaría encontrar la opción que mejor se ajuste a usted.\n\n' + g.benefit + '\n\nLlámenos o escríbanos al {{phone}} y con gusto le ayudamos a realizar su cotización en un minuto.',
+      g.why + '\n\nEs normal dejarlo para después, pero cotizar es rápido y sin compromiso. Estamos para ayudarle en español y en inglés.\n\nLlámenos o escríbanos al {{phone}}.',
+      'Hacer su cotización toma solo unos minutos y no tiene ningún compromiso. Para empezar solo necesitamos ' + g.need + '.\n\nLlámenos o escríbanos al {{phone}} y nosotros nos encargamos del resto.',
+      'Una pregunta que nos hacen mucho: «' + g.q + '»\n\n' + g.a + '\n\nSi tiene otra duda, llámenos o escríbanos al {{phone}}; con gusto se la resolvemos.',
+      'En {{agency}} somos una agencia de seguros en Houston, Texas. Trabajamos con varias compañías para buscarle opciones, y le atendemos con trato personal, en español y en inglés.\n\nSi todavía necesita su ' + g.noun + ', aquí estamos: {{phone}}.',
+      'No queremos llenar su bandeja de correos, así que este es nuestro último mensaje sobre su ' + g.noun + '.\n\nSi todavía lo necesita, llámenos o escríbanos al {{phone}} y con gusto le ayudamos. Y si ya lo resolvió, ¡qué bueno! Cuando necesite algo, ya sabe dónde encontrarnos.'
+    ];
+    return { subject: subj[n - 1], message: msg[n - 1] };
+  }
+  const subj = [
+    '{{name}}, can we help you with your ' + g.noun + '?',
+    'Your ' + g.noun + ': do not put it off',
+    'Quoting your ' + g.noun + ' takes just a minute',
+    'What many people ask about ' + g.noun,
+    'Your trusted insurance agency in Houston',
+    '{{name}}, one last message from {{agency}}'
+  ];
+  const msg = [
+    'Thank you for giving us the chance to help you with your ' + g.noun + '. At {{agency}} we are your trusted insurance agency and we would love to find the option that fits you best.\n\n' + g.benefit + '\n\nCall or text us at {{phone}} and we will gladly help you get your quote in a minute.',
+    g.why + '\n\nIt is normal to put it off, but getting a quote is quick and there is no obligation. We are here to help you in English and in Spanish.\n\nCall or text us at {{phone}}.',
+    'Getting your quote takes just a few minutes and there is no obligation. To get started we only need ' + g.need + '.\n\nCall or text us at {{phone}} and we will take care of the rest.',
+    'A question we get a lot: "' + g.q + '"\n\n' + g.a + '\n\nIf you have any other question, call or text us at {{phone}}; we will gladly answer it.',
+    'At {{agency}} we are an insurance agency in Houston, Texas. We work with several companies to look for options, and we treat you personally, in English and in Spanish.\n\nIf you still need your ' + g.noun + ', we are here: {{phone}}.',
+    'We do not want to fill your inbox, so this is our last message about your ' + g.noun + '.\n\nIf you still need it, call or text us at {{phone}} and we will gladly help. And if you already took care of it, great! Whenever you need something, you know where to find us.'
+  ];
+  return { subject: subj[n - 1], message: msg[n - 1] };
+}
+// Busca el texto: si Geidy lo cambió (overrides = filas de lead_email_templates) usa el suyo; si no, el original.
+function ldPick(overrides, group, step, lang){
+  const l = lang === 'en' ? 'en' : 'es';
+  const rows = overrides || [];
+  for(let i = 0; i < rows.length; i++){
+    const r = rows[i];
+    if(r.group_key === group && r.lang === l && Number(r.step) === Number(step) && String(r.message || '').trim()) return { subject: r.subject || ldDefault(group, step, l).subject, message: r.message, custom: true };
+  }
+  const d = ldDefault(group, step, l); d.custom = false; return d;
+}
+function ldFill(text, agency, phone){ return String(text || '').replace(/\{\{\s*phone\s*\}\}/gi, phone || '').replace(/\{\{\s*agency\s*\}\}/gi, agency || 'GMAX All Insurance'); }
+function ldTelHref(phone){ const d = String(phone || '').replace(/\D/g, ''); return d.length === 10 ? 'tel:+1' + d : (d.length === 11 && d[0] === '1' ? 'tel:+' + d : (d ? 'tel:' + d : '')); }
+// Arma el correo de un lead. o = { lang, name, group, step, overrides, settings:{agency_name,address,phone,website}, unsubUrl }
+function ldBuildEmail(o){
+  const s = o.settings || {};
+  const lang = o.lang === 'en' ? 'en' : 'es';
+  const t = ldPick(o.overrides, o.group, o.step, lang);
+  const agency = s.agency_name || 'GMAX All Insurance';
+  const phone = s.phone || '';
+  const href = ldTelHref(phone);
+  const m = hmBuildEmail({
+    lang: lang, name: o.name, subject: ldFill(t.subject, agency, phone), message: ldFill(t.message, agency, phone), closing: '',
+    campaignName: agency, settings: s, unsubUrl: o.unsubUrl,
+    cta: href ? { label: (lang === 'en' ? 'Call us: ' : 'Llámenos: ') + phone, href: href } : null
+  });
+  return m;
+}
+// ¿A quién le toca correo hoy?
+//   leads   = clientes con estado «lead_nuevo» { id, first_name, full_name, email, preferred_language, client_status, deleted_at, email_opt_out, created_at, leadAt (última cotización o alta), product, hasPolicy }
+//   sends   = envíos ya hechos { client_id, step, status ('sent'|'failed'), sent_at }
+//   cfg     = { interval_days, max_emails, first_delay_days, max_lead_age_days }
+//   nowMs   = ahora (ms)
+// Devuelve { due:[{c, step, lang, group}], waiting, done, excluded:{...} }
+function ldCompute(leads, sends, cfg, nowMs){
+  const DAY = 86400000, SLACK = 3 * 3600000;   // 3 h de margen para que el envío de las 10:00 no se salte un día por unos minutos
+  const maxN = Math.min(LD_MAX_STEPS, Math.max(1, Number(cfg.max_emails) || LD_MAX_STEPS));
+  const interval = Math.max(1, Number(cfg.interval_days) || 3), first = Math.max(0, cfg.first_delay_days == null ? 1 : Number(cfg.first_delay_days)), maxAge = Math.max(1, Number(cfg.max_lead_age_days) || 45);
+  const out = { due: [], waiting: 0, done: 0, excluded: { eliminado: 0, baja: 0, ya_es_cliente: 0, sin_correo: 0, correo_invalido: 0, muy_viejo: 0, muchos_fallos: 0, correo_repetido: 0, no_es_lead: 0 } };
+  const by = {};
+  (sends || []).forEach(function(r){ if(!r.client_id) return; const o = by[r.client_id] || (by[r.client_id] = { n: 0, last: 0, maxStep: 0, failed: 0 }); if(r.status === 'sent'){ o.n++; o.maxStep = Math.max(o.maxStep, Number(r.step) || 0); const t = Date.parse(r.sent_at); if(t > o.last) o.last = t; } else if(r.status === 'failed') o.failed++; });
+  const seen = {};
+  const x = out.excluded;
+  (leads || []).forEach(function(c){
+    const st = by[c.id] || { n: 0, last: 0, maxStep: 0, failed: 0 };
+    if(c.deleted_at){ x.eliminado++; return; }
+    if(c.client_status !== 'lead_nuevo'){ x.no_es_lead++; return; }
+    if(c.email_opt_out){ x.baja++; return; }
+    if(c.hasPolicy){ x.ya_es_cliente++; return; }
+    const email = String(c.email || '').trim();
+    if(!email){ x.sin_correo++; return; }
+    if(!HM_EMAIL_RE.test(email)){ x.correo_invalido++; return; }
+    const key = email.toLowerCase();
+    if(seen[key]){ x.correo_repetido++; return; }
+    seen[key] = 1;
+    if(st.failed >= 3 && st.n === 0){ x.muchos_fallos++; return; }
+    const step = Math.max(st.n, st.maxStep) + 1;
+    if(step > maxN){ out.done++; return; }
+    const startMs = Date.parse(c.leadAt || c.created_at);
+    let dueAt;
+    if(st.n === 0){
+      if(!isNaN(startMs) && nowMs - startMs > maxAge * DAY){ x.muy_viejo++; return; }
+      dueAt = (isNaN(startMs) ? nowMs : startMs) + first * DAY - SLACK;
+    } else dueAt = st.last + interval * DAY - SLACK;
+    if(nowMs < dueAt){ out.waiting++; return; }
+    out.due.push({ c: c, step: step, lang: hmLang(c), group: ldGroup(c.product) });
+  });
+  return out;
+}
+// ===== LD-SHARED-END =====
+// ===== LD-UI-START =====
+// ✉️ Bandeja de correos → «Leads (automático)». Solo admin / super_admin.
+// Requiere migracion_correos_leads.sql, las funciones send-lead-emails y email-unsubscribe, y (para que salga solo) migracion_cron_correos_leads.sql.
+const LD = { loaded: false, loading: false, error: null, settings: null, templates: [], sends: [], leads: [], plan: null, noLang: 0, ed: { group: 'auto', lang: 'es', step: 1 }, busy: false };
+const LD_FN_URL = SUPABASE_URL + '/functions/v1/send-lead-emails';
+const LD_EXCL = { eliminado: 'eliminados', baja: 'dados de baja de los correos', ya_es_cliente: 'que ya tienen póliza', sin_correo: 'sin correo guardado', correo_invalido: 'con un correo que no es válido', muy_viejo: 'registrados hace demasiado tiempo', muchos_fallos: 'cuyo correo rebotó 3 veces', correo_repetido: 'con un correo repetido en otra ficha', no_es_lead: 'que ya no son lead' };
+function ldChunks(a, n){ const o = []; for(let i = 0; i < a.length; i += n) o.push(a.slice(i, i + n)); return o; }
+async function ldOpen(){
+  if(!hmUser()) return;
+  ldPaint();
+  await ldLoad();
+  ldPaint();
+}
+async function ldLoad(){
+  if(LD.loading) return; LD.loading = true;
+  try {
+    const [s, t, e] = await Promise.all([
+      sb.from('lead_email_settings').select('*').eq('id', 1).maybeSingle(),
+      sb.from('lead_email_templates').select('*'),
+      sb.from('lead_email_sends').select('client_id, email, group_key, step, language, status, error, trigger, sent_at').order('sent_at', { ascending: false }).limit(3000)
+    ]);
+    const err = s.error || t.error || e.error; if(err) throw new Error(err.message);
+    if(!s.data) throw new Error('relation lead_email_settings: no hay fila de ajustes');
+    LD.settings = s.data; LD.templates = t.data || []; LD.sends = e.data || [];
+    const leads = [];
+    for(let from = 0; ; from += 1000){
+      const r = await sb.from('clients').select('id, first_name, full_name, email, preferred_language, client_status, deleted_at, email_opt_out, created_at').eq('client_status', 'lead_nuevo').is('deleted_at', null).order('created_at', { ascending: true }).range(from, from + 999);
+      if(r.error) throw new Error(r.error.message);
+      leads.push(...(r.data || [])); if(!r.data || r.data.length < 1000) break;
+    }
+    const quoteBy = {}, hasPol = {};
+    for(const part of ldChunks(leads.map(l => l.id), 100)){
+      const q = await sb.from('client_quotes').select('client_id, product, created_at').in('client_id', part).order('created_at', { ascending: true });
+      (q.data || []).forEach(r => { quoteBy[r.client_id] = r; });
+      const p = await sb.from('client_policies').select('client_id').neq('status', 'cancelled').in('client_id', part);
+      (p.data || []).forEach(r => { hasPol[r.client_id] = true; });
+    }
+    leads.forEach(l => { const q = quoteBy[l.id]; l.product = q ? q.product : null; l.leadAt = q && Date.parse(q.created_at) > Date.parse(l.created_at) ? q.created_at : l.created_at; l.hasPolicy = !!hasPol[l.id]; });
+    LD.leads = leads;
+    LD.noLang = leads.filter(l => l.email && !l.preferred_language).length;
+    LD.plan = ldCompute(leads, LD.sends, LD.settings, Date.now());
+    LD.error = null; LD.loaded = true;
+  } catch(ex){
+    LD.error = /relation|does not exist|schema cache|column/i.test(ex.message) ? 'Falta correr la migración SQL de los correos a leads (migracion_correos_leads.sql) en Supabase.' : ex.message;
+  } finally { LD.loading = false; }
+}
+function ldViewHtml(){ return '<div id="ld-body">' + ldBodyHtml() + '</div>'; }
+function ldPaint(){ const el = document.getElementById('ld-body'); if(el) el.innerHTML = ldBodyHtml(); }
+function ldDate(iso){ return iso ? (typeof formatDateTimeUS === 'function' ? formatDateTimeUS(iso) : iso) : '—'; }
+function ldLangName(l){ return l === 'en' ? 'Inglés' : 'Español'; }
+function ldBodyHtml(){
+  if(LD.error) return '<div class="dash-card"><div class="msg error" style="display:block;">' + hmEsc(LD.error) + '</div><button class="btn-ghost" style="width:auto; padding:8px 16px; margin-top:10px;" onclick="LD.error=null; LD.loaded=false; ldOpen()">Reintentar</button></div>';
+  if(!LD.loaded) return '<div class="dash-card">Cargando…</div>';
+  return ldViewStatus() + ldViewMessages() + ldViewHistory();
+}
+function ldViewStatus(){
+  const s = LD.settings, p = LD.plan, hs = HM.settings || {};
+  const addrOk = String(hs.address || '').trim().length >= 8;
+  const warn = addrOk ? '' : '<div class="msg" style="display:block; background:#FFF6E0; color:#7A5A00; border:1px solid #F0D58A; margin:10px 0;">Antes de enviar, escribe la <b>dirección de la agencia</b> en la pestaña «Configuración» (la ley exige la dirección en cada correo de mercadeo).</div>';
+  const byGroup = {};
+  p.due.forEach(d => { const k = d.group; const o = byGroup[k] || (byGroup[k] = { es: 0, en: 0 }); o[d.lang]++; });
+  const dueRows = Object.keys(byGroup).sort().map(k => '<tr><td>' + hmEsc((LD_GROUPS[k] || LD_GROUPS.general).label) + '</td><td>' + byGroup[k].es + '</td><td>' + byGroup[k].en + '</td></tr>').join('');
+  const excl = Object.keys(p.excluded).filter(k => p.excluded[k]).map(k => p.excluded[k] + ' ' + LD_EXCL[k]);
+  const sel = (id, val, opts) => '<select id="ld-' + id + '">' + opts.map(o => '<option value="' + o[0] + '"' + (String(val) === String(o[0]) ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+  const on = !!s.enabled;
+  return '<div class="dash-card"><div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;"><div><h4 style="margin:0;">Envío automático a leads: ' + (on ? '<span class="tr-chip tr-chip-green" style="font-size:13px;">PRENDIDO</span>' : '<span class="tr-chip tr-chip-gray" style="font-size:13px;">APAGADO</span>') + '</h4>' +
+    '<p class="sub" style="margin:6px 0 0;">Cada lead (estado «Lead nuevo», que todavía no es cliente) recibe un correo <b>según el seguro que cotizó</b>, <b>en el idioma de su ficha</b>, con tu teléfono y el enlace para darse de baja. Cada ' + s.interval_days + ' días, hasta ' + s.max_emails + ' correos por lead; después deja de recibir solo.</p></div>' +
+    '<button class="' + (on ? 'btn-ghost' : 'btn-primary') + '" style="width:auto; padding:10px 22px; margin:0;" onclick="ldToggle()">' + (on ? 'Apagar' : 'Prender el envío automático') + '</button></div>' + warn +
+    '<div class="sub" style="margin:10px 0 0;">Sale solo todos los días a las 10:00 am (hora de Houston, en invierno) si ya programaste la tarea (migracion_cron_correos_leads.sql). Mientras esté apagado no sale nada solo.</div></div>' +
+    '<div class="dash-card"><h4 style="margin-top:0;">Qué toca hoy</h4>' +
+    '<div style="margin:0 0 10px;"><span class="tr-chip tr-chip-green">Les toca hoy: ' + p.due.length + '</span><span class="tr-chip tr-chip-gray">Esperando su turno: ' + p.waiting + '</span><span class="tr-chip tr-chip-gray">Ya recibieron todos sus correos: ' + p.done + '</span><span class="tr-chip tr-chip-gray">Leads en total: ' + LD.leads.length + '</span></div>' +
+    (LD.noLang ? '<div class="sub" style="margin:0 0 8px;">⚠ ' + LD.noLang + ' lead(s) no tienen idioma guardado: reciben el correo en español. Puedes cambiarlo en su ficha («Idioma preferido»).</div>' : '') +
+    (dueRows ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Seguro que cotizaron</th><th>En español</th><th>En inglés</th></tr></thead><tbody>' + dueRows + '</tbody></table></div>' : '<p class="sub" style="margin:0;">Hoy no le toca correo a nadie.</p>') +
+    (excl.length ? '<details style="margin-top:10px;"><summary class="sub">No reciben (' + Object.keys(p.excluded).reduce((a, k) => a + p.excluded[k], 0) + ' leads) — ver por qué</summary><ul style="margin:6px 0 0 18px;">' + excl.map(x => '<li>' + hmEsc(x) + '</li>').join('') + '</ul></details>' : '') +
+    '<div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;"><button class="btn-ghost" style="width:auto; padding:8px 16px;" onclick="ldRefresh()">Actualizar</button>' + (p.due.length ? '<button class="btn-primary" style="width:auto; padding:8px 18px; margin:0;" onclick="ldRunNow()">Enviar ahora lo que toca hoy (' + p.due.length + ')</button>' : '') + '</div></div>' +
+    '<div class="dash-card"><h4 style="margin-top:0;">Ritmo de los correos</h4><div class="form-row-2">' +
+    '<div class="form-row"><label>Cada cuántos días un correo nuevo</label>' + sel('interval', s.interval_days, [[2, '2 días'], [3, '3 días (recomendado)'], [4, '4 días'], [5, '5 días'], [7, '7 días']]) + '</div>' +
+    '<div class="form-row"><label>Cuántos correos en total por lead</label>' + sel('max', s.max_emails, [[3, '3'], [4, '4'], [5, '5'], [6, '6 (recomendado)']]) + '</div></div><div class="form-row-2">' +
+    '<div class="form-row"><label>El primer correo sale…</label>' + sel('first', s.first_delay_days, [[0, 'el mismo día'], [1, 'al día siguiente (recomendado)'], [2, 'a los 2 días'], [3, 'a los 3 días']]) + '</div>' +
+    '<div class="form-row"><label>No incluir leads registrados hace más de…</label>' + sel('age', s.max_lead_age_days, [[30, '30 días'], [45, '45 días (recomendado)'], [60, '60 días'], [90, '90 días'], [180, '180 días']]) + '</div></div>' +
+    '<p class="sub">Los leads viejos casi no responden y sus correos suelen rebotar; por eso al prender el envío NO se manda a toda tu lista vieja de golpe. Máximo ' + (s.daily_cap || 300) + ' correos por día.</p>' +
+    '<button class="btn-primary" style="width:auto; padding:9px 20px;" onclick="ldSaveSettings()">Guardar ritmo</button></div>';
+}
+function ldGroupOptions(sel){ return LD_GROUP_KEYS.map(k => '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + hmEsc(LD_GROUPS[k].label) + '</option>').join(''); }
+function ldCurrentText(){
+  const e = LD.ed; const row = LD.templates.find(r => r.group_key === e.group && r.lang === e.lang && Number(r.step) === Number(e.step) && String(r.message || '').trim());
+  const d = ldDefault(e.group, e.step, e.lang);
+  return { subject: row ? (row.subject || d.subject) : d.subject, message: row ? row.message : d.message, custom: !!row, row: row || null, original: d };
+}
+function ldViewMessages(){
+  const e = LD.ed, t = ldCurrentText();
+  return '<div class="dash-card"><h4 style="margin-top:0;">Los mensajes</h4>' +
+    '<p class="sub">Hay un mensaje distinto para cada seguro, en español y en inglés, y 6 pasos (uno por cada correo). Ya vienen escritos; si quieres cambiar alguno, edítalo aquí. Usa <b>{{nombre}}</b> para el nombre del cliente, <b>{{phone}}</b> para el teléfono de la agencia y <b>{{agency}}</b> para el nombre de la agencia. El botón de llamada, la dirección y el enlace para darse de baja se agregan solos.</p>' +
+    '<div class="form-row-2"><div class="form-row"><label>Seguro que cotizó</label><select id="ld-ed-group" onchange="ldEdChange()">' + ldGroupOptions(e.group) + '</select></div>' +
+    '<div class="form-row-2" style="gap:8px;"><div class="form-row"><label>Idioma</label><select id="ld-ed-lang" onchange="ldEdChange()"><option value="es"' + (e.lang === 'es' ? ' selected' : '') + '>Español</option><option value="en"' + (e.lang === 'en' ? ' selected' : '') + '>Inglés</option></select></div>' +
+    '<div class="form-row"><label>Correo número</label><select id="ld-ed-step" onchange="ldEdChange()">' + [1, 2, 3, 4, 5, 6].map(n => '<option value="' + n + '"' + (n === Number(e.step) ? ' selected' : '') + '>' + n + (n === 1 ? ' (el primero)' : n === 6 ? ' (el último)' : '') + '</option>').join('') + '</select></div></div></div>' +
+    '<div class="form-row"><label>Asunto ' + (t.custom ? '<span class="tr-chip tr-chip-amber">cambiado por ti</span>' : '<span class="tr-chip tr-chip-gray">original</span>') + '</label><input type="text" id="ld-ed-subject" value="' + hmEsc(t.subject) + '"></div>' +
+    '<div class="form-row"><label>Mensaje</label><textarea id="ld-ed-message" rows="9" style="width:100%;">' + hmEsc(t.message) + '</textarea></div>' +
+    '<div style="display:flex; gap:8px; flex-wrap:wrap;"><button class="btn-primary" style="width:auto; padding:9px 18px; margin:0;" onclick="ldSaveTemplate()">Guardar mi versión</button>' +
+    '<button class="btn-ghost" style="width:auto; padding:9px 18px;" onclick="ldPreview()">Ver cómo se ve</button><button class="btn-ghost" style="width:auto; padding:9px 18px;" id="ld-test-btn" onclick="ldSendTest(this)">Enviarme una prueba</button>' +
+    (t.custom ? '<button class="btn-ghost" style="width:auto; padding:9px 18px; color:#B23A3A;" onclick="ldRestoreTemplate()">Volver al original</button>' : '') + '</div></div>';
+}
+function ldViewHistory(){
+  const nameBy = {}; LD.leads.forEach(l => { nameBy[l.id] = l.full_name || l.first_name; });
+  const rows = LD.sends.filter(s => s.status !== 'pending').slice(0, 40);
+  const total = LD.sends.filter(s => s.status === 'sent').length, failed = LD.sends.filter(s => s.status === 'failed').length;
+  return '<div class="dash-card"><h4 style="margin-top:0;">Últimos correos a leads</h4><p class="sub">Enviados en total: <b>' + total + '</b>' + (failed ? ' · Fallaron: <b>' + failed + '</b>' : '') + '</p>' +
+    (rows.length ? '<div class="dash-table-wrap"><table class="dash-table"><thead><tr><th>Fecha</th><th>Lead</th><th>Correo</th><th>Seguro</th><th>Nº</th><th>Idioma</th><th>Resultado</th></tr></thead><tbody>' +
+      rows.map(s => '<tr><td>' + hmEsc(ldDate(s.sent_at)) + '</td><td>' + hmEsc(nameBy[s.client_id] || '—') + '</td><td>' + hmEsc(s.email) + '</td><td>' + hmEsc((LD_GROUPS[s.group_key] || LD_GROUPS.general).label) + '</td><td>' + s.step + '</td><td>' + ldLangName(s.language) + '</td><td>' + (s.status === 'sent' ? hmChip('Enviado', 'green') : hmChip('Falló', 'red') + ' <span class="sub">' + hmEsc(s.error || '') + '</span>') + '</td></tr>').join('') + '</tbody></table></div>' : '<p style="margin:0;">Todavía no se ha enviado ningún correo a leads.</p>') + '</div>';
+}
+async function ldRefresh(){ LD.loaded = false; ldPaint(); await ldLoad(); ldPaint(); }
+function ldMsg(m, k){ hmToast(m, k); }
+async function ldCallFn(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const resp = await fetch(LD_FN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (session ? session.access_token : SUPABASE_ANON_KEY), 'apikey': SUPABASE_ANON_KEY }, body: JSON.stringify(body) });
+  let data = {}; try { data = await resp.json(); } catch(e){ /* sin cuerpo */ }
+  if(!resp.ok || data.error) throw new Error(data.error || (resp.status === 404 ? 'La función send-lead-emails todavía no está desplegada en Supabase.' : 'Error ' + resp.status));
+  return data;
+}
+async function ldSaveSettings(){
+  const v = id => Number((document.getElementById('ld-' + id) || { value: 0 }).value);
+  const row = { interval_days: v('interval'), max_emails: v('max'), first_delay_days: v('first'), max_lead_age_days: v('age'), updated_by: currentProfile ? currentProfile.id : null };
+  const { error } = await sb.from('lead_email_settings').update(row).eq('id', 1);
+  if(error){ ldMsg('No se pudo guardar: ' + error.message, 'error'); return; }
+  await ldRefresh(); ldMsg('Guardado.');
+}
+async function ldToggle(){
+  const s = LD.settings, on = !s.enabled;
+  if(on){
+    if(String((HM.settings || {}).address || '').trim().length < 8){ ldMsg('Primero escribe la dirección de la agencia en «Configuración».', 'error'); return; }
+    if(!confirm('Vas a PRENDER el envío automático.\n\nTodos los días a las 10:00 am saldrá un correo a cada lead al que le toque (hoy les tocaría a ' + LD.plan.due.length + ').\n\n¿Prender?')) return;
+  }
+  const { error } = await sb.from('lead_email_settings').update({ enabled: on, updated_by: currentProfile ? currentProfile.id : null }).eq('id', 1);
+  if(error){ ldMsg('No se pudo cambiar: ' + error.message, 'error'); return; }
+  await ldRefresh(); ldMsg(on ? 'Envío automático PRENDIDO.' : 'Envío automático apagado.');
+}
+async function ldRunNow(){
+  const n = LD.plan ? LD.plan.due.length : 0; if(!n) return;
+  if(!confirm('Se van a enviar ' + n + ' correo(s) ahora mismo, cada uno a su lead, en su idioma.\n\n¿Enviar?')) return;
+  LD.busy = true; ldMsg('Enviando… no cierres esta pantalla.', 'success');
+  try {
+    const r = await ldCallFn({ action: 'run' });
+    await ldRefresh();
+    const parts = ['Se enviaron ' + r.sent + ' correo(s).']; if(r.failed) parts.push(r.failed + ' fallaron (míralos abajo).'); if(r.remaining) parts.push('Quedaron ' + r.remaining + ' para mañana (tope diario).');
+    ldMsg(parts.join(' '), r.failed ? 'error' : 'success');
+  } catch(e){ ldMsg(e.message, 'error'); }
+  LD.busy = false;
+}
+function ldEdChange(){
+  LD.ed = { group: document.getElementById('ld-ed-group').value, lang: document.getElementById('ld-ed-lang').value, step: Number(document.getElementById('ld-ed-step').value) };
+  ldPaint();
+}
+function ldEdValues(){ return { subject: document.getElementById('ld-ed-subject').value.trim(), message: document.getElementById('ld-ed-message').value.trim() }; }
+async function ldSaveTemplate(){
+  const e = LD.ed, v = ldEdValues();
+  if(!v.message){ ldMsg('El mensaje no puede quedar vacío. Si quieres el original, toca «Volver al original».', 'error'); return; }
+  if(!v.subject){ ldMsg('Escribe el asunto.', 'error'); return; }
+  const cur = ldCurrentText();
+  const by = currentProfile ? currentProfile.id : null;
+  let res;
+  if(cur.row && cur.row.id) res = await sb.from('lead_email_templates').update({ subject: v.subject, message: v.message, updated_by: by }).eq('id', cur.row.id);
+  else res = await sb.from('lead_email_templates').insert({ group_key: e.group, lang: e.lang, step: e.step, subject: v.subject, message: v.message, updated_by: by });
+  if(res.error){ ldMsg('No se pudo guardar: ' + res.error.message, 'error'); return; }
+  const t = await sb.from('lead_email_templates').select('*'); LD.templates = t.data || LD.templates; ldPaint(); ldMsg('Guardado. Desde el próximo envío se usa tu versión.');
+}
+async function ldRestoreTemplate(){
+  const cur = ldCurrentText(); if(!cur.row) return;
+  if(!confirm('¿Volver al mensaje original de este correo? Se pierde tu versión.')) return;
+  const { error } = await sb.from('lead_email_templates').delete().eq('id', cur.row.id);
+  if(error){ ldMsg('No se pudo: ' + error.message, 'error'); return; }
+  LD.templates = LD.templates.filter(r => r.id !== cur.row.id); ldPaint(); ldMsg('Listo: volvió el mensaje original.');
+}
+function ldMailFor(draft){
+  const e = LD.ed, en = e.lang === 'en';
+  const ov = [{ group_key: e.group, lang: e.lang, step: e.step, subject: draft.subject, message: draft.message }];
+  return ldBuildEmail({ lang: e.lang, name: en ? 'John' : 'Ignacio', group: e.group, step: e.step, overrides: ov, settings: HM.settings || {}, unsubUrl: HM_UNSUB_URL + '?t=ejemplo&l=' + e.lang });
+}
+function ldPreview(){
+  const v = ldEdValues(); if(!v.message){ ldMsg('Escribe el mensaje para ver cómo queda.', 'error'); return; }
+  const m = ldMailFor(v);
+  hmModal('Vista previa', '<div class="sub" style="margin:0 0 6px;"><b>Asunto:</b> ' + hmEsc(m.subject) + '</div><iframe id="ld-prev-frame" title="Vista previa" sandbox="" style="width:100%; height:560px; border:1px solid var(--line); border-radius:10px; background:#fff;"></iframe>', [{ label: 'Cerrar' }], true);
+  document.getElementById('ld-prev-frame').srcdoc = m.html;
+}
+async function ldSendTest(btn){
+  const v = ldEdValues(); if(!v.message){ ldMsg('Escribe el mensaje para mandarte la prueba.', 'error'); return; }
+  const old = btn.textContent; btn.disabled = true; btn.textContent = 'Enviando…';
+  try { const r = await ldCallFn({ action: 'test', group: LD.ed.group, step: LD.ed.step, lang: LD.ed.lang, draft: v }); btn.textContent = '✓ Enviada a ' + r.sentTo; }
+  catch(e){ ldMsg(e.message, 'error'); btn.textContent = old; btn.disabled = false; }
+}
+// ===== LD-UI-END =====
+// ===== LDLANG-JS-START =====
+// Idioma del cliente / lead: botones «Español | English» en su perfil (se guarda al instante y queda en el historial de cambios)
+// y la etiqueta ES / EN junto al nombre en las listas. De este campo depende el idioma de TODOS los correos.
+function ldLangBadge(c){
+  const en = c && String(c.preferred_language || '').toLowerCase().indexOf('en') === 0;
+  return ' <span class="badge" style="background:' + (en ? '#E4EEFF; color:#1F4FA3' : '#EDEFF5; color:#3A3F55') + ';" title="Idioma de sus correos: ' + (en ? 'inglés' : 'español') + '">' + (en ? 'EN' : 'ES') + '</span>';
+}
+function cdIdiomaPaint(c){
+  const box = document.getElementById('cd-idioma-toggle'); if(!box) return;
+  const l = c && String(c.preferred_language || '').toLowerCase().indexOf('en') === 0 ? 'en' : 'es';
+  window._cdIdioma = c && c.preferred_language ? l : null;
+  box.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.l === l));
+  const hint = document.getElementById('cd-idioma-hint');
+  if(hint) hint.textContent = c && c.preferred_language ? 'Los correos le llegan en este idioma.' : 'Sin idioma guardado: los correos le llegan en español. Escoge uno.';
+}
+async function cdSetIdioma(lang){
+  lang = lang === 'en' ? 'en' : 'es';
+  if(!currentClientId) return;
+  const prev = window._cdIdioma;
+  const box = document.getElementById('cd-idioma-toggle'); if(box) box.querySelectorAll('button').forEach(b => { b.disabled = true; });
+  try {
+    const { error } = await sb.from('clients').update({ preferred_language: lang }).eq('id', currentClientId);
+    if(error) throw error;
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      await sb.from('client_audit_log').insert({ client_id: currentClientId, changed_by: session.user.id, changed_by_name: currentProfile ? currentProfile.full_name : session.user.email, changes: 'Idioma preferido: "' + (prev || '(vacío)') + '" → "' + lang + '"' });
+    } catch(e){ /* el historial es un extra: si falla, el cambio de idioma ya quedó guardado */ }
+    const el = document.getElementById('cd-view-idioma'); if(el) el.textContent = lang === 'en' ? 'Inglés' : 'Español';
+    cdIdiomaPaint({ preferred_language: lang });
+    const sel = document.getElementById('ec-idioma'); if(sel) sel.value = lang;
+    showMsg('clientDetailMsg', 'success', 'Idioma guardado: ' + (lang === 'en' ? 'inglés' : 'español') + '. Sus correos le llegarán en ese idioma.');
+    if(typeof loadClientAuditLog === 'function') loadClientAuditLog(currentClientId);
+    if(typeof loadClients === 'function') loadClients();
+  } catch(e){
+    showMsg('clientDetailMsg', 'error', 'No se pudo guardar el idioma: ' + ((e && e.message) || e));
+  }
+  if(box) box.querySelectorAll('button').forEach(b => { b.disabled = false; });
+}
+// ===== LDLANG-JS-END =====
 
 // ===== SOCIAL-START =====
 // Pestaña «Redes sociales» (solo administradoras): personas que comentan tus videos o te escriben por Instagram, Facebook y WhatsApp.
