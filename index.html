@@ -1535,6 +1535,17 @@
 
         <div class="dash-card" id="leadsCard" style="margin-top:20px; background:#EAF1FB; border:1.5px solid #C7D9F3;">
           <h4 style="margin-top:0; color:#1E4FA0;">🧲 Leads en proceso</h4>
+          <div id="leadsFilterBar" style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin:4px 0 6px;">
+            <div class="form-row" style="margin:0;"><label>Desde (fecha en que se registró)</label><input type="text" id="leads-desde" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" style="width:150px;" oninput="maskDateInput(this); applyLeadsDateFilter()"></div>
+            <div class="form-row" style="margin:0;"><label>Hasta</label><input type="text" id="leads-hasta" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" autocomplete="off" style="width:150px;" oninput="maskDateInput(this); applyLeadsDateFilter()"></div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button type="button" class="btn-ghost" style="width:auto; padding:7px 12px; font-size:13px;" onclick="setLeadsDatePreset('today')">Hoy</button>
+              <button type="button" class="btn-ghost" style="width:auto; padding:7px 12px; font-size:13px;" onclick="setLeadsDatePreset('7')">Últimos 7 días</button>
+              <button type="button" class="btn-ghost" style="width:auto; padding:7px 12px; font-size:13px;" onclick="setLeadsDatePreset('month')">Este mes</button>
+              <button type="button" class="btn-ghost" style="width:auto; padding:7px 12px; font-size:13px;" onclick="setLeadsDatePreset('')">Ver todos</button>
+            </div>
+          </div>
+          <div id="leadsFilterInfo" class="sub" style="margin:0 0 8px;"></div>
           <div id="leadsList"><p class="sub">Cargando...</p></div>
           <div id="leadsPager" style="display:flex; align-items:center; margin-top:10px; flex-wrap:wrap;"></div>
         </div>
@@ -13780,20 +13791,57 @@
     renderLeadsPage();
   }
 
+  // Filtro por fecha de registro (MM/DD/AAAA). Cada lado es opcional: solo «Desde» = de esa fecha en adelante; solo «Hasta» = hasta esa fecha.
+  function leadsDateRange(){
+    const d = (document.getElementById('leads-desde') || { value: '' }).value.trim();
+    const h = (document.getElementById('leads-hasta') || { value: '' }).value.trim();
+    const out = { from: null, to: null, error: '' };
+    if(d){ if(d.length < 10) { /* todavía escribiendo */ } else { out.from = mmddyyyyToISO(d); if(!out.from) out.error = 'La fecha «Desde» no es válida (escríbela como MM/DD/AAAA).'; } }
+    if(h){ if(h.length < 10) { /* todavía escribiendo */ } else { out.to = mmddyyyyToISO(h); if(!out.to && !out.error) out.error = 'La fecha «Hasta» no es válida (escríbela como MM/DD/AAAA).'; } }
+    if(!out.error && out.from && out.to && out.from > out.to) out.error = 'La fecha «Desde» es después de «Hasta». Revisa las fechas.';
+    return out;
+  }
+  function leadRegisteredISO(c){ return c && c.created_at ? toISODateLocal(new Date(c.created_at)) : ''; }
+  function leadsVisibleData(){
+    const r = leadsDateRange();
+    if(r.error) return [];
+    if(!r.from && !r.to) return allLeadsData;
+    return allLeadsData.filter(c => { const iso = leadRegisteredISO(c); return iso && (!r.from || iso >= r.from) && (!r.to || iso <= r.to); });
+  }
+  function applyLeadsDateFilter(){ leadsCurrentPage = 1; renderLeadsPage(); }
+  function setLeadsDatePreset(kind){
+    const d = document.getElementById('leads-desde'), h = document.getElementById('leads-hasta'); if(!d || !h) return;
+    const now = new Date(), fmt = x => isoToMMDDYYYYDisplay(toISODateLocal(x));
+    if(kind === 'today'){ d.value = fmt(now); h.value = fmt(now); }
+    else if(kind === '7'){ const a = new Date(now); a.setDate(a.getDate() - 6); d.value = fmt(a); h.value = fmt(now); }
+    else if(kind === 'month'){ d.value = fmt(new Date(now.getFullYear(), now.getMonth(), 1)); h.value = fmt(now); }
+    else { d.value = ''; h.value = ''; }
+    applyLeadsDateFilter();
+  }
+
   function renderLeadsPage(){
     const list = document.getElementById('leadsList');
     const pager = document.getElementById('leadsPager');
-    if(allLeadsData.length === 0){
-      list.innerHTML = '<p class="sub">No hay leads en proceso ahora mismo.</p>';
+    const info = document.getElementById('leadsFilterInfo');
+    const range = leadsDateRange();
+    const filtering = !!(range.from || range.to || range.error);
+    const leadsShown = leadsVisibleData();
+    if(info){
+      if(range.error) info.innerHTML = '<span style="color:#B23A3A;">' + range.error + '</span>';
+      else if(range.from || range.to) info.textContent = 'Mostrando ' + leadsShown.length + ' de ' + allLeadsData.length + ' leads — registrados ' + (range.from && range.to ? 'del ' + formatDateUS(range.from) + ' al ' + formatDateUS(range.to) : range.from ? 'desde el ' + formatDateUS(range.from) : 'hasta el ' + formatDateUS(range.to)) + '.';
+      else info.textContent = '';
+    }
+    if(leadsShown.length === 0){
+      list.innerHTML = filtering ? '<p class="sub">No hay leads registrados en ese rango de fechas.</p>' : '<p class="sub">No hay leads en proceso ahora mismo.</p>';
       if(pager) pager.innerHTML = '';
       return;
     }
 
-    const totalPages = Math.max(1, Math.ceil(allLeadsData.length / LEADS_PAGE_SIZE));
+    const totalPages = Math.max(1, Math.ceil(leadsShown.length / LEADS_PAGE_SIZE));
     if(leadsCurrentPage > totalPages) leadsCurrentPage = totalPages;
     if(leadsCurrentPage < 1) leadsCurrentPage = 1;
     const start = (leadsCurrentPage - 1) * LEADS_PAGE_SIZE;
-    const pageItems = allLeadsData.slice(start, start + LEADS_PAGE_SIZE);
+    const pageItems = leadsShown.slice(start, start + LEADS_PAGE_SIZE);
 
     const showAgentAttribution = isAdminUser();
 
@@ -13813,6 +13861,7 @@
       return `
       <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${typeof ldLangBadge === 'function' ? ldLangBadge(c) : ''}${webBadge}${agentLine}</div>
+        <span class="sub" style="margin:0 0 0 auto;" title="Fecha en que se registró el lead">📅 ${formatDateUS(leadRegisteredISO(c))}</span>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:6px 10px; color:#8a3030; border-color:#E3B8B8;" onclick="markLeadNoContactar('${c.id}', event)">🚫 No contactar</button>
           <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
@@ -13823,7 +13872,7 @@
     if(pager){
       pager.innerHTML = `
         <button class="btn-ghost" style="width:auto; padding:6px 14px;" ${leadsCurrentPage <= 1 ? 'disabled' : ''} onclick="changeLeadsPage(-1)">← Anteriores</button>
-        <span class="sub" style="margin:0 10px 0;">Página ${leadsCurrentPage} de ${totalPages} (${allLeadsData.length} en total)</span>
+        <span class="sub" style="margin:0 10px 0;">Página ${leadsCurrentPage} de ${totalPages} (${leadsShown.length} ${filtering ? 'en ese rango' : 'en total'})</span>
         <button class="btn-ghost" style="width:auto; padding:6px 14px;" ${leadsCurrentPage >= totalPages ? 'disabled' : ''} onclick="changeLeadsPage(1)">Siguientes →</button>
       `;
     }
@@ -19634,6 +19683,7 @@ function fmDismissAll(){ const s = fmSeenIds().concat(fmLastNotifIds); fmSaveSee
   }
 })();
 // ===== FIRMAS-JS-END =====
+
 
 
 // ===== HM-SHARED-START =====
