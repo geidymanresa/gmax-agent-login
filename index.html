@@ -1396,7 +1396,7 @@
             .lc-opt.close.on{background:#FDEAEA; border-color:#B23A3A; color:#B23A3A;}
             .lc-mini{display:inline-block; text-decoration:none; padding:2px 7px; border:1px solid var(--line); border-radius:8px; font-size:13px; background:#fff;}
           </style>
-          <div class="dash-card" id="callsCard" style="display:none; margin:0; grid-column:1 / -1; background:#EAF6EF; border:1.5px solid #8FCBA9;">
+          <div class="dash-card" id="callsCard" style="display:block; margin:0; grid-column:1 / -1; background:#EAF6EF; border:1.5px solid #8FCBA9;">
             <div style="display:inline-block; background:#1E8A5A; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">📋 Tarea del día</div>
             <h4 style="margin-top:0; color:#13633F;">📞 Llamadas de leads de hoy <span id="lcNavBadge" class="badge" style="display:none; background:#1E8A5A; color:#fff;"></span></h4>
             <p class="sub" style="margin:0 0 10px;">Cada lead de «Leads en proceso» aparece aquí el día que toca llamarlo. Toca «Registrar» para anotar qué hiciste y cómo salió; el CRM sugiere la próxima fecha y el lead vuelve a aparecer ese día.</p>
@@ -20663,7 +20663,7 @@ function lcMyCallsToday(){
 // ---------- tarjeta de Inicio ----------
 function lcRender(){
   const body = document.getElementById('lc-body'); if(!body) return;
-  const card = document.getElementById('callsCard');
+  const card = document.getElementById('callsCard'); if(card) card.style.display = 'block';   // la tarjeta SIEMPRE se ve (aunque falte la migración o haya un error)
   if(LC.missing){ body.innerHTML = '<div class="msg" style="display:block; background:#FFF6E0; color:#7A5A00; border:1px solid #F0D58A;">Falta correr «migracion_llamadas_leads.sql» en Supabase (SQL Editor) para poder anotar las llamadas.</div>'; return; }
   if(LC.error){ body.innerHTML = '<div class="msg error" style="display:block;">No se pudo cargar la lista de llamadas: ' + lcEsc(LC.error) + '</div>'; return; }
   const q = lcQueue(), mine = lcMyCallsToday();
