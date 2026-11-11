@@ -1399,7 +1399,7 @@
           <div class="dash-card" id="callsCard" style="display:block; margin:0; grid-column:1 / -1; background:#EAF6EF; border:1.5px solid #8FCBA9;">
             <div style="display:inline-block; background:#1E8A5A; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">📋 Tarea del día</div>
             <h4 style="margin-top:0; color:#13633F;">📞 Llamadas de leads de hoy <span id="lcNavBadge" class="badge" style="display:none; background:#1E8A5A; color:#fff;"></span></h4>
-            <p class="sub" style="margin:0 0 10px;">Cada lead de «Leads en proceso» aparece aquí el día que toca llamarlo. Toca «Registrar» para anotar qué hiciste y cómo salió; el CRM sugiere la próxima fecha y el lead vuelve a aparecer ese día.</p>
+            <p class="sub" style="margin:0 0 10px;">Cada lead de «Leads en proceso» aparece aquí el día que toca llamarlo. Marca lo que hiciste (llamé, mensaje de texto…) y toca «✔ Listo»: el lead sale de la lista de hoy y vuelve a aparecer en su próxima fecha. Con «📝 Nota» le pones una nota o cambias la fecha, y con «⛔ No molestar más» lo cierras.</p>
             <div id="lc-body"><p class="sub">Cargando…</p></div>
           </div>
           <!-- ===== LLAMADAS-CARD-END ===== -->
@@ -20586,9 +20586,9 @@ async function cdSetIdioma(lang){
 // ===== LLAMADAS-JS-START =====
 // 📞 Llamadas de leads de hoy (tarjeta en Inicio) + historial de llamadas en el perfil del cliente.
 // La lista sale de los leads de «Leads en proceso» (allLeadsData) y del registro lead_call_log (migracion_llamadas_leads.sql).
-const LC = { logs: {}, quotes: {}, tab: 'today', scope: 'mine', page: 1, loading: false, missing: false, error: '', modal: null, busy: false, profileId: null };
+const LC = { logs: {}, quotes: {}, tab: 'today', scope: 'mine', page: 1, sel: {}, loading: false, missing: false, error: '', detail: '', modal: null, busy: false, profileId: null };
 const LC_PAGE = 8;
-const LC_CH = { llamada: ['📞', 'Llamé'], texto: ['💬', 'Mensaje de texto'], correo: ['✉️', 'Correo'], whatsapp: ['🟢', 'WhatsApp'] };
+const LC_CH = { llamada: ['📞', 'Llamé'], texto: ['💬', 'Mensaje de texto'], correo: ['✉️', 'Correo'] };
 const LC_RES = { no_contesto: ['📵', 'No contestó / sin respuesta'], buzon: ['📩', 'Dejé buzón de voz'], hablamos: ['🗣️', 'Hablé con la persona'], numero_malo: ['⚠️', 'Número equivocado o fuera de servicio'] };
 const LC_OUT = {
   quiere_cotizacion: ['🧾', 'Quiere cotización', ''], llamar_despues: ['⏰', 'Pidió que lo llame después', ''], cotizacion_enviada: ['📤', 'Ya le mandé la cotización', ''],
@@ -20627,7 +20627,7 @@ async function lcRefresh(){
     LC.logs = logs; LC.quotes = quotes; LC.missing = false; LC.error = '';
   } catch(e){
     const m = String((e && (e.message || e.code)) || e);
-    LC.missing = /does not exist|schema cache|42P01|PGRST205/i.test(m); LC.error = LC.missing ? '' : m;
+    LC.missing = /lead_call_log|42P01|PGRST205/i.test(m) && /does not exist|schema cache|42P01|PGRST205|Could not find/i.test(m); LC.error = LC.missing ? '' : m; LC.detail = m;
   }
   LC.loading = false;
   lcRender();
@@ -20664,8 +20664,8 @@ function lcMyCallsToday(){
 function lcRender(){
   const body = document.getElementById('lc-body'); if(!body) return;
   const card = document.getElementById('callsCard'); if(card) card.style.display = 'block';   // la tarjeta SIEMPRE se ve (aunque falte la migración o haya un error)
-  if(LC.missing){ body.innerHTML = '<div class="msg" style="display:block; background:#FFF6E0; color:#7A5A00; border:1px solid #F0D58A;">Falta correr «migracion_llamadas_leads.sql» en Supabase (SQL Editor) para poder anotar las llamadas.</div>'; return; }
-  if(LC.error){ body.innerHTML = '<div class="msg error" style="display:block;">No se pudo cargar la lista de llamadas: ' + lcEsc(LC.error) + '</div>'; return; }
+  if(LC.missing){ body.innerHTML = '<div class="msg" style="display:block; background:#FFF6E0; color:#7A5A00; border:1px solid #F0D58A;">Falta correr «migracion_llamadas_leads.sql» en Supabase (SQL Editor) para poder anotar las llamadas. Si ya la corriste, toca «Volver a revisar».<div style="font-size:12px; margin-top:6px; opacity:.85;">Detalle técnico: ' + lcEsc(LC.detail || '') + '</div><button type="button" class="btn-ghost" style="width:auto; padding:6px 14px; margin-top:8px;" onclick="lcRefresh()">Volver a revisar</button></div>'; return; }
+  if(LC.error){ body.innerHTML = '<div class="msg error" style="display:block;">No se pudo cargar la lista de llamadas: ' + lcEsc(LC.error) + '<br><button type="button" class="btn-ghost" style="width:auto; padding:6px 14px; margin-top:8px;" onclick="lcRefresh()">Volver a revisar</button></div>'; return; }
   const q = lcQueue(), mine = lcMyCallsToday();
   const overdue = q.today.filter(x => x.i.overdueDays > 0 && !x.i.isNew).length;
   const tabs = [['today', 'Para hoy y vencidas', q.today.length], ['isnew', 'Nuevos sin contactar', q.isnew.length], ['later', 'Próximos días', q.later.length], ['done', 'Ya hechas hoy', q.done.length]];
@@ -20685,17 +20685,28 @@ function lcRender(){
 function lcSetTab(t){ LC.tab = t; LC.page = 1; lcRender(); }
 function lcSetScope(s){ LC.scope = s; LC.page = 1; lcRender(); }
 function lcPage(d){ LC.page += d; lcRender(); }
+function lcChip(id, g, k, on){ const m = g === 'ch' ? LC_CH[k] : LC_RES[k]; const lab = g === 'ch' ? m[1] : ({ no_contesto: 'No contestó', buzon: 'Buzón de voz', hablamos: 'Hablé con la persona' }[k]); return '<button type="button" class="lc-opt lc-chip' + (on ? ' on' : '') + '" data-c="' + id + '" data-g="' + g + '" data-k="' + k + '" onclick="lcToggle(\'' + id + '\',\'' + g + '\',\'' + k + '\')">' + m[0] + ' ' + lab + '</button>'; }
 function lcRow(c, i){
   const tel = lcTel(c.phone), phone = c.phone ? '<a href="tel:' + tel + '" style="font-weight:700; color:#13633F; text-decoration:none;" title="Tocar para llamar">📞 ' + lcEsc(c.phone) + '</a>' : '<span style="color:#B23A3A;">sin teléfono</span>';
-  const quick = tel ? '<a href="sms:' + tel + '" class="lc-mini" title="Mandar mensaje de texto">💬</a><a href="https://wa.me/' + tel.replace('+', '') + '" target="_blank" rel="noopener" class="lc-mini" title="Abrir WhatsApp">🟢</a>' : '';
   const prod = LC.quotes[c.id] ? '<span class="badge" style="background:#E4EEFF; color:#1F4FA3;">Cotizó: ' + lcEsc(lcProductLabel(LC.quotes[c.id])) + '</span> ' : '';
   const when = i.isNew ? '<span class="badge blue">Nuevo · ' + lcEsc(lcAgo(lcRegISO(c))) + '</span>' : i.overdueDays > 0 ? '<span class="badge" style="background:#FDEAEA; color:#B23A3A;">Vencida hace ' + i.overdueDays + (i.overdueDays === 1 ? ' día' : ' días') + '</span>' : i.due ? '<span class="badge" style="background:#FFF3DC; color:#8A5A00;">Para hoy</span>' : '<span class="badge gray">Para el ' + lcEsc(formatDateUS(i.next)) + '</span>';
   const last = i.last ? '<div class="sub" style="margin:2px 0 0; font-size:12.5px;">Último intento (' + lcEsc(lcAgo(toISODateLocal(new Date(i.last.created_at)))) + '): ' + lcEsc(lcSummary(i.last)) + '</div>' : '';
   const warn = (i.attempts >= 6 && !i.talked) ? ' <span class="badge" style="background:#FDEAEA; color:#B23A3A;" title="Las agencias suelen cerrar o pasar el lead a correos después de unos 6–7 intentos sin contacto">⚠ ' + i.attempts + ' intentos sin contacto</span>' : '';
-  return '<div style="padding:10px 0; border-bottom:1px solid #CFE5D8; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">' +
-    '<div style="min-width:240px; flex:1;"><div><strong>' + lcEsc(c.full_name) + '</strong>' + (typeof ldLangBadge === 'function' ? ldLangBadge(c) : '') + (c.source_public_form ? ' <span class="badge blue">🌐 Web</span>' : '') + ' ' + phone + ' ' + quick + '</div>' +
-    '<div style="margin-top:3px;">' + prod + when + ' <span class="sub" style="margin:0 4px;">Intento #' + (i.attempts + 1) + '</span>' + warn + '</div>' + last + '</div>' +
-    '<div style="display:flex; gap:6px; flex-wrap:wrap;"><button class="btn-primary" style="width:auto; padding:8px 16px; margin:0;" onclick="lcOpen(\'' + c.id + '\')">📞 Registrar</button><button class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="goToClientFromUnderwriting(\'' + c.id + '\')">Ver</button></div></div>';
+  const sel = LC.sel[c.id] || { ch: [], result: null };
+  const canMark = LC.tab !== 'done';
+  const marks = canMark ? '<div class="lc-marks" style="margin-top:8px;"><div class="sub" style="margin:0 0 4px; font-size:12px;">Marca lo que hiciste y toca «Listo»:</div><div class="lc-opts">' + ['llamada', 'texto'].map(k => lcChip(c.id, 'ch', k, sel.ch.includes(k))).join('') + '<span style="width:6px;"></span>' + ['no_contesto', 'buzon', 'hablamos'].map(k => lcChip(c.id, 'result', k, sel.result === k)).join('') + '</div>' +
+    '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;"><button type="button" class="btn-primary lc-done" style="width:auto; padding:8px 20px; margin:0;" onclick="lcQuickSave(\'' + c.id + '\')">✔ Listo</button><button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="lcOpen(\'' + c.id + '\')" title="Poner nota, cambiar la próxima fecha o dejar más detalle">📝 Nota / más opciones</button><button type="button" class="btn-ghost lc-nomore" style="width:auto; padding:8px 14px; color:#B23A3A;" onclick="lcNoMore(\'' + c.id + '\')" title="El cliente pidió que no lo molesten más">⛔ No molestar más</button><button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="goToClientFromUnderwriting(\'' + c.id + '\')">Ver perfil</button></div></div>'
+    : '<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;"><button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="lcOpen(\'' + c.id + '\')">📝 Agregar nota / otra llamada</button><button type="button" class="btn-ghost" style="width:auto; padding:8px 14px;" onclick="goToClientFromUnderwriting(\'' + c.id + '\')">Ver perfil</button></div>';
+  return '<div class="lc-row" data-id="' + c.id + '" style="padding:12px 0; border-bottom:1px solid #CFE5D8;">' +
+    '<div><strong>' + lcEsc(c.full_name) + '</strong>' + (typeof ldLangBadge === 'function' ? ldLangBadge(c) : '') + (c.source_public_form ? ' <span class="badge blue">🌐 Web</span>' : '') + ' ' + phone + '</div>' +
+    '<div style="margin-top:3px;">' + prod + when + ' <span class="sub" style="margin:0 4px;">Intento #' + (i.attempts + 1) + '</span>' + warn + '</div>' + last + marks + '</div>';
+}
+function lcToggle(id, g, k){
+  const s = LC.sel[id] || (LC.sel[id] = { ch: [], result: null });
+  if(g === 'ch'){ const n = s.ch.indexOf(k); if(n >= 0) s.ch.splice(n, 1); else s.ch.push(k); }
+  else s.result = s.result === k ? null : k;
+  if(g === 'result' && s.result && !s.ch.length) s.ch.push('llamada');   // si marcó cómo salió y no dijo qué hizo, fue una llamada
+  lcRender();
 }
 function lcSummary(r){
   const ch = (r.channels || []).map(k => (LC_CH[k] || ['', k])[1]).join(' + ');
@@ -20716,14 +20727,14 @@ async function lcOpen(clientId, clientObj){
   lcSuggest();
   lcDrawModal();
 }
-function lcSuggestDays(){
-  const m = LC.modal; if(!m) return 3;
-  if(m.outcome === 'quiere_cotizacion') return 1;
-  if(m.outcome === 'cotizacion_enviada') return 2;
-  if(m.outcome === 'llamar_despues') return 3;
-  if(m.result === 'numero_malo') return 1;
-  return m.attempt - 1 < LC_STEPS.length ? LC_STEPS[m.attempt - 1] : 7;
+function lcDaysFor(attempt, result, outcome){
+  if(outcome === 'quiere_cotizacion') return 1;
+  if(outcome === 'cotizacion_enviada') return 2;
+  if(outcome === 'llamar_despues') return 3;
+  if(result === 'numero_malo') return 1;
+  return attempt - 1 < LC_STEPS.length ? LC_STEPS[attempt - 1] : 7;
 }
+function lcSuggestDays(){ const m = LC.modal; return m ? lcDaysFor(m.attempt, m.result, m.outcome) : 3; }
 function lcSuggest(){ const m = LC.modal; if(!m || m.nextTouched) return; m.next = isoToMMDDYYYYDisplay(lcAddDays(lcToday(), lcSuggestDays())); }
 function lcOpt(group, key, icon, label, on, extra){ return '<button type="button" class="lc-opt' + (on ? ' on' : '') + (extra === 'close' ? ' close' : '') + '" data-g="' + group + '" data-k="' + key + '" onclick="lcPick(\'' + group + '\',\'' + key + '\')">' + icon + ' ' + lcEsc(label) + '</button>'; }
 function lcDrawModal(){
@@ -20737,7 +20748,7 @@ function lcDrawModal(){
   ov.innerHTML = '<div class="tr-modal-box" role="dialog" aria-modal="true" style="max-width:640px;"><h3 style="margin:0 0 4px;">📞 ' + lcEsc(c.full_name) + (typeof ldLangBadge === 'function' ? ldLangBadge(c) : '') + '</h3>' +
     '<div class="sub" style="margin:0 0 6px;">' + (c.phone ? '<a href="tel:' + tel + '" style="font-weight:700; color:#13633F;">' + lcEsc(c.phone) + '</a>' : 'Sin teléfono') + (LC.quotes[c.id] ? ' · Cotizó: ' + lcEsc(lcProductLabel(LC.quotes[c.id])) : '') + ' · Registrado ' + lcEsc(formatDateUS(lcRegISO(c))) + ' · Intento #' + m.attempt + '</div>' + hint +
     '<div class="lc-sec">¿Qué hiciste? <span class="sub">(puedes marcar varias)</span></div><div class="lc-opts">' + Object.keys(LC_CH).map(k => lcOpt('ch', k, LC_CH[k][0], LC_CH[k][1], m.ch.includes(k))).join('') + '</div>' +
-    '<div class="lc-sec">¿Cómo salió?</div><div class="lc-opts">' + Object.keys(LC_RES).map(k => lcOpt('result', k, LC_RES[k][0], LC_RES[k][1], m.result === k)).join('') + '</div>' +
+    '<div class="lc-sec">¿Cómo salió? <span class="sub">(opcional)</span></div><div class="lc-opts">' + Object.keys(LC_RES).map(k => lcOpt('result', k, LC_RES[k][0], LC_RES[k][1], m.result === k)).join('') + '</div>' +
     '<div class="lc-sec">¿En qué quedó? <span class="sub">(opcional)</span></div><div class="lc-opts">' + Object.keys(LC_OUT).filter(k => m.isLead || LC_OUT[k][2] !== 'close').map(k => lcOpt('outcome', k, LC_OUT[k][0], LC_OUT[k][1], m.outcome === k, LC_OUT[k][2])).join('') + '</div>' +
     (closing ? '<div class="msg error" style="display:block; margin-top:8px;">Al guardar, este lead sale de «Leads en proceso» y deja de recibir los correos automáticos.</div>' : '') +
     (closing ? '' : '<div class="lc-sec">Próxima llamada <span class="sub">(se sugiere según los intentos; puedes cambiarla)</span></div><div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;"><input type="text" id="lc-next" value="' + lcEsc(m.next) + '" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" style="width:140px;" oninput="maskDateInput(this); lcNextTyped(this.value)">' + [[1, 'Mañana'], [2, 'En 2 días'], [3, 'En 3 días'], [7, 'En 1 semana'], [14, 'En 2 semanas']].map(a => '<button type="button" class="tr-pill" onclick="lcQuickNext(' + a[0] + ')">' + a[1] + '</button>').join('') + '</div>') +
@@ -20758,12 +20769,28 @@ function lcPick(group, key){
 function lcNextTyped(v){ if(LC.modal){ LC.modal.next = v; LC.modal.nextTouched = true; } }
 function lcQuickNext(n){ if(!LC.modal) return; LC.modal.next = isoToMMDDYYYYDisplay(lcAddDays(lcToday(), n)); LC.modal.nextTouched = true; const i = document.getElementById('lc-next'); if(i) i.value = LC.modal.next; }
 function lcModalErr(t){ const e = document.getElementById('lc-err'); if(e){ e.textContent = t; e.style.display = t ? 'block' : 'none'; } }
+// Guarda el registro (y cierra el lead si corresponde). Lo usan la ventana «Registrar» y los botones rápidos de cada fila.
+async function lcInsertLog(c, o){
+  const { data: { session } } = await sb.auth.getSession();
+  const logs = LC.logs[c.id] || [];
+  const row = { client_id: c.id, user_id: session.user.id, user_name: currentProfile ? currentProfile.full_name : session.user.email, channels: o.ch || [], result: o.result || null, outcome: o.outcome || null, note: o.note || null, next_followup_on: o.closing ? null : o.next, attempt_no: o.attempt || logs.length + 1 };
+  const ins = await sb.from('lead_call_log').insert(row).select().maybeSingle();
+  if(ins.error) throw ins.error;
+  if(o.closing){
+    const status = o.outcome === 'no_contactar' ? 'no_contactar' : 'no_interesado';
+    const reason = o.outcome === 'ya_tiene_seguro' ? 'Ya consiguió seguro (llamada de seguimiento)' : o.outcome === 'no_contactar' ? 'Pidió no ser contactado (llamada de seguimiento)' : 'Ya no está interesado (llamada de seguimiento)';
+    const up = await sb.from('clients').update({ client_status: status, close_reason: reason }).eq('id', c.id);
+    if(up.error) throw new Error('La llamada se guardó, pero no se pudo cerrar el lead: ' + up.error.message);
+    try { await sb.from('client_audit_log').insert({ client_id: c.id, changed_by: session.user.id, changed_by_name: row.user_name, changes: 'Estado del cliente: "' + (c.client_status || '') + '" → "' + status + '"\nMotivo: ' + reason }); } catch(e){ /* el historial es un extra */ }
+  }
+  const l = await sb.from('lead_call_log').select('*').eq('client_id', c.id).order('created_at', { ascending: false }); if(!l.error) LC.logs[c.id] = l.data || [];
+  if(o.closing){ try { if(typeof loadLeads === 'function') await loadLeads(); if(typeof loadClients === 'function') await loadClients(); } catch(e){ console.error(e); } }
+}
 async function lcSave(){
   const m = LC.modal; if(!m || LC.busy) return;
   const note = (document.getElementById('lc-note') || { value: '' }).value.trim(); m.note = note;
   const closing = !!(m.isLead && m.outcome && LC_OUT[m.outcome][2] === 'close');
-  if(!m.ch.length && !note){ lcModalErr('Marca qué hiciste (llamada, texto…) o escribe una nota.'); return; }
-  if(m.ch.length && !m.result){ lcModalErr('Marca cómo salió (no contestó, buzón, hablé con la persona…).'); return; }
+  if(!m.ch.length && !note && !m.outcome){ lcModalErr('Marca qué hiciste (llamé, mensaje de texto…), en qué quedó, o escribe una nota.'); return; }
   let nextISO = null;
   if(!closing){
     const raw = (document.getElementById('lc-next') || { value: m.next }).value.trim();
@@ -20773,26 +20800,41 @@ async function lcSave(){
   }
   LC.busy = true; const btn = document.getElementById('lc-save'); if(btn){ btn.disabled = true; btn.textContent = 'Guardando…'; }
   try {
-    const { data: { session } } = await sb.auth.getSession();
-    const row = { client_id: m.c.id, user_id: session.user.id, user_name: currentProfile ? currentProfile.full_name : session.user.email, channels: m.ch, result: m.result || null, outcome: m.outcome || null, note: note || null, next_followup_on: nextISO, attempt_no: m.attempt };
-    const ins = await sb.from('lead_call_log').insert(row).select().maybeSingle();
-    if(ins.error) throw ins.error;
-    if(closing){
-      const status = m.outcome === 'no_contactar' ? 'no_contactar' : 'no_interesado';
-      const reason = m.outcome === 'ya_tiene_seguro' ? 'Ya consiguió seguro (llamada de seguimiento)' : m.outcome === 'no_contactar' ? 'Pidió no ser contactado (llamada de seguimiento)' : 'Ya no está interesado (llamada de seguimiento)';
-      const up = await sb.from('clients').update({ client_status: status, close_reason: reason }).eq('id', m.c.id);
-      if(up.error) throw new Error('La llamada se guardó, pero no se pudo cerrar el lead: ' + up.error.message);
-      try { await sb.from('client_audit_log').insert({ client_id: m.c.id, changed_by: session.user.id, changed_by_name: row.user_name, changes: 'Estado del cliente: "' + (m.c.client_status || '') + '" → "' + status + '"\nMotivo: ' + reason }); } catch(e){ /* el historial es un extra */ }
-    }
-    const l = await sb.from('lead_call_log').select('*').eq('client_id', m.c.id).order('created_at', { ascending: false }); if(!l.error) LC.logs[m.c.id] = l.data || [];
-    const name = m.c.full_name; lcCloseModal();
-    if(closing){ try { if(typeof loadLeads === 'function') await loadLeads(); if(typeof loadClients === 'function') await loadClients(); } catch(e){ console.error(e); } }
+    await lcInsertLog(m.c, { ch: m.ch, result: m.result, outcome: m.outcome, note, next: nextISO, attempt: m.attempt, closing });
+    const name = m.c.full_name; lcCloseModal(); delete LC.sel[m.c.id];
     lcRender(); lcProfileRender();
     lcMsg('Guardado: ' + name + (closing ? ' — el lead se cerró y sale de la lista.' : '. Próxima llamada: ' + formatDateUS(nextISO) + '.'), 'success');
   } catch(e){
     lcModalErr('No se pudo guardar: ' + ((e && e.message) || e));
     if(btn){ btn.disabled = false; btn.textContent = 'Guardar'; }
   }
+  LC.busy = false;
+}
+// «✔ Listo» en la fila: guarda lo marcado con la próxima fecha sugerida (se puede cambiar después desde «Nota / más opciones»).
+async function lcQuickSave(id){
+  if(LC.busy) return; const c = lcLeadById(id); if(!c) return;
+  const s = LC.sel[id] || { ch: [], result: null };
+  if(!s.ch.length && !s.result){ lcMsg('Primero marca lo que hiciste (llamé, mensaje de texto…) y luego toca «Listo».', 'error'); return; }
+  LC.busy = true;
+  try {
+    const attempt = (LC.logs[id] || []).length + 1, nextISO = lcAddDays(lcToday(), lcDaysFor(attempt, s.result, null));
+    await lcInsertLog(c, { ch: s.ch, result: s.result, note: null, next: nextISO, attempt, closing: false });
+    delete LC.sel[id]; lcRender(); lcProfileRender();
+    lcMsg('Listo: ' + c.full_name + '. Próxima llamada: ' + formatDateUS(nextISO) + ' (si quieres otra fecha o una nota, toca «Nota / más opciones» en «Ya hechas hoy»).', 'success');
+  } catch(e){ lcMsg('No se pudo guardar: ' + ((e && e.message) || e), 'error'); }
+  LC.busy = false;
+}
+// «⛔ No molestar más»: el cliente pidió que no lo contacten. Cierra el lead y deja de recibir correos.
+async function lcNoMore(id){
+  if(LC.busy) return; const c = lcLeadById(id); if(!c) return;
+  if(!confirm('¿Marcar a ' + c.full_name + ' como «No molestar más»? Sale de «Leads en proceso» y deja de recibir correos automáticos.')) return;
+  LC.busy = true;
+  try {
+    const s = LC.sel[id] || { ch: [], result: null };
+    await lcInsertLog(c, { ch: s.ch, result: s.result || 'hablamos', outcome: 'no_contactar', note: 'Pidió que no lo molesten más', next: null, attempt: (LC.logs[id] || []).length + 1, closing: true });
+    delete LC.sel[id]; lcRender(); lcProfileRender();
+    lcMsg(c.full_name + ' quedó como «No contactar» y salió de la lista.', 'success');
+  } catch(e){ lcMsg('No se pudo guardar: ' + ((e && e.message) || e), 'error'); }
   LC.busy = false;
 }
 
