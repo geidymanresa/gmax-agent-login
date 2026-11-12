@@ -1264,11 +1264,13 @@
           </div>
           <div class="form-row"><label>Nueva fecha de expiración (automática)</label><input type="text" id="rn-newexp" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
           <div class="form-row-2">
-            <div class="form-row"><label>Nuevo número de póliza <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="text" id="rn-newnumber" placeholder="Dejar vacío = el mismo"></div>
-            <div class="form-row"><label>Nueva mensualidad ($) <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="number" min="0" step="0.01" id="rn-newpay" placeholder="Dejar vacío = la misma"></div>
+            <div class="form-row"><label>Prima total nueva ($) <span style="color:#C23B3B;">*</span></label><input type="number" min="0" step="0.01" id="rn-newprem" oninput="updateRenewalPremPreview()"></div>
+            <div class="form-row"><label>Nueva mensualidad ($) <span id="rn-newpay-req" style="color:#C23B3B;"></span></label><input type="number" min="0" step="0.01" id="rn-newpay" oninput="updateRenewalPremPreview()"></div>
           </div>
-          <div class="form-row"><label>Fecha del primer pago de esta renovación <span class="sub" style="font-weight:400;">(solo si paga mensual y cambió; vacío = el mismo día de la fecha efectiva)</span></label><input type="text" id="rn-firstpay" placeholder="MM/DD/AAAA" maxlength="10" inputmode="numeric" oninput="maskDateInput(this)"></div>
-          <p class="sub" style="margin-top:0;">La nueva fecha efectiva empieza igual que la fecha de expiración anterior (puedes cambiarla). La póliza sigue activa y vuelve a entrar a los recordatorios de pago y de revisión.</p>
+          <div class="sub" id="rn-prem-preview" style="margin:-6px 0 10px; font-size:12.5px;"></div>
+          <div class="form-row"><label>Nuevo número de póliza <span class="sub" style="font-weight:400;">(solo si cambió)</span></label><input type="text" id="rn-newnumber" placeholder="Dejar vacío = el mismo"></div>
+          <div class="form-row"><label>Tarjeta de seguro / ID card con las fechas nuevas <span style="color:#C23B3B;">*</span> <span class="sub" style="font-weight:400;">(obligatoria · foto o PDF)</span></label><input type="file" id="rn-card" accept="image/*,.pdf"></div>
+          <p class="sub" style="margin-top:0;">La nueva fecha efectiva empieza igual que la fecha de expiración anterior (puedes cambiarla). Los pagos del nuevo periodo caen el mismo día de la fecha efectiva. La tarjeta se guarda en Documentos del cliente. La póliza sigue activa y vuelve a entrar a los recordatorios de pago y de revisión.</p>
           <div style="display:flex; gap:10px; margin-top:6px; flex-wrap:wrap;">
             <button type="button" class="btn-primary" style="width:auto; padding:11px 20px;" onclick="confirmPolicyRenewed()">✅ Confirmar renovación</button>
             <button type="button" class="btn-ghost" style="width:auto; padding:10px 18px;" onclick="closeRenewalDialog()">Cancelar</button>
@@ -1411,7 +1413,7 @@
           <div class="dash-card" id="paymentCheckCard" style="display:none; margin:0; background:#FDF0E4; border:1.5px solid #F0B87F;">
             <div style="display:inline-block; background:#C97A2E; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">📋 Tarea del día</div>
             <h4 style="margin-top:0; color:#9a5518;">💳 Tareas del día: pagos de clientes</h4>
-            <p class="sub" style="margin:0 0 8px;">A estos clientes les tocó el pago mensual de su póliza (el día del pago y hasta 10 días después). Contáctalos y anota qué se habló. Cuando el pago esté hecho, márcala "Al día" y la tarea desaparece.</p>
+            <p class="sub" style="margin:0 0 8px;">A estos clientes les tocó el pago mensual de su póliza. La tarea sale al día siguiente del pago (el mismo día la aseguradora todavía la muestra activa) y se queda hasta 10 días. Revisa en la aseguradora si el pago entró; si hay problema, contacta al cliente y anota qué se habló. Cuando todo esté bien, márcala "Al día" y la tarea desaparece.</p>
             <div id="paymentCheckList"></div>
           </div>
 
@@ -1470,8 +1472,8 @@
                "Se renovó", "No se renovó" o "No mostrar más". -->
           <div class="dash-card" id="renewalFollowupCard" style="display:none; margin:0; background:#FDEAEA; border:1.5px solid #E39C9C;">
             <div style="display:inline-block; background:#C23B3B; color:#fff; font-size:10.5px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;">🔴 Urgente</div>
-            <h4 style="margin-top:0; color:#8a3030;">🔄 Pólizas que vencieron — ¿se renovaron?</h4>
-            <p class="sub" style="margin:0 0 8px;">Confirma qué pasó con cada una. Si se renovó, las fechas se actualizan solas.</p>
+            <h4 style="margin-top:0; color:#8a3030;">🔄 Renovaciones — ¿se renovaron?</h4>
+            <p class="sub" style="margin:0 0 8px;">Estas pólizas llegaron a su fecha de renovación. La tarea sale al día siguiente, cuando ya se ve en la aseguradora si el cliente pagó. Confirma qué pasó: si se renovó, pon la prima nueva, las fechas y sube la tarjeta de seguro.</p>
             <div id="renewalFollowupList"></div>
           </div>
 
@@ -11905,7 +11907,8 @@
   //    nunca se cerraron en el sistema no llenen el tablero de golpe.
   // 2) Pagos mensuales: para toda póliza activa con mensualidad (sin importar
   //    el tipo de seguro), el día del mes en que le toca pagar al cliente (el
-  //    mismo día de su fecha efectiva) sale un aviso, y se queda 10 días o
+  //    mismo día de su fecha efectiva) sale un aviso AL DÍA SIGUIENTE (cuando la aseguradora
+  //    ya muestra si pagó), y se queda 10 días o
   //    hasta que se marque "Al día". Las pólizas de pago completo (sin
   //    mensualidad) solo tienen el aviso de renovación.
   //    Se excluyen las que ya tienen cobro automático por tarjeta o el aviso
@@ -11913,7 +11916,9 @@
   // Lo que se resolvió se guarda en policy_reminder_acks (migracion_renovaciones_y_pagos.sql).
   const RENEWAL_FOLLOWUP_WINDOW_DAYS = 60;
   const PAYMENT_CHECK_WINDOW_DAYS = 10;
+  const PAYMENT_CHECK_FIRST_DAY = 1;   // días después del pago en que empieza a salir el aviso (1 = al día siguiente)
   const DEFAULT_RENEWAL_TERM_MONTHS = 6;
+  const RENEWAL_CARD_MAX_MB = 15;
   let renewalFollowupCache = {};
 
   function isoToLocalDate(iso){ return new Date(iso + 'T00:00:00'); }
@@ -12130,20 +12135,24 @@
     const card = document.getElementById('renewalFollowupCard');
     const list = document.getElementById('renewalFollowupList');
     if(!card || !list) return;
-    if(!isAdminUser()){ card.style.display = 'none'; return; }
+    const admin = isAdminUser();
 
     const hoy = new Date(); hoy.setHours(0,0,0,0);
     const desde = new Date(hoy); desde.setDate(desde.getDate() - RENEWAL_FOLLOWUP_WINDOW_DAYS);
+    // La tarea sale AL DÍA SIGUIENTE de la fecha de renovación (la de expiración de la vigencia anterior): ese día se ve en la aseguradora
+    // si el cliente pagó la renovación o si hubo algún problema. «hasta ayer» = expiration_date < hoy.
     const { data, error } = await sb.from('client_policies')
-      .select('*, client:client_id(full_name)')
+      .select('*, client:client_id(full_name, assigned_agent_id)')
       .neq('status', 'cancelled')
-      .lte('expiration_date', toISODateLocal(hoy))
+      .lt('expiration_date', toISODateLocal(hoy))
       .gte('expiration_date', toISODateLocal(desde))
       .order('expiration_date', { ascending: true });
-    if(error || !data || data.length === 0){ card.style.display = 'none'; return; }
+    // La administradora ve todas; cada agente, las pólizas de sus clientes.
+    const mine = (data || []).filter(p => admin || (currentProfile && p.client && p.client.assigned_agent_id === currentProfile.id));
+    if(error || mine.length === 0){ card.style.display = 'none'; return; }
 
     const { set: acked, error: ackError } = await fetchReminderAcks('renewal', toISODateLocal(desde));
-    const pending = data.filter(p => !acked.has(p.id + '|' + p.expiration_date));
+    const pending = mine.filter(p => !acked.has(p.id + '|' + p.expiration_date));
     if(pending.length === 0){ card.style.display = 'none'; return; }
 
     renewalFollowupCache = {};
@@ -12151,24 +12160,25 @@
     const { map: contactMap } = await fetchContactLogs('renewal', toISODateLocal(desde));
     pending.forEach(p => {
       contactTaskCache[p.id + '|renewal|' + p.expiration_date] =
-        `${p.client ? p.client.full_name : 'Cliente'} — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''} con ${p.company || '—'} — venció el ${formatDateUS(p.expiration_date)}`;
+        `${p.client ? p.client.full_name : 'Cliente'} — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''} con ${p.company || '—'} — renovación del ${formatDateUS(p.expiration_date)}`;
     });
     card.style.display = 'block';
     list.innerHTML = (ackError ? ACK_MIGRATION_WARNING : '') + pending.map(p => {
       const dias = Math.round((hoy - isoToLocalDate(p.expiration_date)) / 86400000);
-      const cuando = dias <= 0 ? 'venció hoy' : dias === 1 ? 'venció ayer' : `venció hace ${dias} días`;
+      const cuando = dias <= 1 ? 'se renovaba ayer' : `se renovaba hace ${dias} días`;
       return `
       <div style="padding:10px 0; border-bottom:1px solid #E39C9C;">
         <div style="cursor:pointer;" onclick="goToClientFromUnderwriting('${p.client_id}')">
           <strong>${escapeHtml(p.client ? p.client.full_name : 'Cliente')}</strong> — ${INSURANCE_TYPE_LABELS[p.insurance_type] || p.insurance_type || ''}
           con ${escapeHtml(p.company || '—')} ${p.policy_number ? '(#' + escapeHtml(p.policy_number) + ')' : ''}
           <span style="font-weight:700; color:#8a3030;">— ${cuando} (${formatDateUS(p.expiration_date)})</span>
+          <div class="sub" style="font-size:12px; margin-top:2px;">Entra a la aseguradora: mira si el cliente pagó la renovación o si hay algún problema. Después toca «Se renovó» y pon la prima nueva, las fechas y la tarjeta de seguro.</div>
         </div>
         ${contactStatusHtml(contactMap[p.id + '|' + p.expiration_date])}
         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
           <button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="openContactDialog('${p.id}', 'renewal', '${p.expiration_date}')">📞 Contacté al cliente</button>
           <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#177A54; border-color:#A9DFC4;" onclick="openRenewalDialog('${p.id}', 'renewed')">✅ Se renovó</button>
-          <button class="btn-ghost" style="width:auto; padding:6px 12px; color:#8a3030; border-color:#E3B8B8;" onclick="openRenewalDialog('${p.id}', 'not')">❌ No se renovó</button>
+          ${admin ? `<button class="btn-ghost" style="width:auto; padding:6px 12px; color:#8a3030; border-color:#E3B8B8;" onclick="openRenewalDialog('${p.id}', 'not')">❌ No se renovó</button>` : ''}
           <button class="btn-ghost" style="width:auto; padding:6px 12px;" onclick="dismissRenewalFollowup('${p.id}', '${p.expiration_date}')">🙈 No mostrar más</button>
         </div>
       </div>`;
@@ -12200,11 +12210,16 @@
       }
       if(!term || term < 1 || term > 36) term = DEFAULT_RENEWAL_TERM_MONTHS;
       document.getElementById('rn-neweff').value = formatDateUS(p.expiration_date);
-      document.getElementById('rn-firstpay').value = '';
       document.getElementById('rn-term').value = term;
       document.getElementById('rn-newnumber').value = '';
       document.getElementById('rn-newpay').value = '';
-      updateRenewalNewExpiration();
+      document.getElementById('rn-newprem').value = '';
+      document.getElementById('rn-card').value = '';
+      const prevMonthly = Number(p.monthly_payment) > 0, prevPrem = policyPremium(p);
+      document.getElementById('rn-newpay').placeholder = prevMonthly ? 'Antes: $' + Number(p.monthly_payment).toFixed(2) : 'Vacío si paga en full';
+      document.getElementById('rn-newprem').placeholder = prevPrem ? 'Antes: $' + prevPrem.toFixed(2) : '';
+      document.getElementById('rn-newpay-req').textContent = prevMonthly ? '*' : '';
+      updateRenewalNewExpiration(); updateRenewalPremPreview();
     } else {
       document.querySelectorAll('input[name="rn-reason"]').forEach(r => { r.checked = false; });
     }
@@ -12213,6 +12228,25 @@
 
   function closeRenewalDialog(){
     document.getElementById('renewalOverlay').style.display = 'none';
+  }
+
+  // Prima = depósito (primer pago) + (término − 1) mensualidades. En una renovación el «depósito» es el primer pago del nuevo periodo.
+  function renewalPremParts(){
+    const prem = parseFloat(document.getElementById('rn-newprem').value);
+    const monRaw = document.getElementById('rn-newpay').value;
+    const mon = monRaw === '' ? 0 : parseFloat(monRaw);
+    const term = parseInt(document.getElementById('rn-term').value, 10) || 0;
+    if(!(prem > 0) || !term || isNaN(mon)) return null;
+    if(!(mon > 0)) return { prem, mon: 0, term, first: prem };
+    const first = Math.round((prem - mon * Math.max(0, term - 1)) * 100) / 100;
+    return { prem, mon, term, first };
+  }
+  function updateRenewalPremPreview(){
+    const el = document.getElementById('rn-prem-preview'); if(!el) return;
+    const r = renewalPremParts(); el.style.color = '';
+    if(!r){ el.textContent = ''; return; }
+    if(r.mon > 0 && r.first <= 0){ el.textContent = 'La prima total no alcanza para ' + r.term + ' mensualidades de $' + r.mon.toFixed(2) + '. Revisa la prima o la mensualidad.'; el.style.color = '#B23A3A'; return; }
+    el.textContent = r.mon > 0 ? 'Prima total $' + r.prem.toFixed(2) + ' = primer pago $' + r.first.toFixed(2) + ' + ' + Math.max(0, r.term - 1) + ' mensualidad(es) de $' + r.mon.toFixed(2) : 'Pago en full: $' + r.prem.toFixed(2);
   }
 
   function updateRenewalNewExpiration(){
@@ -12230,9 +12264,18 @@
     const newExp = mmddyyyyToISO(document.getElementById('rn-newexp').value);
     const term = parseInt(document.getElementById('rn-term').value, 10);
     const newNumber = document.getElementById('rn-newnumber').value.trim();
-    const newPayRaw = document.getElementById('rn-newpay').value;
     if(!newEff || !newExp || !term){ showMsg('rn-msg', 'error', 'Completa la fecha efectiva, el término y la fecha de expiración (MM/DD/AAAA).'); return; }
     if(newExp <= newEff){ showMsg('rn-msg', 'error', 'La fecha de expiración tiene que ser después de la fecha efectiva.'); return; }
+    // Prima total nueva (obligatoria) y mensualidad (obligatoria si la póliza ya pagaba mensual)
+    const prevMonthly = Number(p.monthly_payment) > 0;
+    const parts = renewalPremParts();
+    if(!parts){ showMsg('rn-msg', 'error', 'Escribe la prima total nueva' + (prevMonthly ? ' y la nueva mensualidad.' : '.')); return; }
+    if(prevMonthly && !(parts.mon > 0)){ showMsg('rn-msg', 'error', 'Esta póliza pagaba mensual: escribe la nueva mensualidad.'); return; }
+    if(parts.mon > 0 && parts.first <= 0){ showMsg('rn-msg', 'error', 'La prima total no alcanza para ' + parts.term + ' mensualidades de $' + parts.mon.toFixed(2) + '. Revisa la prima o la mensualidad.'); return; }
+    // Tarjeta de seguro con las fechas nuevas: obligatoria
+    const cardFile = document.getElementById('rn-card').files[0];
+    if(!cardFile){ showMsg('rn-msg', 'error', 'Sube la tarjeta de seguro (ID card) con las fechas nuevas: es obligatoria.'); return; }
+    if(cardFile.size > RENEWAL_CARD_MAX_MB * 1024 * 1024){ showMsg('rn-msg', 'error', 'El archivo pesa más de ' + RENEWAL_CARD_MAX_MB + ' MB. Sube una foto más liviana o un PDF más pequeño.'); return; }
 
     const payload = {
       effective_date: newEff,
@@ -12243,18 +12286,34 @@
       last_status_review_at: new Date(newEff + 'T12:00:00').toISOString()
     };
     if(newNumber) payload.policy_number = newNumber;
-    if(newPayRaw !== '') payload.monthly_payment = parseFloat(newPayRaw);
-    // Fecha del primer pago de la nueva vigencia: la que se escriba, o vacía (= el mismo día de la fecha efectiva).
-    // Así la fecha de la vigencia anterior no se arrastra a la renovación.
-    const fpRaw = document.getElementById('rn-firstpay').value.trim();
-    const fpIso = fpRaw ? mmddyyyyToISO(fpRaw) : null;
-    if(fpRaw && !fpIso){ showMsg('rn-msg', 'error', 'La fecha del primer pago no es válida. Escríbela como MM/DD/AAAA.'); return; }
-    if(fpIso && (fpIso < newEff || fpIso >= newExp)){ showMsg('rn-msg', 'error', 'La fecha del primer pago tiene que estar dentro de la nueva vigencia.'); return; }
-    if(fpIso && !(await firstPaymentColumnReady())){ showMsg('rn-msg', 'error', FIRST_PAY_MIGRATION_MSG); return; }
-    if(fpIso || (p.first_payment_date && await firstPaymentColumnReady())) payload.first_payment_date = fpIso;
+    // Prima: total_premium + mensualidad + «depósito» (= primer pago del nuevo periodo) para que la prima calculada (depósito + (término−1) mensualidades) dé la total.
+    payload.total_premium = parts.prem;
+    payload.monthly_payment = parts.mon > 0 ? parts.mon : null;
+    payload.deposit_amount = parts.first;
+    // Los pagos del nuevo periodo caen el mismo día de la fecha efectiva: la fecha del primer pago de la vigencia anterior no se arrastra.
+    if(p.first_payment_date && await firstPaymentColumnReady()) payload.first_payment_date = null;
 
+    // 1) tarjeta de seguro → Documentos del cliente (si algo falla después, se deshace)
+    const { data: { session } } = await sb.auth.getSession();
+    const goBtn = document.querySelector('#rn-renewBox .btn-primary'); if(goBtn){ goBtn.disabled = true; goBtn.textContent = 'Guardando…'; }
+    const resetBtn = () => { if(goBtn){ goBtn.disabled = false; goBtn.textContent = '✅ Confirmar renovación'; } };
+    const safeName = cardFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const cardPath = `${p.client_id}/${Date.now()}_${safeName}`;
+    const up = await sb.storage.from('client-documents').upload(cardPath, cardFile);
+    if(up.error){ resetBtn(); showMsg('rn-msg', 'error', 'No se pudo subir la tarjeta: ' + up.error.message + '. No se renovó nada.'); return; }
+    const cardIns = await sb.from('client_documents').insert({
+      client_id: p.client_id, policy_id: p.id, file_name: 'Tarjeta de seguro (renovación ' + formatDateUS(newEff) + ') — ' + cardFile.name,
+      storage_path: cardPath, category: 'Tarjeta de seguro / ID card', uploaded_by: session && session.user ? session.user.id : null
+    }).select('id').single();
+    if(cardIns.error){ try{ await sb.storage.from('client-documents').remove([cardPath]); }catch(e){} resetBtn(); showMsg('rn-msg', 'error', 'La tarjeta se subió pero no se pudo guardar en Documentos: ' + cardIns.error.message + '. No se renovó nada.'); return; }
+
+    // 2) la póliza
     const { error } = await sb.from('client_policies').update(payload).eq('id', policyId);
-    if(error){ showMsg('rn-msg', 'error', 'No se pudo renovar: ' + error.message); return; }
+    if(error){
+      try{ if(cardIns.data) await sb.from('client_documents').delete().eq('id', cardIns.data.id); await sb.storage.from('client-documents').remove([cardPath]); }catch(e){}
+      resetBtn(); showMsg('rn-msg', 'error', 'No se pudo renovar: ' + error.message); return;
+    }
+    resetBtn();
 
     // Constancia de la renovación (fechas viejas y nuevas) — si falla, la póliza
     // ya quedó renovada igual, solo se avisa.
@@ -12262,7 +12321,8 @@
       old_effective: p.effective_date, old_expiration: p.expiration_date,
       new_effective: newEff, new_expiration: newExp, term_months: term,
       old_policy_number: p.policy_number || null, new_policy_number: newNumber || null,
-      old_monthly_payment: p.monthly_payment ?? null, new_monthly_payment: newPayRaw !== '' ? parseFloat(newPayRaw) : null
+      old_monthly_payment: p.monthly_payment ?? null, new_monthly_payment: parts.mon > 0 ? parts.mon : null,
+      old_total_premium: policyPremium(p) || null, new_total_premium: parts.prem, card_document_id: cardIns.data ? cardIns.data.id : null
     });
     if(ackErr) console.error('No se pudo guardar la constancia de renovación:', ackErr);
 
@@ -12324,7 +12384,9 @@
         if(p.expiration_date && cycleISO >= p.expiration_date) return;                 // ahí manda el aviso de renovación
       }
       const diff = Math.round((hoy - cycle) / 86400000);
-      if(diff < 0 || diff > PAYMENT_CHECK_WINDOW_DAYS) return;
+      // El mismo día del pago la aseguradora todavía muestra la póliza «activa» mientras intenta cobrar: el aviso sale DESDE EL DÍA SIGUIENTE,
+      // cuando ya se ve si el pago entró o si quedó pendiente de cancelación.
+      if(diff < PAYMENT_CHECK_FIRST_DAY || diff > PAYMENT_CHECK_WINDOW_DAYS) return;
       if(acked.has(p.id + '|' + cycleISO)) return;
       items.push({ p, cycleISO, diff });
     });
@@ -12348,7 +12410,7 @@
           con ${escapeHtml(p.company || '—')} ${p.policy_number ? '(#' + escapeHtml(p.policy_number) + ')' : ''}
           <span class="sub">— $${Number(p.monthly_payment).toFixed(2)} mensual</span>
           <span style="font-weight:700; color:#9a5518;">— ${cuando} (${formatDateUS(cycleISO)})</span>
-          <div class="sub" style="font-size:12px; margin-top:2px;">Póliza activa — pago pendiente de confirmar</div>
+          <div class="sub" style="font-size:12px; margin-top:2px;">Entra a la aseguradora y mira si el pago entró o si la póliza quedó pendiente de cancelación</div>
         </div>
         ${contactStatusHtml(contactMap[p.id + '|' + cycleISO])}
         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
@@ -13725,10 +13787,42 @@
       leads = leads.filter(c => !clientesConPolizaActiva.has(c.id));
     }
 
+    // Ex-clientes: clientes cuyas pólizas están TODAS canceladas (la última hace 90 días o menos) también son leads para llamar.
+    try{
+      const ex = await loadExClientLeads(new Set(leads.map(c => c.id)));
+      if(ex.length){ leads = leads.concat(ex); leads.sort((a, b) => String(b._leadSince || b.created_at || '').localeCompare(String(a._leadSince || a.created_at || ''))); }
+    }catch(e){ console.error('Ex-clientes como leads:', e); }
+
     allLeadsData = leads;
     leadsCurrentPage = 1;
     renderLeadsPage();
     if(typeof lcRefresh === 'function') lcRefresh().catch(e => console.error(e));
+  }
+
+  // ===== EX-CLIENTES COMO LEADS =====
+  // Un cliente que se quedó SIN ninguna póliza activa (todas canceladas) es, para el sistema, un lead: sale en «Leads en proceso» y en
+  // «Llamadas de leads de hoy» para tratar de venderle algo otra vez. Solo cuenta si la última cancelación fue hace EXCLIENT_LEAD_DAYS días o menos
+  // (no se llena la lista con clientes viejos). Usa client_policies.cancelled_at (migracion_cancelada_el.sql); sin esa migración, simplemente no hay ex-clientes.
+  // No entran a los correos automáticos a leads (esos solo miran client_status = 'lead_nuevo').
+  const EXCLIENT_LEAD_DAYS = 90;
+  async function loadExClientLeads(skipIds){
+    const cut = new Date(); cut.setDate(cut.getDate() - EXCLIENT_LEAD_DAYS);
+    const r = await sb.from('client_policies').select('client_id, cancelled_at').eq('status', 'cancelled').gte('cancelled_at', cut.toISOString());
+    if(r.error || !r.data || !r.data.length) return [];
+    const since = {};
+    r.data.forEach(p => { if(p.cancelled_at && (!since[p.client_id] || p.cancelled_at > since[p.client_id])) since[p.client_id] = p.cancelled_at; });
+    const ids = Object.keys(since).filter(id => !skipIds.has(id));
+    const out = [];
+    for(let i = 0; i < ids.length; i += 100){
+      const part = ids.slice(i, i + 100);
+      const act = await sb.from('client_policies').select('client_id').neq('status', 'cancelled').in('client_id', part);
+      if(act.error) return [];
+      const conActiva = new Set((act.data || []).map(p => p.client_id));
+      const cl = await sb.from('clients').select('*, agente:assigned_agent_id(full_name, producer_code)').in('id', part).in('client_status', ['activo', 'inactivo']).is('deleted_at', null);
+      if(cl.error) return [];
+      (cl.data || []).forEach(c => { if(!conActiva.has(c.id)) out.push(Object.assign({}, c, { _exclient: true, _leadSince: toISODateLocal(new Date(since[c.id])) })); });
+    }
+    return out;
   }
 
   // Filtro por fecha de registro (MM/DD/AAAA). Cada lado es opcional: solo «Desde» = de esa fecha en adelante; solo «Hasta» = hasta esa fecha.
@@ -13741,7 +13835,7 @@
     if(!out.error && out.from && out.to && out.from > out.to) out.error = 'La fecha «Desde» es después de «Hasta». Revisa las fechas.';
     return out;
   }
-  function leadRegisteredISO(c){ return c && c.created_at ? toISODateLocal(new Date(c.created_at)) : ''; }
+  function leadRegisteredISO(c){ return c && c._leadSince ? c._leadSince : c && c.created_at ? toISODateLocal(new Date(c.created_at)) : ''; }
   function leadsVisibleData(){
     const r = leadsDateRange();
     if(r.error) return [];
@@ -13800,8 +13894,8 @@
         : '';
       return `
       <div style="padding:8px 0; border-bottom:1px solid #C7D9F3; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div><strong>${c.full_name}</strong> <span class="sub">— ${CLIENT_STATUS_LABELS[c.client_status] || c.client_status}</span>${typeof ldLangBadge === 'function' ? ldLangBadge(c) : ''}${webBadge}${agentLine}</div>
-        <span class="sub" style="margin:0 0 0 auto;" title="Fecha en que se registró el lead">📅 ${formatDateUS(leadRegisteredISO(c))}</span>
+        <div><strong>${c.full_name}</strong> <span class="sub">— ${c._exclient ? 'Ex-cliente (sin pólizas activas)' : (CLIENT_STATUS_LABELS[c.client_status] || c.client_status)}</span>${typeof ldLangBadge === 'function' ? ldLangBadge(c) : ''}${webBadge}${agentLine}</div>
+        <span class="sub" style="margin:0 0 0 auto;" title="${c._exclient ? 'Fecha en que canceló su última póliza' : 'Fecha en que se registró el lead'}">📅 ${formatDateUS(leadRegisteredISO(c))}</span>
         <div style="display:flex; gap:6px; flex-wrap:wrap;">
           <button class="btn-ghost" style="width:auto; padding:6px 10px; color:#8a3030; border-color:#E3B8B8;" onclick="markLeadNoContactar('${c.id}', event)">🚫 No contactar</button>
           <button class="btn-ghost" style="width:auto; padding:6px 10px;" onclick="goToClientFromUnderwriting('${c.id}')">Ver</button>
@@ -20513,7 +20607,7 @@ function lcAddDays(iso, n){ const p = String(iso).split('-').map(Number); return
 function lcDiff(a, b){ const pa = String(a).split('-').map(Number), pb = String(b).split('-').map(Number); return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 864e5); }
 function lcDigits(p){ return String(p || '').replace(/\D/g, ''); }
 function lcTel(p){ const d = lcDigits(p); return d.length === 10 ? '+1' + d : d.length === 11 && d[0] === '1' ? '+' + d : d ? '+' + d : ''; }
-function lcRegISO(c){ return c && c.created_at ? toISODateLocal(new Date(c.created_at)) : lcToday(); }
+function lcRegISO(c){ return c && c._leadSince ? c._leadSince : c && c.created_at ? toISODateLocal(new Date(c.created_at)) : lcToday(); }   // un ex-cliente cuenta desde el día que se quedó sin pólizas activas
 function lcProductLabel(k){ return k ? ((typeof INSURANCE_TYPE_LABELS !== 'undefined' && INSURANCE_TYPE_LABELS[k]) || k) : ''; }
 function lcAgo(iso){ const n = lcDiff(iso, lcToday()); return n <= 0 ? 'hoy' : n === 1 ? 'ayer' : 'hace ' + n + ' días'; }
 function lcMsg(msg, kind){ const el = document.getElementById('lc-msg'); if(!el) return; el.className = 'msg ' + (kind || 'success'); el.textContent = msg; el.style.display = msg ? 'block' : 'none'; clearTimeout(lcMsg.t); if(msg && kind !== 'error') lcMsg.t = setTimeout(() => { el.style.display = 'none'; }, 6000); }
@@ -20600,8 +20694,9 @@ function lcPage(d){ LC.page += d; lcRender(); }
 function lcChip(id, g, k, on){ const m = g === 'ch' ? LC_CH[k] : LC_RES[k]; const lab = g === 'ch' ? m[1] : ({ no_contesto: 'No contestó', buzon: 'Buzón de voz', hablamos: 'Hablé con la persona' }[k]); return '<button type="button" class="lc-opt lc-chip' + (on ? ' on' : '') + '" data-c="' + id + '" data-g="' + g + '" data-k="' + k + '" onclick="lcToggle(\'' + id + '\',\'' + g + '\',\'' + k + '\')">' + m[0] + ' ' + lab + '</button>'; }
 function lcRow(c, i){
   const tel = lcTel(c.phone), phone = c.phone ? '<a href="tel:' + tel + '" style="font-weight:700; color:#13633F; text-decoration:none;" title="Tocar para llamar">📞 ' + lcEsc(c.phone) + '</a>' : '<span style="color:#B23A3A;">sin teléfono</span>';
-  const prod = LC.quotes[c.id] ? '<span class="badge" style="background:#E4EEFF; color:#1F4FA3;">Cotizó: ' + lcEsc(lcProductLabel(LC.quotes[c.id])) + '</span> ' : '';
-  const when = i.isNew ? '<span class="badge blue">Nuevo · ' + lcEsc(lcAgo(lcRegISO(c))) + '</span>' : i.overdueDays > 0 ? '<span class="badge" style="background:#FDEAEA; color:#B23A3A;">Vencida hace ' + i.overdueDays + (i.overdueDays === 1 ? ' día' : ' días') + '</span>' : i.due ? '<span class="badge" style="background:#FFF3DC; color:#8A5A00;">Para hoy</span>' : '<span class="badge gray">Para el ' + lcEsc(formatDateUS(i.next)) + '</span>';
+  const exc = c._exclient ? '<span class="badge" style="background:#F1E9FF; color:#5B3FA3;" title="Cliente que se quedó sin ninguna póliza activa: hay que tratar de volver a venderle">Ex-cliente · canceló ' + lcEsc(formatDateUS(c._leadSince)) + '</span> ' : '';
+  const prod = exc + (LC.quotes[c.id] ? '<span class="badge" style="background:#E4EEFF; color:#1F4FA3;">Cotizó: ' + lcEsc(lcProductLabel(LC.quotes[c.id])) + '</span> ' : '');
+  const when = i.isNew ? '<span class="badge blue">' + (c._exclient ? 'Para llamar desde su cancelación · ' : 'Nuevo · ') + lcEsc(lcAgo(lcRegISO(c))) + '</span>' : i.overdueDays > 0 ? '<span class="badge" style="background:#FDEAEA; color:#B23A3A;">Vencida hace ' + i.overdueDays + (i.overdueDays === 1 ? ' día' : ' días') + '</span>' : i.due ? '<span class="badge" style="background:#FFF3DC; color:#8A5A00;">Para hoy</span>' : '<span class="badge gray">Para el ' + lcEsc(formatDateUS(i.next)) + '</span>';
   const last = i.last ? '<div class="sub" style="margin:2px 0 0; font-size:12.5px;">Último intento (' + lcEsc(lcAgo(toISODateLocal(new Date(i.last.created_at)))) + '): ' + lcEsc(lcSummary(i.last)) + '</div>' : '';
   const warn = (i.attempts >= 6 && !i.talked) ? ' <span class="badge" style="background:#FDEAEA; color:#B23A3A;" title="Las agencias suelen cerrar o pasar el lead a correos después de unos 6–7 intentos sin contacto">⚠ ' + i.attempts + ' intentos sin contacto</span>' : '';
   const sel = LC.sel[c.id] || { ch: [], result: null };
@@ -20635,7 +20730,7 @@ async function lcOpen(clientId, clientObj){
   if(!c){ lcMsg('No se encontró ese cliente.', 'error'); return; }
   if(!LC.logs[clientId]){ const l = await sb.from('lead_call_log').select('*').eq('client_id', clientId).order('created_at', { ascending: false }); if(!l.error) LC.logs[clientId] = l.data || []; }
   const logs = LC.logs[clientId] || [];
-  LC.modal = { c, isLead: c.client_status === 'lead_nuevo', ch: ['llamada'], result: null, outcome: null, next: '', nextTouched: false, attempt: logs.length + 1, talkedBefore: logs.some(r => r.result === 'hablamos') };
+  LC.modal = { c, isLead: c.client_status === 'lead_nuevo' || !!c._exclient, ch: ['llamada'], result: null, outcome: null, next: '', nextTouched: false, attempt: logs.length + 1, talkedBefore: logs.some(r => r.result === 'hablamos') };
   lcSuggest();
   lcDrawModal();
 }
@@ -20658,7 +20753,7 @@ function lcDrawModal(){
   const hint = m.attempt >= 6 && !m.talkedBefore ? '<div class="msg" style="display:block; background:#FFF6E0; color:#7A5A00; border:1px solid #F0D58A; margin:8px 0;">Este sería el intento #' + m.attempt + ' sin haber hablado con la persona. Las agencias suelen cerrar el lead o dejarlo solo con correos después de unos 6–7 intentos (≈3 semanas).</div>' : '';
   const ov = document.createElement('div'); ov.id = 'lc-modal'; ov.className = 'tr-modal-ov';
   ov.innerHTML = '<div class="tr-modal-box" role="dialog" aria-modal="true" style="max-width:640px;"><h3 style="margin:0 0 4px;">📞 ' + lcEsc(c.full_name) + (typeof ldLangBadge === 'function' ? ldLangBadge(c) : '') + '</h3>' +
-    '<div class="sub" style="margin:0 0 6px;">' + (c.phone ? '<a href="tel:' + tel + '" style="font-weight:700; color:#13633F;">' + lcEsc(c.phone) + '</a>' : 'Sin teléfono') + (LC.quotes[c.id] ? ' · Cotizó: ' + lcEsc(lcProductLabel(LC.quotes[c.id])) : '') + ' · Registrado ' + lcEsc(formatDateUS(lcRegISO(c))) + ' · Intento #' + m.attempt + '</div>' + hint +
+    '<div class="sub" style="margin:0 0 6px;">' + (c.phone ? '<a href="tel:' + tel + '" style="font-weight:700; color:#13633F;">' + lcEsc(c.phone) + '</a>' : 'Sin teléfono') + (LC.quotes[c.id] ? ' · Cotizó: ' + lcEsc(lcProductLabel(LC.quotes[c.id])) : '') + ' · ' + (c._exclient ? 'Canceló ' : 'Registrado ') + lcEsc(formatDateUS(lcRegISO(c))) + ' · Intento #' + m.attempt + '</div>' + hint +
     '<div class="lc-sec">¿Qué hiciste? <span class="sub">(puedes marcar varias)</span></div><div class="lc-opts">' + Object.keys(LC_CH).map(k => lcOpt('ch', k, LC_CH[k][0], LC_CH[k][1], m.ch.includes(k))).join('') + '</div>' +
     '<div class="lc-sec">¿Cómo salió? <span class="sub">(opcional)</span></div><div class="lc-opts">' + Object.keys(LC_RES).map(k => lcOpt('result', k, LC_RES[k][0], LC_RES[k][1], m.result === k)).join('') + '</div>' +
     '<div class="lc-sec">¿En qué quedó? <span class="sub">(opcional)</span></div><div class="lc-opts">' + Object.keys(LC_OUT).filter(k => m.isLead || LC_OUT[k][2] !== 'close').map(k => lcOpt('outcome', k, LC_OUT[k][0], LC_OUT[k][1], m.outcome === k, LC_OUT[k][2])).join('') + '</div>' +
