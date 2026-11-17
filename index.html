@@ -20502,7 +20502,7 @@ async function ldLoad(){
     LD.plan = ldCompute(leads, LD.sends, LD.settings, Date.now());
     LD.error = null; LD.loaded = true;
   } catch(ex){
-    LD.error = /relation|does not exist|schema cache|column/i.test(ex.message) ? 'Falta correr la migración SQL de los correos a leads (migracion_correos_leads.sql) en Supabase.' : ex.message;
+    LD.error = /relation|does not exist|schema cache|column/i.test(ex.message) ? 'Falta correr la migración SQL de los correos a leads (migracion_correos_leads.sql) en Supabase. Detalle técnico: ' + ex.message : ex.message;
   } finally { LD.loading = false; }
 }
 function ldViewHtml(){ return '<div id="ld-body">' + ldBodyHtml() + '</div>'; }
