@@ -7363,6 +7363,7 @@ body.role-support .mc-tab-btn[data-mctab="documentos"], body.role-support .mc-ta
       return;
     }
     await ensureStaffInfo(policies.map(p => p.created_by));
+    await loadPolicyTxPeople(clientId);
     tbody.innerHTML = policies.map(p => {
       const co = allCompanies.find(c => c.id === p.company_id);
       let companyCell = p.company || '—';
@@ -7427,7 +7428,7 @@ body.role-support .mc-tab-btn[data-mctab="documentos"], body.role-support .mc-ta
       // los vehículos amarrados a esta póliza en una fila extra, justo debajo.
       let vehiclesRow = '';
       const peopleView = policyPeopleView(p);
-      if(AUTO_POLICY_TYPES.includes(p.insurance_type) || p.people){
+      if(isAutoPolicyType(p.insurance_type) || p.people || peopleView.vehicles.length > 0 || peopleView.drivers != null){
         vehiclesRow = `
       <tr${cancelled ? ' style="opacity:0.7;"' : ''}>
         <td colspan="8" style="background:var(--canvas); padding:10px 16px 14px 16px;">
@@ -9004,8 +9005,36 @@ body.role-support .mc-tab-btn[data-mctab="documentos"], body.role-support .mc-ta
   // ---- Conductores, vehículos y la cobertura de cada auto (pólizas y cotizaciones) ----
   const covLabelOf = (k) => (COVERAGE_OPTIONS.find(c => c.key === k) || {}).label || k;
   // Lo de una póliza: el resumen guardado al venderla + los vehículos que se le fueron agregando/quitando en el expediente.
+  // Pólizas vendidas antes de que existiera el resumen guardado: sus conductores/vehículos/coberturas quedaron escritos en las notas de
+  // la transacción de «Nueva póliza» («Conductores: 2. Vehículos y coberturas: Vehículo 1 (…) — Liability, PIP; …»). Se leen de ahí.
+  let policyTxPeople = {};
+  function parsePeopleFromNotes(notes){
+    const t = String(notes || '');
+    const mv = t.match(/Vehículos y coberturas:\s*(.+?)\.?\s*(?:\n|$)/);
+    if(!mv) return null;
+    let drivers = null, names = [];
+    let m = t.match(/Conductores que siguen:\s*(.*?)\.\s*Conductores nuevos:\s*(\d+)/);
+    if(m){ names = /^ninguno$/i.test(m[1].trim()) ? [] : m[1].split(/,\s*/).map(x => x.trim()).filter(Boolean); drivers = names.length + parseInt(m[2], 10); }
+    else if((m = t.match(/Conductores:\s*(\d+)\./))) drivers = parseInt(m[1], 10);
+    const vehicles = mv[1].split(/;\s*(?=Vehículo \d+)/).map(seg => {
+      const k = seg.match(/^Vehículo\s+\d+(?:\s*\(([^)]*)\))?(?:\s*\(nuevo\))?\s*—\s*(.*)$/);
+      if(!k) return null;
+      const desc = (k[1] && !/^nuevo$/i.test(k[1].trim())) ? k[1].trim() : '';
+      return { desc, vin: '', coverages: k[2].split(/,\s*(?![^()]*\))/).map(x => x.trim()).filter(Boolean) };
+    }).filter(Boolean);
+    if(!vehicles.length && drivers == null) return null;
+    return { drivers, driver_names: names, vehicles };
+  }
+  async function loadPolicyTxPeople(clientId){
+    policyTxPeople = {};
+    try{
+      const { data } = await sb.from('client_transactions').select('policy_id, notes, created_at').eq('client_id', clientId).eq('transaction_type', 'nueva_poliza').is('deleted_at', null).order('created_at', { ascending: true });
+      (data || []).forEach(t => { if(t.policy_id && !policyTxPeople[t.policy_id]){ const pp = parsePeopleFromNotes(t.notes); if(pp) policyTxPeople[t.policy_id] = pp; } });
+    }catch(e){ /* sin esto igual se ven los vehículos amarrados a la póliza */ }
+  }
+  const isAutoPolicyType = (t) => AUTO_POLICY_TYPES.includes(t) || /auto|moto/i.test(String(t || ''));
   function policyPeopleView(p){
-    const snap = (p && p.people && typeof p.people === 'object') ? p.people : null;
+    const snap = (p && p.people && typeof p.people === 'object') ? p.people : (policyTxPeople[p.id] || null);
     const all = (allClientVehicles || []).filter(v => v.policy_id === p.id);
     const removedVins = new Set(all.filter(v => v.status === 'removed' && v.vin).map(v => v.vin));
     const list = [], seen = new Set();
