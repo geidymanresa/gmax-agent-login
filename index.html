@@ -4897,6 +4897,7 @@ body.role-support .mc-tab-btn[data-mctab="documentos"], body.role-support .mc-ta
       document.getElementById('sign-doc-title').textContent = data.document_title || 'Documento';
       document.getElementById('sign-doc-html').innerHTML = data.document_html || '';
       initSignaturePad();
+      smsSignOffer(token);   // casilla opcional de textos (solo en «Recibo de pago» y si el cliente aún no dio permiso)
     } catch(err){
       document.getElementById('sign-loading').style.display = 'none';
       document.getElementById('sign-error').style.display = 'block';
@@ -5017,6 +5018,7 @@ body.role-support .mc-tab-btn[data-mctab="documentos"], body.role-support .mc-ta
         showMsg('sign-msg','error', data.error || 'No se pudo guardar la firma.');
         return;
       }
+      smsSignRecord(token);   // si marcó la casilla de textos, se guarda el permiso ya con el recibo firmado
       document.getElementById('sign-content').style.display = 'none';
       // Vuelve a pedir el documento — ya viene marcado como firmado, con el
       // contenido completo y la firma, listo para ver/descargar. La bandera le
