@@ -2713,13 +2713,15 @@ body.role-support .mc-tab-btn[data-mctab="documentos"], body.role-support .mc-ta
             <div class="msg" id="sms-msg"></div>
             <div id="sms-actions" style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;"></div>
             <div id="sms-panel" style="display:none;"></div>
-            <h5 style="margin:16px 0 6px;">Mensajes</h5>
-            <div class="dash-table-wrap">
-              <table class="dash-table">
-                <thead><tr><th>Fecha</th><th></th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
-                <tbody id="sms-log"><tr><td colspan="5">—</td></tr></tbody>
-              </table>
-            </div>
+            <details id="sms-log-details" style="margin:14px 0 4px;">
+              <summary id="sms-log-summary" style="cursor:pointer; font-weight:700; font-size:14px;">Mensajes</summary>
+              <div class="dash-table-wrap" style="margin-top:8px;">
+                <table class="dash-table">
+                  <thead><tr><th>Fecha</th><th></th><th>Tipo</th><th>Mensaje</th><th>Estado</th></tr></thead>
+                  <tbody id="sms-log"><tr><td colspan="5">—</td></tr></tbody>
+                </table>
+              </div>
+            </details>
             <details style="margin-top:12px;"><summary style="cursor:pointer; font-size:13px; color:#5B6478;">Historial del permiso (quién lo dio y cómo)</summary>
               <div class="dash-table-wrap" style="margin-top:8px;"><table class="dash-table"><thead><tr><th>Fecha</th><th>Qué pasó</th><th>Cómo</th><th>Detalle</th></tr></thead><tbody id="sms-consent-log"><tr><td colspan="4">—</td></tr></tbody></table></div>
             </details>
@@ -18943,7 +18945,7 @@ async function smsLoadClientCard(clientId){
   if(err){
     const missing = /does not exist|schema cache|42P01|PGRST205/i.test(String(err.message || err.code || ''));
     document.getElementById('sms-badge').textContent = '—'; document.getElementById('sms-status-line').textContent = '';
-    document.getElementById('sms-actions').innerHTML = ''; document.getElementById('sms-log').innerHTML = '<tr><td colspan="5">—</td></tr>'; document.getElementById('sms-consent-log').innerHTML = '<tr><td colspan="4">—</td></tr>';
+    document.getElementById('sms-actions').innerHTML = ''; document.getElementById('sms-log').innerHTML = '<tr><td colspan="5">—</td></tr>'; { const se = document.getElementById('sms-log-summary'); if(se) se.textContent = 'Mensajes'; } document.getElementById('sms-consent-log').innerHTML = '<tr><td colspan="4">—</td></tr>';
     smsMsg('error', missing ? 'Falta correr las migraciones de SMS en Supabase (migracion_sms_consentimiento.sql y migracion_sms_2_enlace_y_mensajes.sql).' : 'No se pudo cargar esta sección: ' + (err.message || err));
     return;
   }
@@ -18978,6 +18980,13 @@ function smsRender(events, msgs){
 
   document.getElementById('sms-log').innerHTML = msgs.length ? msgs.map(m => '<tr><td>' + smsEsc(smsFmtTime(m.sent_at || m.created_at)) + '</td><td>' + (m.direction === 'in' ? '⬇ Recibido' : '⬆ Enviado') + '</td><td>' + smsEsc(SMS_KIND_LABEL[m.kind] || m.kind) + '</td><td style="max-width:420px; white-space:pre-wrap;">' + smsEsc(m.body) + '</td><td>' + smsEsc(SMS_STATUS_LABEL[m.status] || m.status) + (m.error ? '<br><span style="color:#9B2222; font-size:12px;">' + smsEsc(m.error) + '</span>' : '') + '</td></tr>').join('')
     : '<tr><td colspan="5">Aún no se ha enviado ni recibido ningún mensaje de este cliente.</td></tr>';
+  { // El detalle va recogido: en el título solo se ve cuántos hay y cuántos esperan el visto bueno.
+    const sumEl = document.getElementById('sms-log-summary');
+    if(sumEl){
+      const pend = msgs.filter(m => m.status === 'pending_approval').length;
+      sumEl.textContent = 'Mensajes (' + msgs.length + ')' + (pend ? ' · Por aprobar: ' + pend : '');
+    }
+  }
   document.getElementById('sms-consent-log').innerHTML = events.length ? events.map(e => '<tr><td>' + smsEsc(smsFmtTime(e.created_at)) + '</td><td>' + (e.event === 'opt_in' ? '✅ Dio permiso' : '⛔ Canceló') + '</td><td>' + smsEsc(SMS_SOURCE_LABEL[e.source] || e.source) + '</td><td style="max-width:360px;">' + smsEsc(e.note || e.consent_version || '') + '</td></tr>').join('')
     : '<tr><td colspan="4">Sin registros.</td></tr>';
 }
